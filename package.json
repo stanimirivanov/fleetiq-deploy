@@ -1,0 +1,24 @@
+{
+  "name": "fleetiq-deploy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.5.1",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "check": "node tools/verify.mjs structural",
+    "verify": "node tools/verify.mjs",
+    "test": "node --test tools/tests/*.test.mjs",
+    "format": "biome format --write .",
+    "style": "biome ci .",
+    "local": "node tools/local.mjs",
+    "qualify": "node tools/verify.mjs docker",
+    "secrets:install": "node tools/install-gitleaks.mjs"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "yaml": "2.9.1"
+  }
+}

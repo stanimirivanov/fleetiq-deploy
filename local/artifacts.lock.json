@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "sources": {
+    "platform": {
+      "repository": "https://github.com/stanimirivanov/fleetiq-platform.git",
+      "commit": "66cc8a8f15457707197e274c90228538487ef810"
+    },
+    "ux": {
+      "repository": "https://github.com/stanimirivanov/fleetiq-ux.git",
+      "commit": "a1ebe3bcb22781cc70ac00f8ed0e2fb396537dbe"
+    }
+  },
+  "images": {
+    "rust": "rust:1.98.1-slim-bookworm@sha256:ff521445a372125ed4f76e1453a1f8098f2d05332d1601d30db1c1f62757e730",
+    "runtime": "debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587",
+    "node": "node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d",
+    "edge": "caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f",
+    "postgres": "postgres:18.6-alpine3.23@sha256:885cf05d376c7cf27afef02073e6bdac3841252537f16e244fd1c1e6a7c99fb1"
+  },
+  "tools": {
+    "node": "24.18.0",
+    "pnpm": "12.5.1",
+    "compose": "5.5.1"
+  }
+}

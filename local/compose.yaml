@@ -1,0 +1,94 @@
+# Only edge publishes a host port. Secrets are mounted files, never Compose values.
+x-labels: &labels
+  com.fleetiq.deploy.owner: ${FLEETIQ_OWNER:?Run pnpm local init first}
+x-restrictions: &restricted
+  labels: *labels
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+  stop_grace_period: 15s
+services:
+  postgres:
+    image: ${FLEETIQ_POSTGRES_IMAGE:?Missing pinned PostgreSQL image}
+    labels: *labels
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    environment:
+      POSTGRES_DB: fleetiq
+      POSTGRES_USER: fleetiq
+      POSTGRES_PASSWORD_FILE: /run/secrets/database_password
+    secrets: [database_password]
+    volumes: [database:/var/lib/postgresql]
+    networks: [database]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U fleetiq -d fleetiq"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    mem_limit: 512m
+  backend:
+    <<: *restricted
+    image: ${FLEETIQ_BACKEND_IMAGE:?Build the reviewed backend image}
+    pull_policy: never
+    user: "10001:10001"
+    environment:
+      FLEETIQ_BIND_ADDRESS: 0.0.0.0:8080
+      FLEETIQ_BROWSER_ORIGIN: ${FLEETIQ_BROWSER_ORIGIN:?Missing browser origin}
+      FLEETIQ_OIDC_ISSUER: ${FLEETIQ_OIDC_ISSUER:?Missing OIDC issuer}
+      FLEETIQ_OIDC_CLIENT_ID: ${FLEETIQ_OIDC_CLIENT_ID:?Missing OIDC client}
+      FLEETIQ_OIDC_IDENTITY_AUTHORITY: ${FLEETIQ_OIDC_IDENTITY_AUTHORITY:?Missing identity authority}
+    secrets: [database_password, oidc_client_secret]
+    volumes:
+      - ./backend-entrypoint.sh:/opt/fleetiq/backend-entrypoint.sh:ro
+      - ./healthcheck.sh:/opt/fleetiq/healthcheck.sh:ro
+    tmpfs: ["/tmp:size=16m,mode=1777,noexec,nosuid"]
+    networks: [application, database]
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, /bin/bash, /opt/fleetiq/healthcheck.sh]
+      interval: 3s
+      timeout: 3s
+      start_period: 10s
+      retries: 40
+    mem_limit: 512m
+    pids_limit: 128
+  edge:
+    <<: *restricted
+    image: ${FLEETIQ_EDGE_IMAGE:?Build the production UX image}
+    pull_policy: never
+    user: "10001:10001"
+    ports:
+      - target: 8443
+        published: "${FLEETIQ_HTTPS_PORT:?Missing HTTPS port}"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - certificates:/data
+    tmpfs:
+      - "/tmp:size=16m,mode=1777,noexec,nosuid"
+      - "/config:size=1m,uid=10001,gid=10001,mode=0700,noexec,nosuid"
+    networks: [application]
+    depends_on:
+      backend: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8081/ready"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    mem_limit: 256m
+    pids_limit: 128
+secrets:
+  database_password:
+    file: ${FLEETIQ_DATABASE_PASSWORD_FILE:?Missing password file}
+  oidc_client_secret:
+    file: ${FLEETIQ_OIDC_SECRET_FILE:?Missing OIDC secret file}
+volumes:
+  database: {labels: *labels}
+  certificates: {labels: *labels}
+networks:
+  application: {labels: *labels}
+  database: {internal: true, labels: *labels}

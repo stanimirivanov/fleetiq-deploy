@@ -1,0 +1,19 @@
+# Short-lived, synthetic proxy contract probe; not an identity provider.
+services:
+  edge:
+    environment:
+      FLEETIQ_API_UPSTREAM: proxy-probe:8080
+  proxy-probe:
+    image: ${FLEETIQ_NODE_IMAGE:?Missing pinned probe image}
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    labels:
+      com.fleetiq.deploy.owner: ${FLEETIQ_OWNER}
+    command: [node, /probe.mjs]
+    volumes:
+      - ./qualification/probe.mjs:/probe.mjs:ro
+    networks: [application]
+    mem_limit: 128m
+    pids_limit: 64

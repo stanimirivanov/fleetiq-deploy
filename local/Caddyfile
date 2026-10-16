@@ -1,0 +1,33 @@
+{
+  admin off
+  persist_config off
+  auto_https disable_redirects
+  skip_install_trust
+}
+http://:8081 {
+  bind 127.0.0.1
+  respond /ready 200
+}
+https://localhost:8443 {
+  tls internal
+  header {
+    X-Content-Type-Options nosniff
+    Referrer-Policy same-origin
+    -Server
+  }
+  @backend path /api /api/* /health/*
+  handle @backend {
+    header >Cache-Control "no-store"
+    reverse_proxy {$FLEETIQ_API_UPSTREAM:backend:8080}
+  }
+  handle /assets/* {
+    root * /srv
+    file_server
+  }
+  handle {
+    root * /srv
+    header Cache-Control "no-cache"
+    try_files {path} /index.html
+    file_server
+  }
+}

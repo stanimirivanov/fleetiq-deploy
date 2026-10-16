@@ -1,0 +1,102 @@
+import assert from 'node:assert/strict';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { parse } from 'yaml';
+import { verifyWorkflow } from './ci.mjs';
+import { lock, sourceCompose, validateLock } from './policy.mjs';
+import { root, run } from './process.mjs';
+
+export function structure() {
+  validateLock();
+  verifyWorkflow();
+  const packageFile = JSON.parse(readFileSync(resolve(root, 'package.json')));
+  assert.equal(packageFile.packageManager, `pnpm@${lock.tools.pnpm}`);
+  const compose = sourceCompose();
+  assert.deepEqual(Object.keys(compose.services).sort(), [
+    'backend',
+    'edge',
+    'postgres',
+  ]);
+  assert(!compose.services.backend.ports && !compose.services.postgres.ports);
+  assert.equal(compose.services.edge.ports[0].host_ip, '127.0.0.1');
+  assert.equal(compose.networks.database.internal, true);
+  const caddy = readFileSync(resolve(root, 'local/Caddyfile'), 'utf8');
+  for (const rule of [
+    'admin off',
+    'tls internal',
+    'header >Cache-Control "no-store"',
+    '@backend path /api /api/* /health/*',
+    'handle /assets/*',
+    'try_files {path} /index.html',
+  ])
+    assert(caddy.includes(rule), 'Required edge policy changed');
+  assert(
+    !/header_up\s+(?:Host|Origin|Cookie)|header_down\s+(?:Set-Cookie)|tls_insecure_skip_verify/u.test(
+      caddy,
+    ),
+  );
+  for (const file of [
+    'local/images/backend.Dockerfile',
+    'local/images/edge.Dockerfile',
+  ])
+    assert(
+      !/FROM\s+[^$\s]/u.test(readFileSync(resolve(root, file), 'utf8')),
+      'Image bases must come from the reviewed artifact lock',
+    );
+  const workflow = parse(
+    readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8'),
+  );
+  assert.deepEqual(Object.keys(workflow.on), ['pull_request']);
+  assert.deepEqual(workflow.permissions, { contents: 'read' });
+  assert.deepEqual(Object.keys(workflow.jobs).sort(), ['docker', 'structural']);
+  const expectedActions = {
+    'actions/checkout': '3d3c42e5aac5ba805825da76410c181273ba90b1',
+    'actions/setup-node': '949feb2413d6458794dcd2491c4babbbce0c15c1',
+    'actions/upload-artifact': 'cf430e030ddbb5b0abf93d22962f4752f3646cd9',
+  };
+  for (const [name, job] of Object.entries(workflow.jobs)) {
+    const steps = job.steps;
+    for (const step of steps) {
+      assert(!step['continue-on-error']);
+      if (step.uses) {
+        const [action, commit] = step.uses.split('@');
+        assert.equal(commit, expectedActions[action], 'Unreviewed CI action');
+      }
+    }
+    const commands = steps.map((step) => step.run ?? '').join('\n');
+    assert(commands.includes('pnpm install --frozen-lockfile'));
+    assert(commands.includes('pnpm secrets:install'));
+    assert(commands.includes(name === 'docker' ? 'pnpm qualify' : 'pnpm check'));
+  }
+  assert(
+    readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8').includes(
+      'secrets.FLEETIQ_SOURCE_READ_TOKEN',
+    ),
+  );
+  const tracked = run('git', [
+    'ls-files',
+    '--cached',
+    '--others',
+    '--exclude-standard',
+    '-z',
+  ])
+    .split('\0')
+    .filter(Boolean);
+  for (const file of tracked) {
+    assert(
+      !/(?:^|\/)(?:\.local|\.env)(?:\/|$)/u.test(file),
+      'Private configuration must not enter Git',
+    );
+    if (!file.endsWith('.md') || !existsSync(resolve(root, file))) continue;
+    const bytes = readFileSync(resolve(root, file), 'utf8');
+    if (bytes.split('\n').length > 100)
+      assert(bytes.slice(0, 500).includes('TL;DR'), 'Long guides require a TL;DR');
+    for (const match of bytes.matchAll(/\]\(([^)#]+)(?:#[^)]*)?\)/gu)) {
+      if (/^(?:https?:|mailto:)/u.test(match[1])) continue;
+      assert(
+        existsSync(resolve(root, file, '..', match[1])),
+        `Broken documentation link: ${file}`,
+      );
+    }
+  }
+}

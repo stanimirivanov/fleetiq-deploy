@@ -1,0 +1,9 @@
+node_modules/
+.local/
+.verification/
+target/
+.idea/
+*.log
+.env
+.env.*
+!.env.example
