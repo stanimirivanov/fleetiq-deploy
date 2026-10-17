@@ -1,9 +1,22 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { gitFailureCategory } from './git-diagnostics.mjs';
 import { pnpmLaunchers } from './pnpm-launchers.mjs';
 
 export const root = fileURLToPath(new URL('../', import.meta.url));
+/** Safe metadata only: process output and credentials are never retained in errors. */
+export class CommandFailure extends Error {
+  constructor(phase, result, category) {
+    const outcome =
+      result.error?.code ?? result.signal ?? result.status ?? 'unavailable';
+    super(`Command failed: ${phase} (${outcome}; ${category})`);
+    this.name = 'CommandFailure';
+    this.category = category;
+    this.exitCode = result.status;
+  }
+}
+
 export function run(program, args, options = {}) {
   const result = spawnSync(program, args, {
     cwd: root,
@@ -19,10 +32,14 @@ export function run(program, args, options = {}) {
     const phase =
       program === 'docker'
         ? `docker/${args.find((argument) => ['up', 'down', 'run', 'exec', 'inspect', 'config', 'info', 'ps', 'ls', 'cp', 'version', 'show', 'build'].includes(argument)) ?? 'preflight'}`
-        : `${program} ${args[0] ?? ''}`;
-    const outcome =
-      result.error?.code ?? result.signal ?? result.status ?? 'unavailable';
-    throw new Error(`Command failed: ${phase} (${outcome})`);
+        : program === 'git'
+          ? `git ${args.find((argument) => ['clone', 'fetch', 'checkout', 'remote', 'status', 'rev-parse', 'ls-files', 'init', 'config', 'add', 'commit', 'merge-base', 'archive', 'log'].includes(argument)) ?? 'operation'}`
+          : `${program} ${args[0] ?? ''}`;
+    const category =
+      program === 'git'
+        ? gitFailureCategory(result.stderr, result.error?.code)
+        : 'command-failed';
+    throw new CommandFailure(phase, result, category);
   }
   return result.stdout?.trim() ?? '';
 }

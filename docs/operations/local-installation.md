@@ -128,3 +128,30 @@ explicitly unconfigured and its synthetic proxy test is not a sign-in test.
 Only its own containers, networks and volumes are removed. Metadata stays in
 `.verification/`; private configuration, source checkouts and caches are not
 uploaded as CI artifacts.
+
+## Source-fetch diagnostics
+
+CI uses `FLEETIQ_SOURCE_READ_TOKEN` for the locked private source repositories.
+The secret must permit Contents:read on both `fleetiq-platform` and
+`fleetiq-ux`. A configured secret name alone does not prove access. Check its
+expiration and any organization authorization privately; never paste its value.
+
+Source fetching reports the source key, clone/fetch operation, exit status and
+a fixed failure category. It does not print raw Git/credential-helper stderr,
+URLs with credentials, tokens or environment contents. Categories are diagnostic
+hints rather than proof of the underlying cause: private GitHub repositories
+can return not found when permissions are insufficient.
+
+- `repository-access-unavailable` / `authentication-failed`: check the source
+  selection and token's repository access/validity; do not substitute a deploy
+  repository-only job token or weaken repository validation.
+- `revision-unavailable`: verify the exact locked commit is reachable. Do not
+  replace the pin with a branch to make CI pass.
+- `network-or-timeout` / `tls-trust-failed`: check runner networking and
+  approved trust configuration; never disable TLS verification.
+- `tool-unavailable` / `command-failed`: inspect runner prerequisites
+  privately. Unknown output stays suppressed rather than being treated as safe.
+
+Fresh `--no-checkout` clones are populated only at the reviewed commit before
+cleanliness is checked. Existing dirty or foreign clones are refused; do not
+reset them as an automatic retry. This preserves local edits and source identity.

@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { sourceFailureGuidance } from './git-diagnostics.mjs';
 import { digest, lock, ownedPath, validateLock } from './policy.mjs';
-import { root, run } from './process.mjs';
+import { CommandFailure, root, run } from './process.mjs';
 
 function sourceCache() {
   const local = resolve(root, '.local');
@@ -32,38 +33,70 @@ export function prepareSources() {
       'Configure repository secret FLEETIQ_SOURCE_READ_TOKEN with platform contents:read access.',
     );
   const cache = sourceCache();
-  for (const [name, pin] of Object.entries(lock.sources)) {
-    const path = resolve(cache, name);
-    if (existsSync(path)) validateSourceDirectory(cache, path);
-    const auth = process.env.GH_TOKEN
-      ? ['-c', 'credential.helper=', '-c', 'credential.helper=!gh auth git-credential']
-      : [];
-    if (!existsSync(path))
-      run(
-        'git',
-        [...auth, 'clone', '--no-checkout', '--filter=blob:none', pin.repository, path],
-        { timeout: 300_000 },
-      );
-    validateSourceDirectory(cache, path);
-    checkOrigin(path, pin);
+  const auth = process.env.GH_TOKEN
+    ? ['-c', 'credential.helper=', '-c', 'credential.helper=!gh auth git-credential']
+    : [];
+  for (const [name, pin] of Object.entries(lock.sources))
+    materializeSource(cache, name, pin, auth);
+}
+function sourceCommand(name, operation, args, options) {
+  console.log(`Source ${name}: ${operation} reviewed repository`);
+  try {
+    return run('git', args, options);
+  } catch (error) {
+    const category =
+      error instanceof CommandFailure ? error.category : 'command-failed';
+    const exit = error instanceof CommandFailure ? error.exitCode : null;
+    throw new Error(
+      `Source ${name}: ${operation} failed (${category}; exit ${exit ?? 'unavailable'}). ${sourceFailureGuidance[category]}`,
+    );
+  }
+}
+/** Materialize one already validated source selection; preserve dirty existing clones. */
+export function materializeSource(cache, name, pin, auth = []) {
+  assert(['platform', 'ux'].includes(name), 'Unknown source identity');
+  const path = resolve(cache, name);
+  const fresh = !existsSync(path);
+  if (!fresh) validateSourceDirectory(cache, path);
+  if (fresh)
+    sourceCommand(
+      name,
+      'clone',
+      [...auth, 'clone', '--no-checkout', '--filter=blob:none', pin.repository, path],
+      { timeout: 300_000 },
+    );
+  validateSourceDirectory(cache, path);
+  checkOrigin(path, pin);
+  // --no-checkout deliberately has no populated index. Only existing clones
+  // have a worktree whose cleanliness must be proven before changing HEAD.
+  if (!fresh)
     assert(
       run('git', ['-C', path, 'status', '--porcelain']) === '',
       'Source checkout has local changes',
     );
-    run('git', [...auth, '-C', path, 'fetch', '--depth', '1', 'origin', pin.commit], {
+  sourceCommand(
+    name,
+    'fetch',
+    [...auth, '-C', path, 'fetch', '--depth', '1', 'origin', pin.commit],
+    {
       timeout: 300_000,
-    });
-    run('git', ['-C', path, 'checkout', '--detach', pin.commit]);
-    assert(
-      run('git', ['-C', path, 'rev-parse', 'HEAD']) === pin.commit,
-      'Source commit differs from the reviewed pin',
-    );
-    assert(
-      !existsSync(resolve(path, '.gitmodules')),
-      'Submodules need a separate source review',
-    );
-  }
+    },
+  );
+  run('git', ['-C', path, 'checkout', '--detach', pin.commit]);
+  assert(
+    run('git', ['-C', path, 'rev-parse', 'HEAD']) === pin.commit,
+    'Source commit differs from the reviewed pin',
+  );
+  assert(
+    run('git', ['-C', path, 'status', '--porcelain']) === '',
+    'Reviewed checkout is not clean',
+  );
+  assert(
+    !existsSync(resolve(path, '.gitmodules')),
+    'Submodules need a separate source review',
+  );
 }
+
 export function validateSources() {
   validateLock();
   const cache = sourceCache();

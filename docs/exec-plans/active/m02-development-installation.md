@@ -27,3 +27,13 @@ CSRF, expiry/revocation and cross-tenant authorization using POM browser tests
 and a controlled HTTPS OIDC provider. Resolve trusted private-provider CA support
 with the backend first. Infrastructure-only identity mode and synthetic proxy
 probes do not fulfill those criteria.
+
+## Relationship to the Kubernetes delivery plan
+
+The merged [Kubernetes plan PR #4](https://github.com/stanimirivanov/fleetiq-deploy/pull/4)
+selects Helm/Kustomize, Argo CD and Argo Workflows for the long-term deployment
+path. This Compose slice remains a bounded development bridge and diagnostic
+foundation, not a production deployment or a parallel release system to expand.
+Finish its source access and existing qualification requirements independently;
+producer images and Kubernetes packages are delivered in the new D01-D14 slices.
+Do not rewrite this PR into that multi-PR program or remove a failing gate.
