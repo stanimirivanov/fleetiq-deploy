@@ -47,3 +47,33 @@ Do not describe infrastructure results as authenticated acceptance.
 Run behavioral fixtures with `pnpm test`. They include policy mutation tests;
 installation behavior is exercised against Docker by the docker group.
 Windows structural CI and Linux infrastructure CI use the same runner.
+
+## CI prerequisites and evidence recovery
+
+pnpm 12 installs a native executable. Its exact pinned global installation must
+run its own setup scripts. Bootstrap explicitly allows only `pnpm@12.5.1`
+with npm's strict script policy; do not add `--ignore-scripts` to that bootstrap
+command. Windows otherwise leaves an extensionless placeholder that can return
+without running a command. This does not enable lifecycle scripts for application
+dependencies. The shared adapter discovers native PATH/adjacent npm executables
+and JavaScript/Corepack entries without a shell; only an exact successful version
+probe qualifies a launcher. Broken or mismatched launchers fail closed.
+
+Each job finalizes metadata-only CI evidence even when dependency installation,
+source fetching or image building prevents the verifier from starting. A success
+requires both successful preceding steps and a complete group receipt for the
+current GitHub SHA, all inventoried checks passed, and equal source fingerprints.
+A shell step returning zero without running verification cannot pass this gate.
+The uploader explicitly includes hidden files for only `.verification/*.json`;
+missing artifacts remain errors. Never widen that path to private installation
+state, environment dumps or command logs.
+
+The installation job needs the owner-configured repository secret
+`FLEETIQ_SOURCE_READ_TOKEN` with contents:read on both locked source repositories.
+A missing secret is reported as an incomplete prerequisite, never skipped or
+replaced by the job token. See [installation](../operations/local-installation.md).
+
+GitHub Actions use reviewed major tags. Runtime tools, images and application
+source commits retain their exact version/digest pins. Change the authority in
+`tools/ci.mjs` and render it together with the workflow; mutation tests protect
+mandatory gates, major action versions and evidence collection.

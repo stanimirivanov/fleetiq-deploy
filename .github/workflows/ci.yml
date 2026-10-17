@@ -16,39 +16,45 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@v7
         with:
           node-version: 24.18.0
-      - run: npm install --global pnpm@12.5.1 --ignore-scripts
+      - run: npm install --global pnpm@12.5.1 --allow-scripts=pnpm@12.5.1 --strict-allow-scripts
       - run: pnpm install --frozen-lockfile
       - run: pnpm secrets:install
       - run: pnpm check
         env:
           FLEETIQ_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - name: Record job verification outcome
+        if: always()
+        run: node tools/ci-evidence.mjs structural
+        env:
+          FLEETIQ_CI_STATUS: ${{ job.status }}
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: structural-${{ matrix.os }}
           path: .verification/*.json
           if-no-files-found: error
+          include-hidden-files: true
           retention-days: 7
   docker:
     name: Real HTTPS installation
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@v7
         with:
           node-version: 24.18.0
-      - run: npm install --global pnpm@12.5.1 --ignore-scripts
+      - run: npm install --global pnpm@12.5.1 --allow-scripts=pnpm@12.5.1 --strict-allow-scripts
       - run: pnpm install --frozen-lockfile
       - run: pnpm secrets:install
       - name: Install checksum-verified Compose
@@ -61,10 +67,16 @@ jobs:
         run: pnpm local build
       - name: Qualify infrastructure (real browser sign-in is the next slice)
         run: pnpm qualify
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - name: Record job verification outcome
+        if: always()
+        run: node tools/ci-evidence.mjs docker
+        env:
+          FLEETIQ_CI_STATUS: ${{ job.status }}
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: docker-installation
           path: .verification/*.json
           if-no-files-found: error
+          include-hidden-files: true
           retention-days: 7

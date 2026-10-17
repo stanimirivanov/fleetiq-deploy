@@ -172,11 +172,19 @@ test('rendered Compose sensor rejects exposure, privilege, auth-mode and ownersh
   assert.throws(() => composePolicy(model(), true));
   assert.throws(() => composePolicy(model(true)));
 });
-test('CI parity covers omitted checks, conditional skips, weakened permissions and mutable actions', () => {
+test('CI parity covers omitted checks, conditional skips, weakened permissions and unreviewed action versions', () => {
   verifyWorkflow();
   verifyWorkflow(expectedWorkflow.replaceAll('\n', '\r\n'));
   for (const replacement of [
     ['pnpm check', 'echo skipped'],
+    ['actions/checkout@v7', `actions/checkout@${'a'.repeat(40)}`],
+    ['actions/setup-node@v7', 'actions/setup-node@v8'],
+    ['include-hidden-files: true', 'include-hidden-files: false'],
+    ['node tools/ci-evidence.mjs structural', 'echo evidence-skipped'],
+    [
+      'npm install --global pnpm@12.5.1',
+      'npm install --global pnpm@12.5.1 --ignore-scripts',
+    ],
     ['contents: read', 'contents: write'],
     ['on:\n  pull_request:', 'on:\n  push:'],
     ['pnpm qualify', 'pnpm test'],

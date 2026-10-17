@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, realpathSync } from 'node:fs';
-import { delimiter, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { pnpmLaunchers } from './pnpm-launchers.mjs';
 
 export const root = fileURLToPath(new URL('../', import.meta.url));
 export function run(program, args, options = {}) {
@@ -26,27 +26,31 @@ export function run(program, args, options = {}) {
   }
   return result.stdout?.trim() ?? '';
 }
-export function pnpm(args, options) {
-  // Invoke the actual JavaScript CLI, avoiding cmd.exe/PowerShell and .cmd
-  // launching differences. pnpm 12 does not always provide npm_execpath.
-  const candidates = [process.env.npm_execpath];
-  for (const directory of (process.env.PATH ?? process.env.Path ?? '').split(
-    delimiter,
-  )) {
-    for (const file of [
-      'node_modules/pnpm/bin/pnpm.mjs',
-      'node_modules/pnpm/bin/pnpm.cjs',
-      'node_modules/corepack/dist/pnpm.js',
-    ])
-      candidates.push(resolve(directory, file));
-    const command = resolve(directory, 'pnpm');
-    if (existsSync(command)) candidates.push(realpathSync(command));
-  }
-  const executable = candidates.find(
-    (path) =>
-      ['pnpm.cjs', 'pnpm.mjs', 'pnpm.js'].some((name) => path?.endsWith(name)) &&
-      existsSync(path),
+/** Select only a launcher that actually reports the repository's exact pnpm pin. */
+export function pinnedPnpm({ environment = process.env, execute = run } = {}) {
+  const manifest = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url)),
   );
-  if (!executable) throw new Error('The pinned pnpm JavaScript CLI is unavailable.');
-  return run(process.execPath, [executable, ...args], options);
+  const expected = /^pnpm@(\d+\.\d+\.\d+)$/u.exec(manifest.packageManager)?.[1];
+  if (!expected) throw new Error('Invalid pnpm version pin');
+  for (const launcher of pnpmLaunchers(root, { environment })) {
+    try {
+      if (
+        execute(launcher.command, [...launcher.args, '--version'], {
+          env: environment,
+          timeout: 30_000,
+        }) === expected
+      )
+        return launcher;
+    } catch {
+      // An unavailable, incompatible or broken launcher cannot qualify.
+    }
+  }
+  throw new Error(
+    'The pinned pnpm executable is unavailable; install the exact package including its native-executable setup.',
+  );
+}
+export function pnpm(args, options) {
+  const launcher = pinnedPnpm();
+  return run(launcher.command, [...launcher.args, ...args], options);
 }

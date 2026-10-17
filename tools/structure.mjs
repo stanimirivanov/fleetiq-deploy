@@ -50,17 +50,17 @@ export function structure() {
   assert.deepEqual(workflow.permissions, { contents: 'read' });
   assert.deepEqual(Object.keys(workflow.jobs).sort(), ['docker', 'structural']);
   const expectedActions = {
-    'actions/checkout': '3d3c42e5aac5ba805825da76410c181273ba90b1',
-    'actions/setup-node': '949feb2413d6458794dcd2491c4babbbce0c15c1',
-    'actions/upload-artifact': 'cf430e030ddbb5b0abf93d22962f4752f3646cd9',
+    'actions/checkout': 'v7',
+    'actions/setup-node': 'v7',
+    'actions/upload-artifact': 'v7',
   };
   for (const [name, job] of Object.entries(workflow.jobs)) {
     const steps = job.steps;
     for (const step of steps) {
       assert(!step['continue-on-error']);
       if (step.uses) {
-        const [action, commit] = step.uses.split('@');
-        assert.equal(commit, expectedActions[action], 'Unreviewed CI action');
+        const [action, version] = step.uses.split('@');
+        assert.equal(version, expectedActions[action], 'Unreviewed CI action');
       }
     }
     const commands = steps.map((step) => step.run ?? '').join('\n');

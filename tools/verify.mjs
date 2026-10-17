@@ -6,29 +6,11 @@ import { pnpm, root, run } from './process.mjs';
 import { qualify } from './qualify.mjs';
 import { checkSecrets } from './secrets.mjs';
 import { structure } from './structure.mjs';
+import { catalogue } from './verification-catalogue.mjs';
 
 const group = process.argv[2] ?? 'structural';
 const base = process.env.FLEETIQ_BASE_SHA || undefined;
-const catalogue = {
-  structural: [
-    'toolchain',
-    'harness-tests',
-    'style',
-    'policy',
-    'secrets',
-    'dependencies',
-  ],
-  docker: ['toolchain', 'policy', 'installation'],
-  acceptance: [
-    'toolchain',
-    'harness-tests',
-    'style',
-    'policy',
-    'secrets',
-    'dependencies',
-    'installation',
-  ],
-};
+
 const evidence = {
   schemaVersion: 1,
   group,

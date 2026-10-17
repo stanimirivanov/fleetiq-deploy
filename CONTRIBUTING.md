@@ -29,8 +29,11 @@ adversarial fixtures and the limits of repository-owned checks.
 
 Changes to image/source/tool pins, CI authority, secret handling and qualification
 assertions require explicit review in the issue and PR. Resolve pins from official
-release registries; do not accept mutable tags or update a checksum merely to
+release registries; do not accept mutable image/source/tool tags or update a checksum merely to
 satisfy a failed download. Dependency updates run the same gates.
+GitHub Actions use reviewed major-version tags (for example, `actions/checkout@v7`),
+as requested for this repository; the CI authority rejects hashes, patch tags
+and unreviewed major versions.
 
 Keep runtime configuration out of tracked files. Use argument arrays and
 `shell: false`; handle credentials through private files or child environments.
