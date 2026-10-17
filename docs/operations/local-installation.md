@@ -132,8 +132,9 @@ uploaded as CI artifacts.
 ## Source-fetch diagnostics
 
 CI uses `FLEETIQ_SOURCE_READ_TOKEN` for the locked private source repositories.
-The secret must permit Contents:read on both `fleetiq-platform` and
-`fleetiq-ux`. A configured secret name alone does not prove access. Check its
+Use a fine-grained personal access token with Contents:read and automatic
+Metadata:read for both selected repositories, `fleetiq-platform` and `fleetiq-ux`.
+No write permission or classic token is required. A configured secret name alone does not prove access. Check its
 expiration and any organization authorization privately; never paste its value.
 
 Source fetching reports the source key, clone/fetch operation, exit status and
@@ -155,3 +156,11 @@ can return not found when permissions are insufficient.
 Fresh `--no-checkout` clones are populated only at the reviewed commit before
 cleanliness is checked. Existing dirty or foreign clones are refused; do not
 reset them as an automatic retry. This preserves local edits and source identity.
+
+A blobless clone can download promised file objects during checkout, after the
+explicit clone and fetch succeed. All three operations therefore receive the
+same per-command credential helper; it is not written into Git configuration.
+A checkout authentication failure after successful clone/fetch is not a reason
+to broaden token permissions. The regression fixture serves a real authenticated
+partial clone over loopback HTTP and proves both the missing-helper rejection
+and successful checkout with the helper. It uses synthetic credentials only.

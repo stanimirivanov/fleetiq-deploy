@@ -82,7 +82,16 @@ export function materializeSource(cache, name, pin, auth = []) {
       timeout: 300_000,
     },
   );
-  run('git', ['-C', path, 'checkout', '--detach', pin.commit]);
+  // A blobless clone can fetch file objects during checkout. The helper must
+  // remain scoped to this operation as well; never persist it in clone config.
+  sourceCommand(name, 'checkout', [
+    ...auth,
+    '-C',
+    path,
+    'checkout',
+    '--detach',
+    pin.commit,
+  ]);
   assert(
     run('git', ['-C', path, 'rev-parse', 'HEAD']) === pin.commit,
     'Source commit differs from the reviewed pin',
