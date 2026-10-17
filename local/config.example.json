@@ -1,0 +1,8 @@
+{
+  "httpsPort": 58443,
+  "oidc": {
+    "issuer": "https://identity.example.invalid/realms/fleetiq",
+    "clientId": "fleetiq-local",
+    "authority": "development-oidc"
+  }
+}

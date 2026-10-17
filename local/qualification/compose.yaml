@@ -1,0 +1,8 @@
+# Infrastructure qualification has no identity routes. Never use this override for normal up.
+services:
+  backend:
+    environment:
+      FLEETIQ_BROWSER_ORIGIN: !reset null
+      FLEETIQ_OIDC_ISSUER: !reset null
+      FLEETIQ_OIDC_CLIENT_ID: !reset null
+      FLEETIQ_OIDC_IDENTITY_AUTHORITY: !reset null

@@ -1,0 +1,82 @@
+name: Deployment verification
+on:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: deploy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  structural:
+    name: Harness (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.0
+      - run: npm install --global pnpm@12.5.1 --allow-scripts=pnpm@12.5.1 --strict-allow-scripts
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm secrets:install
+      - run: pnpm check
+        env:
+          FLEETIQ_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      - name: Record job verification outcome
+        if: always()
+        run: node tools/ci-evidence.mjs structural
+        env:
+          FLEETIQ_CI_STATUS: ${{ job.status }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: structural-${{ matrix.os }}
+          path: .verification/*.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+  docker:
+    name: Real HTTPS installation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.0
+      - run: npm install --global pnpm@12.5.1 --allow-scripts=pnpm@12.5.1 --strict-allow-scripts
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm secrets:install
+      - name: Install checksum-verified Compose
+        run: node tools/install-compose.mjs
+      - name: Fetch reviewed application sources
+        run: pnpm local sources
+        env:
+          GH_TOKEN: ${{ secrets.FLEETIQ_SOURCE_READ_TOKEN }}
+      - name: Build reviewed application sources (no source credential)
+        run: pnpm local build
+      - name: Qualify infrastructure (real browser sign-in is the next slice)
+        run: pnpm qualify
+      - name: Record job verification outcome
+        if: always()
+        run: node tools/ci-evidence.mjs docker
+        env:
+          FLEETIQ_CI_STATUS: ${{ job.status }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: docker-installation
+          path: .verification/*.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
