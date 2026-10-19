@@ -1,0 +1,157 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fleetiq.invalid/releases/common.json",
+  "$defs": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,95}$",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "time": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "image": {
+      "type": "string",
+      "pattern": "^ghcr\\.io/stanimirivanov/[a-z0-9/-]+@sha256:[a-f0-9]{64}$",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "revision"],
+      "properties": {
+        "repository": {
+          "enum": [
+            "stanimirivanov/fleetiq-platform",
+            "stanimirivanov/fleetiq-ux",
+            "stanimirivanov/fleetiq-deploy"
+          ]
+        },
+        "revision": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run", "attempt", "artifactDigest", "recordDigest"],
+      "properties": {
+        "run": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "artifactDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "recordDigest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "digest"],
+      "properties": {
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository", "revision"],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "revision": {
+              "$ref": "#/$defs/sha"
+            }
+          }
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "commit", "tree"],
+      "properties": {
+        "name": {
+          "enum": ["maintenance", "migration", "activation", "recovery"]
+        },
+        "commit": {
+          "$ref": "#/$defs/sha"
+        },
+        "tree": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "migration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "description", "checksum"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]{1,20}$",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "checksum": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{96}$",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "receiptRef": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/digest"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "description": "Closed shared vocabulary. Digests identify bytes; timestamps and review fields do not grant authority."
+}

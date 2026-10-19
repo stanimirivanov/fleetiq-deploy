@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fleetiq.invalid/releases/receipt.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "requestId",
+    "candidate",
+    "release",
+    "environment",
+    "clusterUid",
+    "previous",
+    "outcome",
+    "phase",
+    "revision",
+    "evidence",
+    "finished"
+  ],
+  "properties": {
+    "format": {
+      "const": "fleetiq-release-receipt.v1"
+    },
+    "requestId": {
+      "$ref": "common.json#/$defs/id"
+    },
+    "candidate": {
+      "$ref": "common.json#/$defs/digest"
+    },
+    "release": {
+      "$ref": "common.json#/$defs/digest"
+    },
+    "environment": {
+      "$ref": "common.json#/$defs/name"
+    },
+    "clusterUid": {
+      "$ref": "common.json#/$defs/id"
+    },
+    "previous": {
+      "$ref": "common.json#/$defs/receiptRef"
+    },
+    "outcome": {
+      "enum": ["succeeded", "failed", "recovery-required"]
+    },
+    "phase": {
+      "enum": ["maintenance", "migration", "activation", "recovery"]
+    },
+    "revision": {
+      "$ref": "common.json#/$defs/sha"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "common.json#/$defs/digest"
+      },
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true
+    },
+    "finished": {
+      "$ref": "common.json#/$defs/time"
+    }
+  },
+  "description": "Durable outcome, not an automatic rollback instruction. Recovery-required blocks subsequent release admission."
+}

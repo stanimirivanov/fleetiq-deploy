@@ -1,4 +1,5 @@
 name: Deployment verification
+run-name: FleetIQ PR ${{ github.event.pull_request.number }} from ${{ github.event.pull_request.head.sha }} to main at ${{ github.sha }}
 on:
   pull_request:
 permissions:
@@ -78,6 +79,38 @@ jobs:
         if: always()
         with:
           name: docker-installation
+          path: .verification/*.json
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7
+  packages:
+    name: Immutable OCI package round trip
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.18.0
+      - run: npm install --global pnpm@12.5.1 --allow-scripts=pnpm@12.5.1 --strict-allow-scripts
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm secrets:install
+      - run: pnpm manifests:install
+      - run: pnpm packages:check
+        env:
+          FLEETIQ_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      - name: Record job verification outcome
+        if: always()
+        run: node tools/ci-evidence.mjs packages
+        env:
+          FLEETIQ_CI_STATUS: ${{ job.status }}
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: packages
           path: .verification/*.json
           if-no-files-found: error
           include-hidden-files: true

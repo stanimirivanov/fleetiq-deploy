@@ -7,6 +7,8 @@
 - [Verification](development/verification.md): deterministic checks and evidence.
 - [Kubernetes packages](operations/kubernetes-packages.md): reusable charts,
   offline preview, credentials, networking and retention boundaries.
+- [Release packages](operations/release-packages.md): immutable OCI publication,
+  producer verification and separate candidate/promotion contracts.
 - [Kubernetes delivery plan](exec-plans/active/kubernetes-gitops-deployment.md): D01-D14 sequence and provider prerequisites.
 - [Active delivery plan](exec-plans/active/m02-development-installation.md):
   scope, remaining browser qualification and acceptance.

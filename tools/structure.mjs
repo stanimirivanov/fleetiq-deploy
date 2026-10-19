@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parse } from 'yaml';
-import { verifyWorkflow } from './ci.mjs';
+import { verifyPublicationWorkflow, verifyWorkflow } from './ci.mjs';
 import { lock, sourceCompose, validateLock } from './policy.mjs';
 import { root, run } from './process.mjs';
 
 export function structure() {
   validateLock();
   verifyWorkflow();
+  verifyPublicationWorkflow();
   const packageFile = JSON.parse(readFileSync(resolve(root, 'package.json')));
   assert.equal(packageFile.packageManager, `pnpm@${lock.tools.pnpm}`);
   assert.equal(
@@ -60,7 +61,11 @@ export function structure() {
   );
   assert.deepEqual(Object.keys(workflow.on), ['pull_request']);
   assert.deepEqual(workflow.permissions, { contents: 'read' });
-  assert.deepEqual(Object.keys(workflow.jobs).sort(), ['docker', 'structural']);
+  assert.deepEqual(Object.keys(workflow.jobs).sort(), [
+    'docker',
+    'packages',
+    'structural',
+  ]);
   const expectedActions = {
     'actions/checkout': 'v7',
     'actions/setup-node': 'v7',
@@ -78,7 +83,15 @@ export function structure() {
     const commands = steps.map((step) => step.run ?? '').join('\n');
     assert(commands.includes('pnpm install --frozen-lockfile'));
     assert(commands.includes('pnpm secrets:install'));
-    assert(commands.includes(name === 'docker' ? 'pnpm qualify' : 'pnpm check'));
+    assert(
+      commands.includes(
+        name === 'docker'
+          ? 'pnpm qualify'
+          : name === 'packages'
+            ? 'pnpm packages:check'
+            : 'pnpm check',
+      ),
+    );
     if (name === 'structural') assert(commands.includes('pnpm manifests:install'));
   }
   assert(

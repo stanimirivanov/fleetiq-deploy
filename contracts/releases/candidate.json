@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fleetiq.invalid/releases/candidate.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "release",
+    "releaseId",
+    "environment",
+    "clusterUid",
+    "expectedCurrent",
+    "phases",
+    "policy"
+  ],
+  "properties": {
+    "format": {
+      "const": "fleetiq-release-candidate.v1"
+    },
+    "release": {
+      "$ref": "common.json#/$defs/digest"
+    },
+    "releaseId": {
+      "$ref": "common.json#/$defs/id"
+    },
+    "environment": {
+      "$ref": "common.json#/$defs/name"
+    },
+    "clusterUid": {
+      "$ref": "common.json#/$defs/id"
+    },
+    "expectedCurrent": {
+      "$ref": "common.json#/$defs/receiptRef"
+    },
+    "phases": {
+      "type": "array",
+      "items": {
+        "$ref": "common.json#/$defs/phase"
+      },
+      "minItems": 1,
+      "maxItems": 4,
+      "uniqueItems": true
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "execution", "migration", "backup", "created", "expires"],
+      "properties": {
+        "mode": {
+          "enum": ["install", "upgrade"]
+        },
+        "execution": {
+          "enum": ["guided", "workflow"]
+        },
+        "migration": {
+          "enum": ["none", "forward-only"]
+        },
+        "backup": {
+          "enum": ["none", "required"],
+          "description": "Requirement only; the verified backup receipt is produced after drain and bound to execution evidence."
+        },
+        "created": {
+          "$ref": "common.json#/$defs/time"
+        },
+        "expires": {
+          "$ref": "common.json#/$defs/time"
+        }
+      }
+    }
+  },
+  "description": "A candidate has no activation authority. First installation still requires a separately observed empty-target proof."
+}

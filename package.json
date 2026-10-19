@@ -17,10 +17,15 @@
     "qualify": "node tools/verify.mjs docker",
     "secrets:install": "node tools/install-gitleaks.mjs",
     "manifests:install": "node tools/manifests/install.mjs",
-    "manifests:check": "node tools/verify.mjs manifests"
+    "manifests:check": "node tools/verify.mjs manifests",
+    "releases:check": "node tools/releases/cli.mjs contracts",
+    "releases:verify-artifacts": "node tools/releases/cli.mjs verify-artifacts",
+    "packages:check": "node tools/verify.mjs packages"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
-    "yaml": "2.9.1"
+    "ajv": "8.20.0",
+    "yaml": "2.9.1",
+    "yauzl": "3.4.0"
   }
 }

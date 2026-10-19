@@ -1,7 +1,7 @@
 # FleetIQ Kubernetes GitOps delivery plan
 
-Status: In progress; planning issue #3. D01-D03 merged; D04 is tracked in
-[issue #5](https://github.com/stanimirivanov/fleetiq-deploy/issues/5).
+Status: In progress; planning issue #3. D01-D04 merged; D05 is tracked in
+[issue #7](https://github.com/stanimirivanov/fleetiq-deploy/issues/7).
 
 ## TL;DR
 
