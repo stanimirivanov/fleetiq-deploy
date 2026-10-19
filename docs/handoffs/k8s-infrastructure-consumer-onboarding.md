@@ -2,6 +2,10 @@
 
 Status: Proposed request to the project that owns `k8s-infrastructure`.
 
+Refreshed for D06 on 2026-10-19: provider main is unchanged and qualification
+evidence is pending. See the [current assessment](../operations/d06-readiness.md)
+and [focused owning-project prompt](k8s-infrastructure-d06-unblock.md).
+
 ## TL;DR
 
 - Give the instructions below to the infrastructure-owning project.
