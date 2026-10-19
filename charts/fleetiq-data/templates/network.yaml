@@ -1,0 +1,49 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Values.clusterName }}-default-deny
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Values.clusterName }}-instances
+spec:
+  podSelector:
+    matchLabels: { cnpg.io/cluster: {{ .Values.clusterName | quote }} }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ .Values.network.runtimeNamespace | quote }} }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: {{ .Values.network.backendName | quote }} }
+      ports: [{ protocol: TCP, port: 5432 }]
+    - from:
+        - podSelector:
+            matchLabels: { cnpg.io/cluster: {{ .Values.clusterName | quote }} }
+      ports: [{ protocol: TCP, port: 5432 }, { protocol: TCP, port: 8000 }]
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ .Values.network.operatorNamespace | quote }} }
+          podSelector:
+            matchLabels: {{ toJson .Values.network.operatorPodLabels }}
+      ports: [{ protocol: TCP, port: 8000 }]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: { cnpg.io/cluster: {{ .Values.clusterName | quote }} }
+      ports: [{ protocol: TCP, port: 5432 }, { protocol: TCP, port: 8000 }]
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ .Values.network.dnsNamespace | quote }} }
+          podSelector:
+            matchLabels: {{ toJson .Values.network.dnsPodLabels }}
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+    - to:
+        - ipBlock: { cidr: {{ .Values.network.apiServerCidr | quote }} }
+      ports: [{ protocol: TCP, port: {{ .Values.network.apiServerPort }} }]

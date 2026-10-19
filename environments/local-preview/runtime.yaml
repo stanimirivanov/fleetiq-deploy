@@ -1,0 +1,21 @@
+# OFFLINE FIXTURES ONLY. These digests are synthetic, not published artifact selections.
+public: { host: fleet.local.test }
+gateway: { className: fixture-gateway, certificateSecret: fleet-tls }
+backend:
+  image: ghcr.io/stanimirivanov/fleetiq-platform@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  databaseSecret: { name: fleet-runtime-database, key: url }
+  databaseTrust: { name: fleet-database-trust, key: ca.crt }
+  oidc:
+    issuer: https://identity.local.test/realms/fleet
+    clientId: fleetiq
+    authority: local-oidc
+    clientSecret: { name: fleet-oidc, key: client-secret }
+    additionalTrust: { name: fleet-oidc-trust, key: ca.crt }
+edge:
+  image: ghcr.io/stanimirivanov/fleetiq-ux@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+network:
+  databaseNamespace: fleetiq-data
+  databaseCluster: fleetiq-db
+  gatewayNamespace: gateway-system
+  gatewayPodLabels: { app.kubernetes.io/name: fleet-gateway }
+  oidcCidrs: [203.0.113.10/32]

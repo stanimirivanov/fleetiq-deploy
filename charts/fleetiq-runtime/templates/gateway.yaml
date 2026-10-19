@@ -1,0 +1,34 @@
+# The provider installs the GatewayClass/controller; the consumer owns this listener.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Release.Name }}
+spec:
+  gatewayClassName: {{ .Values.gateway.className | quote }}
+  listeners:
+    - name: https
+      hostname: {{ .Values.public.host | quote }}
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - { group: '', kind: Secret, name: {{ .Values.gateway.certificateSecret | quote }} }
+      allowedRoutes:
+        namespaces: { from: Same }
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Release.Name }}
+spec:
+  parentRefs:
+    - { group: gateway.networking.k8s.io, kind: Gateway, name: {{ .Release.Name }}, sectionName: https }
+  hostnames: [{{ .Values.public.host | quote }}]
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: / }
+      backendRefs:
+        - { group: '', kind: Service, name: {{ .Release.Name }}-edge, port: 8080, weight: 1 }

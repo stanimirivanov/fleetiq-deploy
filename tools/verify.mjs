@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { checkManifests } from './manifests/check.mjs';
 import { digest, lock } from './policy.mjs';
 import { pnpm, root, run } from './process.mjs';
 import { qualify } from './qualify.mjs';
@@ -55,6 +56,7 @@ try {
         pnpm(['test'], { stdio: 'inherit', timeout: 600000 });
       else if (check === 'style') pnpm(['style'], { stdio: 'inherit' });
       else if (check === 'policy') structure();
+      else if (check === 'manifests') item.measurements = checkManifests();
       else if (check === 'secrets') checkSecrets(base);
       else if (check === 'dependencies')
         pnpm(['audit', '--audit-level', 'moderate'], { stdio: 'inherit' });
@@ -62,6 +64,7 @@ try {
         item.measurements = await qualify((progress) => {
           item.measurements = progress;
         });
+      else throw new Error('Unknown inventoried check; verification cannot pass');
       item.outcome = 'passed';
       console.log(`${check}: passed`);
     } catch (error) {

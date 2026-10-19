@@ -4,6 +4,7 @@
   the change. [ARCHITECTURE.md](ARCHITECTURE.md) owns the service boundaries.
 - [local/AGENTS.md](local/AGENTS.md) covers deployment configuration;
   [tools/AGENTS.md](tools/AGENTS.md) covers verification automation.
+- [charts/AGENTS.md](charts/AGENTS.md) covers Kubernetes packages and offline fixtures.
 - Work in one cohesive issue-sized branch. Preserve unrelated local repositories,
   containers, volumes and Docker caches.
 - Never inspect or print private instance files, provider credentials, cookies or

@@ -32,3 +32,5 @@ in the instance configuration. PostgreSQL port 5432 on your host is unaffected.
 - [Contributor workflow and verification](CONTRIBUTING.md)
 - [Documentation map](docs/README.md)
 - [Delivery plan and qualification boundary](docs/exec-plans/active/m02-development-installation.md)
+- [Kubernetes package contracts and offline preview](docs/operations/kubernetes-packages.md)
+- [Kubernetes GitOps delivery plan](docs/exec-plans/active/kubernetes-gitops-deployment.md)

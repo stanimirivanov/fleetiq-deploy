@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fleetiq-local
+  labels:
+    app.kubernetes.io/part-of: fleetiq
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.35
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fleetiq-data
+  labels:
+    app.kubernetes.io/part-of: fleetiq
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.35
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false

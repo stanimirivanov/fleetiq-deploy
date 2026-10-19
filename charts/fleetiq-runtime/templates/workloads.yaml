@@ -1,0 +1,145 @@
+{{- range $component := list "backend" "edge" }}
+{{- $settings := index $.Values $component }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: {{ $.Release.Name }}-{{ $component }}
+  labels: { app.kubernetes.io/part-of: fleetiq }
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: {{ $.Release.Name }}-{{ $component }}
+  labels: { app.kubernetes.io/part-of: fleetiq }
+spec:
+  replicas: {{ ternary 0 $settings.replicas $.Values.maintenance }}
+  revisionHistoryLimit: 2
+  progressDeadlineSeconds: 300
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $.Release.Name }}-{{ $component }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $.Release.Name }}-{{ $component }}
+        app.kubernetes.io/part-of: fleetiq
+    spec:
+      serviceAccountName: {{ $.Release.Name }}-{{ $component }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: {{ $component }}
+          image: {{ $settings.image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          ports:
+            - { name: http, containerPort: 8080, protocol: TCP }
+          resources: {{ toJson $settings.resources }}
+          {{- if eq $component "backend" }}
+          # The image entrypoint is the executable, not a shell. No startup DDL.
+          args: [serve, --check-schema]
+          env:
+            - { name: FLEETIQ_BIND_ADDRESS, value: '0.0.0.0:8080' }
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: {{ toJson $settings.databaseSecret }}
+            - { name: FLEETIQ_BROWSER_ORIGIN, value: {{ printf "https://%s" $.Values.public.host | quote }} }
+            - { name: FLEETIQ_OIDC_ISSUER, value: {{ $settings.oidc.issuer | quote }} }
+            - { name: FLEETIQ_OIDC_CLIENT_ID, value: {{ $settings.oidc.clientId | quote }} }
+            - { name: FLEETIQ_OIDC_IDENTITY_AUTHORITY, value: {{ $settings.oidc.authority | quote }} }
+            - name: FLEETIQ_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: {{ toJson $settings.oidc.clientSecret }}
+            {{- if $settings.oidc.additionalTrust.name }}
+            - { name: FLEETIQ_OIDC_ADDITIONAL_CA_BUNDLE, value: /etc/fleetiq/oidc/ca.crt }
+            {{- end }}
+          startupProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 24
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: { path: /health/live, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 3
+          {{- else }}
+          env:
+            - { name: FLEETIQ_PUBLIC_AUTHORITY, value: {{ $.Values.public.host | quote }} }
+            - { name: FLEETIQ_API_UPSTREAM, value: {{ printf "%s-backend:8080" $.Release.Name | quote }} }
+          # Producer probe listener is loopback-only; kubelet HTTP probes cannot reach it.
+          startupProbe:
+            exec: { command: [wget, -q, --spider, 'http://127.0.0.1:8081/ready'] }
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 12
+          readinessProbe:
+            exec: { command: [wget, -q, --spider, 'http://127.0.0.1:8081/ready'] }
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            exec: { command: [wget, -q, --spider, 'http://127.0.0.1:8081/ready'] }
+            periodSeconds: 10
+            timeoutSeconds: 3
+          {{- end }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            {{- if eq $component "backend" }}
+            - { name: database-trust, mountPath: /etc/fleetiq/database, readOnly: true }
+            {{- if $settings.oidc.additionalTrust.name }}
+            - { name: oidc-trust, mountPath: /etc/fleetiq/oidc, readOnly: true }
+            {{- end }}
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: { medium: Memory, sizeLimit: 64Mi }
+        {{- if eq $component "backend" }}
+        - name: database-trust
+          configMap:
+            name: {{ $settings.databaseTrust.name | quote }}
+            items: [{ key: {{ $settings.databaseTrust.key | quote }}, path: ca.crt }]
+        {{- if $settings.oidc.additionalTrust.name }}
+        - name: oidc-trust
+          configMap:
+            name: {{ $settings.oidc.additionalTrust.name | quote }}
+            items: [{ key: {{ $settings.oidc.additionalTrust.key | quote }}, path: ca.crt }]
+        {{- end }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: {{ $.Release.Name }}-{{ $component }}
+  labels: { app.kubernetes.io/part-of: fleetiq }
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ $.Release.Name }}-{{ $component }}
+  ports: [{ name: http, port: 8080, targetPort: http, protocol: TCP }]
+{{- end }}

@@ -11,13 +11,15 @@ in the pull request. CI runs only on pull requests.
 ```powershell
 pnpm install --frozen-lockfile
 pnpm secrets:install
+pnpm manifests:install
 pnpm check
 pnpm local build
 pnpm qualify
 ```
 
 `pnpm check` is the structural group: toolchain, harness fixtures, Biome,
-repository/CI policy, Gitleaks worktree/index/history and dependency advisories.
+repository/CI policy, offline Helm/Kustomize/schema/manifest qualification,
+Gitleaks worktree/index/history and dependency advisories.
 `pnpm qualify` runs real Docker installation qualification; build the locked
 images first. Neither group substitutes for the other.
 `pnpm verify acceptance` runs both against already built artifacts.

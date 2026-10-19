@@ -1,0 +1,28 @@
+# No generated passwords, superuser fallback, PVC deletion, or bootstrap SQL.
+profile: local
+clusterName: fleetiq-db
+image: ''
+instances: 1
+storage:
+  className: ''
+  size: 10Gi
+database: fleetiq
+owner:
+  role: fleetiq_migrator
+  passwordSecret: ''
+runtime:
+  role: fleetiq_runtime
+  passwordSecret: ''
+resources:
+  requests: { cpu: 200m, memory: 256Mi }
+  limits: { cpu: '1', memory: 1Gi }
+network:
+  runtimeNamespace: ''
+  backendName: fleetiq-backend
+  operatorNamespace: ''
+  operatorPodLabels: {}
+  dnsNamespace: kube-system
+  dnsPodLabels: { k8s-app: kube-dns }
+  # CNPG instance managers need Kubernetes API access; qualify actual destination.
+  apiServerCidr: ''
+  apiServerPort: 443
