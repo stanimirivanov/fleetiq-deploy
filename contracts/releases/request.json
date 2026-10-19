@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fleetiq.invalid/releases/request.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "id",
+    "candidate",
+    "candidateCommit",
+    "environment",
+    "clusterUid",
+    "expectedCurrent",
+    "created",
+    "expires"
+  ],
+  "properties": {
+    "format": {
+      "const": "fleetiq-release-request.v1"
+    },
+    "id": {
+      "$ref": "common.json#/$defs/id"
+    },
+    "candidate": {
+      "$ref": "common.json#/$defs/digest"
+    },
+    "candidateCommit": {
+      "$ref": "common.json#/$defs/sha"
+    },
+    "environment": {
+      "$ref": "common.json#/$defs/name"
+    },
+    "clusterUid": {
+      "$ref": "common.json#/$defs/id"
+    },
+    "expectedCurrent": {
+      "$ref": "common.json#/$defs/receiptRef"
+    },
+    "created": {
+      "$ref": "common.json#/$defs/time"
+    },
+    "expires": {
+      "$ref": "common.json#/$defs/time"
+    }
+  },
+  "description": "One immutable request ID. Reusing it after any durable receipt is a replay, including failed/recovery-required attempts."
+}

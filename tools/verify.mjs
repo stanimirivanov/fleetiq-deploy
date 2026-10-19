@@ -5,6 +5,9 @@ import { checkManifests } from './manifests/check.mjs';
 import { digest, lock } from './policy.mjs';
 import { pnpm, root, run } from './process.mjs';
 import { qualify } from './qualify.mjs';
+import { checkContracts } from './releases/contracts.mjs';
+import { checkReleaseBoundaries } from './releases/git-policy.mjs';
+import { qualifyPackages } from './releases/qualify.mjs';
 import { checkSecrets } from './secrets.mjs';
 import { structure } from './structure.mjs';
 import { catalogue } from './verification-catalogue.mjs';
@@ -57,6 +60,9 @@ try {
       else if (check === 'style') pnpm(['style'], { stdio: 'inherit' });
       else if (check === 'policy') structure();
       else if (check === 'manifests') item.measurements = checkManifests();
+      else if (check === 'release-contracts')
+        item.measurements = { ...checkContracts(), ...checkReleaseBoundaries(base) };
+      else if (check === 'oci-packages') item.measurements = await qualifyPackages();
       else if (check === 'secrets') checkSecrets(base);
       else if (check === 'dependencies')
         pnpm(['audit', '--audit-level', 'moderate'], { stdio: 'inherit' });

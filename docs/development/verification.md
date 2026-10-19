@@ -23,9 +23,11 @@ commands, changed source bytes or failed cleanup produce a nonzero exit.
 | CI does not omit checks | Exact reviewed workflow renderer plus mutation fixtures |
 | Formatting and dependency policy | Biome CI, frozen lock install and pnpm advisory audit |
 | Kubernetes package fitness | Real Helm/Kustomize rendering, pinned local Kubeconform schemas and parsed manifest policy with rejection fixtures |
+| Immutable publication | Pinned Helm OCI push/pull/render in an owned registry, exact archive/manifest hashes, missing/retag/overwrite rejection |
+| Candidate is not activation | Closed Ajv contracts, active-path rejection, temporary fail-closed Argo source-graph guard and independent admission-context fixtures |
 
 The executable catalogue is in `tools/verification-catalogue.mjs`. Groups are structural, manifests,
-docker and acceptance. Reports include group/check outcomes, source fingerprints,
+packages, docker and acceptance. Reports include group/check outcomes, source fingerprints,
 Git head and timestamps. Docker measurements name the real images and checks,
 but contain no raw command output, cookies, provider subjects or configuration.
 All acceptance requires unchanged candidate file bytes before/after execution.

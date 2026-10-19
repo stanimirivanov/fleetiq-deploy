@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fleetiq.invalid/releases/release-bom.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "id", "package", "images", "inputs", "migrations"],
+  "properties": {
+    "format": {
+      "const": "fleetiq-release.v1"
+    },
+    "id": {
+      "$ref": "common.json#/$defs/id"
+    },
+    "package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "source", "publication"],
+      "properties": {
+        "reference": {
+          "$ref": "common.json#/$defs/image"
+        },
+        "source": {
+          "$ref": "common.json#/$defs/source"
+        },
+        "publication": {
+          "$ref": "common.json#/$defs/publication"
+        }
+      }
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend", "ux"],
+      "properties": {
+        "backend": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reference", "source", "publication"],
+          "properties": {
+            "reference": {
+              "$ref": "common.json#/$defs/image"
+            },
+            "source": {
+              "$ref": "common.json#/$defs/source"
+            },
+            "publication": {
+              "$ref": "common.json#/$defs/publication"
+            }
+          }
+        },
+        "ux": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reference", "source", "publication"],
+          "properties": {
+            "reference": {
+              "$ref": "common.json#/$defs/image"
+            },
+            "source": {
+              "$ref": "common.json#/$defs/source"
+            },
+            "publication": {
+              "$ref": "common.json#/$defs/publication"
+            }
+          }
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["infrastructure", "tools", "workflowTemplate"],
+      "properties": {
+        "infrastructure": {
+          "$ref": "common.json#/$defs/input"
+        },
+        "tools": {
+          "$ref": "common.json#/$defs/input"
+        },
+        "workflowTemplate": {
+          "anyOf": [
+            {
+              "$ref": "common.json#/$defs/input"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "migrations": {
+      "type": "array",
+      "items": {
+        "$ref": "common.json#/$defs/migration"
+      },
+      "minItems": 1,
+      "maxItems": 4096,
+      "uniqueItems": true
+    }
+  },
+  "description": "Full release inventory. Null workflowTemplate permits guided qualification only, never an Argo Workflows run."
+}

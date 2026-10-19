@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://fleetiq.invalid/releases/package-bom.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "source", "version", "toolchain", "qualification", "charts"],
+  "properties": {
+    "format": {
+      "const": "fleetiq-release-package.v1"
+    },
+    "source": {
+      "$ref": "common.json#/$defs/source"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^0\\.1\\.0-r[a-f0-9]{40}\\.run[1-9][0-9]*\\.attempt[1-9][0-9]*$",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "toolchain": {
+      "$ref": "common.json#/$defs/digest"
+    },
+    "qualification": {
+      "$ref": "common.json#/$defs/digest"
+    },
+    "charts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runtime", "data"],
+      "properties": {
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reference", "archive"],
+          "properties": {
+            "reference": {
+              "type": "string",
+              "pattern": "^(?:ghcr\\.io/stanimirivanov/|127\\.0\\.0\\.1:[1-9][0-9]{0,4}/)[a-z0-9/-]+@sha256:[a-f0-9]{64}$",
+              "maxLength": 512
+            },
+            "archive": {
+              "$ref": "common.json#/$defs/digest"
+            }
+          }
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reference", "archive"],
+          "properties": {
+            "reference": {
+              "type": "string",
+              "pattern": "^(?:ghcr\\.io/stanimirivanov/|127\\.0\\.0\\.1:[1-9][0-9]{0,4}/)[a-z0-9/-]+@sha256:[a-f0-9]{64}$",
+              "maxLength": 512
+            },
+            "archive": {
+              "$ref": "common.json#/$defs/digest"
+            }
+          }
+        }
+      }
+    }
+  },
+  "description": "The OCI package contains this inventory; its enclosing OCI digest is recorded externally to avoid a self-referential hash."
+}

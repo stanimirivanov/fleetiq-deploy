@@ -19,7 +19,9 @@ pnpm qualify
 
 `pnpm check` is the structural group: toolchain, harness fixtures, Biome,
 repository/CI policy, offline Helm/Kustomize/schema/manifest qualification,
-Gitleaks worktree/index/history and dependency advisories.
+release contracts and candidate/active boundaries, Gitleaks worktree/index/history
+and dependency advisories. `pnpm packages:check` qualifies actual Helm OCI
+publication/read-back in an owned registry; it needs Linux Docker.
 `pnpm qualify` runs real Docker installation qualification; build the locked
 images first. Neither group substitutes for the other.
 `pnpm verify acceptance` runs both against already built artifacts.

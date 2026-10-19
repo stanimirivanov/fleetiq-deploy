@@ -5,6 +5,8 @@
 - [local/AGENTS.md](local/AGENTS.md) covers deployment configuration;
   [tools/AGENTS.md](tools/AGENTS.md) covers verification automation.
 - [charts/AGENTS.md](charts/AGENTS.md) covers Kubernetes packages and offline fixtures.
+- [tools/releases/AGENTS.md](tools/releases/AGENTS.md) covers immutable publication
+  and candidate/promotion admission contracts.
 - Work in one cohesive issue-sized branch. Preserve unrelated local repositories,
   containers, volumes and Docker caches.
 - Never inspect or print private instance files, provider credentials, cookies or
