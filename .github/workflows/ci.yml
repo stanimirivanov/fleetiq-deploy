@@ -26,6 +26,8 @@ jobs:
       - run: npm install --global pnpm@12.5.1 --allow-scripts=pnpm@12.5.1 --strict-allow-scripts
       - run: pnpm install --frozen-lockfile
       - run: pnpm secrets:install
+      - name: Install checksum-verified offline manifest tools and schemas
+        run: pnpm manifests:install
       - run: pnpm check
         env:
           FLEETIQ_BASE_SHA: ${{ github.event.pull_request.base.sha }}

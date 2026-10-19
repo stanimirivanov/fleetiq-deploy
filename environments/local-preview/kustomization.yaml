@@ -1,0 +1,4 @@
+# Namespace composition only. No Argo Application or active environment selection.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: [namespaces.yaml, quotas.yaml]

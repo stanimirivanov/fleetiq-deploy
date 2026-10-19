@@ -3,6 +3,7 @@
 ## TL;DR
 
 Run `pnpm check` and, after `pnpm local build`, `pnpm qualify`.
+Install pinned offline manifest prerequisites first with `pnpm manifests:install`.
 A focused pass is not a complete acceptance pass. Missing prerequisites, failed
 commands, changed source bytes or failed cleanup produce a nonzero exit.
 
@@ -21,8 +22,9 @@ commands, changed source bytes or failed cleanup produce a nonzero exit.
 | No secret exemptions | Pinned Gitleaks across candidate files, index and incoming history; allow comments ignored |
 | CI does not omit checks | Exact reviewed workflow renderer plus mutation fixtures |
 | Formatting and dependency policy | Biome CI, frozen lock install and pnpm advisory audit |
+| Kubernetes package fitness | Real Helm/Kustomize rendering, pinned local Kubeconform schemas and parsed manifest policy with rejection fixtures |
 
-The executable catalogue is in `tools/verify.mjs`. Groups are structural,
+The executable catalogue is in `tools/verification-catalogue.mjs`. Groups are structural, manifests,
 docker and acceptance. Reports include group/check outcomes, source fingerprints,
 Git head and timestamps. Docker measurements name the real images and checks,
 but contain no raw command output, cookies, provider subjects or configuration.
@@ -44,7 +46,9 @@ production restore, throughput, availability, image vulnerability SBOM analysis
 or full build reproducibility. Those need their planned qualification work.
 Do not describe infrastructure results as authenticated acceptance.
 
-Run behavioral fixtures with `pnpm test`. They include policy mutation tests;
+Run behavioral fixtures with `pnpm test`. Test-file concurrency is bounded to two
+so native renderers, scanners and loopback Git fixtures do not exhaust the host;
+all assertions and existing deadlines remain required. They include policy mutation tests;
 installation behavior is exercised against Docker by the docker group.
 Windows structural CI and Linux infrastructure CI use the same runner.
 

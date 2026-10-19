@@ -1,6 +1,7 @@
 # FleetIQ Kubernetes GitOps delivery plan
 
-Status: Proposed; issue #3. This document plans work; it implements no deployment.
+Status: In progress; planning issue #3. D01-D03 merged; D04 is tracked in
+[issue #5](https://github.com/stanimirivanov/fleetiq-deploy/issues/5).
 
 ## TL;DR
 
@@ -31,11 +32,10 @@ qualification. M08 - Production Readiness owns non-local access, resilience and
 production acceptance. These are FleetIQ milestones; the infrastructure project
 uses its own roadmap. No issue is assigned to multiple milestones.
 
-The current deployment PR #2 remains a separate change under review. Merge it
-with its own CI requirements; do not imply that this plan deploys it, fixes its
-missing source-read secret, or makes its source-built images published artifacts.
-This documentation PR is independent and may merge before or after it. Each
-implementation issue must select exact merged inputs before starting.
+Deployment PR #2 is merged and remains the temporary Compose diagnostic baseline.
+D01-D03 producer interfaces are merged. Their source completion does not select
+published artifacts or authorize a Kubernetes installation; D05/D06 own those gates.
+Each implementation issue selects exact merged inputs before starting.
 
 ## Required provider prerequisites
 
@@ -125,6 +125,9 @@ full test workflow on every push to main.
 - **Dependencies / Parallelism:** Available now; parallel with D01/D02 and D04.
 
 ### PR D04: Package FleetIQ workloads and introduce manifest fitness gates
+
+Implementation: candidate in issue #5. The [package contracts](../../operations/kubernetes-packages.md)
+describe real offline qualification and its limits; no live environment is activated.
 
 - **Repository / milestone:** `fleetiq-deploy`; M02 - Product Foundation.
 - **Objective & Scope:** Create reusable Helm runtime/data packages and environment

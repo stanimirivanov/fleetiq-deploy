@@ -1,0 +1,69 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Release.Name }}-default-deny
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Release.Name }}-edge
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ .Release.Name }}-edge }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ .Values.network.gatewayNamespace | quote }} }
+          podSelector:
+            matchLabels: {{ toJson .Values.network.gatewayPodLabels }}
+      ports: [{ protocol: TCP, port: 8080 }]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: {{ .Release.Name }}-backend }
+      ports: [{ protocol: TCP, port: 8080 }]
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ .Values.network.dnsNamespace | quote }} }
+          podSelector:
+            matchLabels: {{ toJson .Values.network.dnsPodLabels }}
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Release.Name }}-backend
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ .Release.Name }}-backend }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: {{ .Release.Name }}-edge }
+      ports: [{ protocol: TCP, port: 8080 }]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ .Values.network.databaseNamespace | quote }} }
+          podSelector:
+            matchLabels: { cnpg.io/cluster: {{ .Values.network.databaseCluster | quote }} }
+      ports: [{ protocol: TCP, port: 5432 }]
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ .Values.network.dnsNamespace | quote }} }
+          podSelector:
+            matchLabels: {{ toJson .Values.network.dnsPodLabels }}
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+    - to:
+        {{- range .Values.network.oidcCidrs }}
+        - ipBlock: { cidr: {{ . | quote }} }
+        {{- end }}
+      ports: [{ protocol: TCP, port: 443 }]

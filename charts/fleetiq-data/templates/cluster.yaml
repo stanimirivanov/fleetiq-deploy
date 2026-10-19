@@ -1,0 +1,46 @@
+{{- if eq .Values.owner.role .Values.runtime.role }}
+{{- fail "Migration owner and runtime role must be distinct" }}
+{{- end }}
+{{- if eq .Values.owner.passwordSecret .Values.runtime.passwordSecret }}
+{{- fail "Migration owner and runtime password Secrets must be distinct" }}
+{{- end }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Values.clusterName }}
+  annotations:
+    helm.sh/resource-policy: keep
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  imageName: {{ .Values.image | quote }}
+  instances: {{ .Values.instances }}
+  enableSuperuserAccess: false
+  primaryUpdateStrategy: supervised
+  storage:
+    storageClass: {{ .Values.storage.className | quote }}
+    size: {{ .Values.storage.size | quote }}
+  resources: {{ toJson .Values.resources }}
+  bootstrap:
+    initdb:
+      database: {{ .Values.database | quote }}
+      owner: {{ .Values.owner.role | quote }}
+      secret: { name: {{ .Values.owner.passwordSecret | quote }} }
+  managed:
+    roles:
+      - name: {{ .Values.runtime.role | quote }}
+        ensure: present
+        login: true
+        superuser: false
+        createdb: false
+        createrole: false
+        replication: false
+        bypassrls: false
+        inherit: false
+        inRoles: []
+        passwordSecret: { name: {{ .Values.runtime.passwordSecret | quote }} }
+  postgresql:
+    parameters:
+      password_encryption: scram-sha-256
+    pg_hba:
+      - hostssl all all all scram-sha-256

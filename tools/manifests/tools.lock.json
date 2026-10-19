@@ -1,0 +1,125 @@
+{
+  "format": "fleetiq-manifest-tools.v1",
+  "kubernetes": "1.35.0",
+  "tools": {
+    "helm": {
+      "version": "4.3.1",
+      "versionArgs": ["version", "--short"],
+      "platforms": {
+        "linux-x64": {
+          "url": "https://get.helm.sh/helm-v4.3.1-linux-amd64.tar.gz",
+          "sha256": "0403a88ae20913d11b10a2467b50087721fea7581736da6b9d3992f5357fe54b",
+          "executable": "linux-amd64/helm",
+          "binarySha256": "b66cb19f2b31f9d427632ea6c4b4a1ff89b74ecaeaee323cd166da41a7af53bd"
+        },
+        "win32-x64": {
+          "url": "https://get.helm.sh/helm-v4.3.1-windows-amd64.zip",
+          "sha256": "fcfd7b796dcf0f225abc40b5636a3b01f55f3de2fb1dfb18475df94e62c14112",
+          "executable": "windows-amd64/helm.exe",
+          "binarySha256": "912d7210c880c48b2ac91102b1297d6ac637edd9aaaf05beb12da0b496b53ba9"
+        }
+      }
+    },
+    "kustomize": {
+      "version": "5.8.3",
+      "versionArgs": ["version"],
+      "platforms": {
+        "linux-x64": {
+          "url": "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.8.3/kustomize_v5.8.3_linux_amd64.tar.gz",
+          "sha256": "cb9e31198d3f63b44848bd0afc4c8efc56e6cfef9c93a4a39a211940e6decd61",
+          "executable": "kustomize",
+          "binarySha256": "a5e53d28755098b003ae2b6bff7b1650a411a366a0c800c1ea1b677e0cfff747"
+        },
+        "win32-x64": {
+          "url": "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.8.3/kustomize_v5.8.3_windows_amd64.zip",
+          "sha256": "763c4040ff01435bfce39661072452ebdf1cf2808bb91f5708ab4420834fbd42",
+          "executable": "kustomize.exe",
+          "binarySha256": "60bc423d3abc67ee86ae34d46715ef8affd7fd9b1fbba5c1fa4fd00e99dcaa36"
+        }
+      }
+    },
+    "kubeconform": {
+      "version": "0.8.0",
+      "versionArgs": ["-v"],
+      "platforms": {
+        "linux-x64": {
+          "url": "https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz",
+          "sha256": "9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883",
+          "executable": "kubeconform",
+          "binarySha256": "457722b36e98d7bdbc91525e594951ef5d7ea3a29da2d13b9b28a2fb8a5097b7"
+        },
+        "win32-x64": {
+          "url": "https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-windows-amd64.zip",
+          "sha256": "e3f56102bcf4f50b034a567e2482a1c5330799983ddd655952310211aef73d93",
+          "executable": "kubeconform.exe",
+          "binarySha256": "642bf8ea0d614a8c75d2bd012eb6042a90589ff846c69f04863afa446b30f2c1"
+        }
+      }
+    }
+  },
+  "schemas": [
+    {
+      "kind": "Namespace",
+      "apiVersion": "v1",
+      "file": "namespace_v1.json",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/93153a1458e24e93f386c50f9980d584fcba574b/v1.35.0-standalone-strict/namespace-v1.json",
+      "sha256": "324fae677b98d1a6d54340db0c334d053e8ffbafceb3f73326e41de2610d5843"
+    },
+    {
+      "kind": "ResourceQuota",
+      "apiVersion": "v1",
+      "file": "resourcequota_v1.json",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/93153a1458e24e93f386c50f9980d584fcba574b/v1.35.0-standalone-strict/resourcequota-v1.json",
+      "sha256": "9546ed313e622ea84a0ab1ec7ef7e683f05acfbfe97beb746f0b5be6407691df"
+    },
+    {
+      "kind": "ServiceAccount",
+      "apiVersion": "v1",
+      "file": "serviceaccount_v1.json",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/93153a1458e24e93f386c50f9980d584fcba574b/v1.35.0-standalone-strict/serviceaccount-v1.json",
+      "sha256": "8193d6c3561475c6d3d5c44e1faedb1df53905373d904bc17015694326d659cf"
+    },
+    {
+      "kind": "Service",
+      "apiVersion": "v1",
+      "file": "service_v1.json",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/93153a1458e24e93f386c50f9980d584fcba574b/v1.35.0-standalone-strict/service-v1.json",
+      "sha256": "8bf019854daed511e7c174896a898173fa65d88ec5937c687a37303d4cc9351b"
+    },
+    {
+      "kind": "Deployment",
+      "apiVersion": "apps/v1",
+      "file": "deployment_v1.json",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/93153a1458e24e93f386c50f9980d584fcba574b/v1.35.0-standalone-strict/deployment-apps-v1.json",
+      "sha256": "46dc7cc4bec2c9a62400491e2b8057635afbfa6838999c518f7bea5c621a989b"
+    },
+    {
+      "kind": "NetworkPolicy",
+      "apiVersion": "networking.k8s.io/v1",
+      "file": "networkpolicy_v1.json",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/93153a1458e24e93f386c50f9980d584fcba574b/v1.35.0-standalone-strict/networkpolicy-networking-v1.json",
+      "sha256": "f6324cc464f62228b0418f438d167208e4f86c7e3677ba30f608e79a8b26ba79"
+    },
+    {
+      "kind": "Cluster",
+      "apiVersion": "postgresql.cnpg.io/v1",
+      "file": "cluster_v1.json",
+      "url": "https://raw.githubusercontent.com/datreeio/CRDs-catalog/501527ab9c40c827144c8f45945b25a023e344ce/postgresql.cnpg.io/cluster_v1.json",
+      "sha256": "b58695a447c9be7cc5e49faeba0280ec13a34a7b067ce26ed9f8d616717df960"
+    },
+    {
+      "kind": "Gateway",
+      "apiVersion": "gateway.networking.k8s.io/v1",
+      "file": "gateway_v1.json",
+      "url": "https://raw.githubusercontent.com/datreeio/CRDs-catalog/501527ab9c40c827144c8f45945b25a023e344ce/gateway.networking.k8s.io/gateway_v1.json",
+      "sha256": "85575b3a7d79416f8b09658cf6a3f9a6b79544bbf10c4c465c78bdaab1ea0364"
+    },
+    {
+      "kind": "HTTPRoute",
+      "apiVersion": "gateway.networking.k8s.io/v1",
+      "file": "httproute_v1.json",
+      "url": "https://raw.githubusercontent.com/datreeio/CRDs-catalog/501527ab9c40c827144c8f45945b25a023e344ce/gateway.networking.k8s.io/httproute_v1.json",
+      "sha256": "e5692e62edd9b8a14bd2527d0a732e174a649131aa4d47159737dc6527c59ca5"
+    }
+  ]
+}

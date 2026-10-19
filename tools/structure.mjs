@@ -11,6 +11,18 @@ export function structure() {
   verifyWorkflow();
   const packageFile = JSON.parse(readFileSync(resolve(root, 'package.json')));
   assert.equal(packageFile.packageManager, `pnpm@${lock.tools.pnpm}`);
+  assert.equal(
+    packageFile.scripts.test,
+    'node --test --test-concurrency=2 tools/tests/*.test.mjs',
+  );
+  assert.equal(
+    packageFile.scripts['manifests:install'],
+    'node tools/manifests/install.mjs',
+  );
+  assert.equal(
+    packageFile.scripts['manifests:check'],
+    'node tools/verify.mjs manifests',
+  );
   const compose = sourceCompose();
   assert.deepEqual(Object.keys(compose.services).sort(), [
     'backend',
@@ -67,6 +79,7 @@ export function structure() {
     assert(commands.includes('pnpm install --frozen-lockfile'));
     assert(commands.includes('pnpm secrets:install'));
     assert(commands.includes(name === 'docker' ? 'pnpm qualify' : 'pnpm check'));
+    if (name === 'structural') assert(commands.includes('pnpm manifests:install'));
   }
   assert(
     readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8').includes(

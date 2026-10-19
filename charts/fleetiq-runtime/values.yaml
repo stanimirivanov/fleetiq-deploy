@@ -1,0 +1,48 @@
+# Deliberately incomplete: select reviewed artifacts and existing environment inputs.
+# Empty required values fail schema validation instead of producing an unsafe install.
+profile: local
+maintenance: false
+imagePullSecrets: []
+public:
+  host: ''
+gateway:
+  className: ''
+  certificateSecret: ''
+backend:
+  image: ''
+  replicas: 1
+  databaseSecret:
+    name: ''
+    key: url
+  databaseTrust:
+    name: ''
+    key: ca.crt
+  oidc:
+    issuer: ''
+    clientId: ''
+    authority: ''
+    clientSecret:
+      name: ''
+      key: client-secret
+    # An optional public CA augments, never replaces, the provider's normal trust.
+    additionalTrust:
+      name: ''
+      key: ca.crt
+  resources:
+    requests: { cpu: 100m, memory: 64Mi }
+    limits: { cpu: '1', memory: 256Mi }
+edge:
+  image: ''
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 64Mi }
+    limits: { cpu: '1', memory: 128Mi }
+network:
+  databaseNamespace: ''
+  databaseCluster: ''
+  gatewayNamespace: ''
+  gatewayPodLabels: {}
+  dnsNamespace: kube-system
+  dnsPodLabels: { k8s-app: kube-dns }
+  # Explicit HTTPS discovery/JWKS/token destinations, not unrestricted egress.
+  oidcCidrs: []

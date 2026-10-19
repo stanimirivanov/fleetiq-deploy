@@ -1,0 +1,253 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$comment": "Closed D04 package input contract. No credentials, arbitrary commands or migration hooks. Nonlocal sizing is not production acceptance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile",
+    "clusterName",
+    "image",
+    "instances",
+    "storage",
+    "database",
+    "owner",
+    "runtime",
+    "resources",
+    "network"
+  ],
+  "properties": {
+    "profile": {
+      "type": "string",
+      "enum": ["local", "nonlocal"]
+    },
+    "clusterName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 63,
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
+    "image": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[a-z0-9.-]+(:[0-9]+)?/[a-z0-9._/-]+:[1-9][0-9]*\\.[0-9]+(-[a-z0-9.-]+)?@sha256:[a-f0-9]{64}$",
+      "description": "CNPG derives the PostgreSQL version from this tag; the required digest remains the immutable artifact identity."
+    },
+    "instances": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["className", "size"],
+      "properties": {
+        "className": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "size": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8,
+          "pattern": "^[1-9][0-9]*Gi$"
+        }
+      }
+    },
+    "database": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 63,
+      "pattern": "^[a-z][a-z0-9_]{0,62}$"
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "passwordSecret"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z][a-z0-9_]{0,62}$"
+        },
+        "passwordSecret": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "passwordSecret"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z][a-z0-9_]{0,62}$"
+        },
+        "passwordSecret": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requests", "limits"],
+      "properties": {
+        "requests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cpu", "memory"],
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16,
+              "pattern": "^([1-9][0-9]*m?|0\\.[0-9]*[1-9][0-9]*)$"
+            },
+            "memory": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16,
+              "pattern": "^[1-9][0-9]*(Mi|Gi)$"
+            }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["cpu", "memory"],
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16,
+              "pattern": "^([1-9][0-9]*m?|0\\.[0-9]*[1-9][0-9]*)$"
+            },
+            "memory": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16,
+              "pattern": "^[1-9][0-9]*(Mi|Gi)$"
+            }
+          }
+        }
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtimeNamespace",
+        "backendName",
+        "operatorNamespace",
+        "operatorPodLabels",
+        "dnsNamespace",
+        "dnsPodLabels",
+        "apiServerCidr",
+        "apiServerPort"
+      ],
+      "properties": {
+        "runtimeNamespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "backendName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "operatorNamespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "operatorPodLabels": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 16,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253,
+            "pattern": "^[a-zA-Z0-9./_-]+$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63,
+            "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$"
+          }
+        },
+        "dnsNamespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "dnsPodLabels": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 16,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253,
+            "pattern": "^[a-zA-Z0-9./_-]+$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63,
+            "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$"
+          }
+        },
+        "apiServerCidr": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 18,
+          "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/([1-9]|[12][0-9]|3[0-2])$"
+        },
+        "apiServerPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "profile": {
+            "const": "nonlocal"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "instances": {
+            "minimum": 3
+          }
+        }
+      }
+    }
+  ]
+}
