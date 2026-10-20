@@ -47,7 +47,12 @@ export function manifestPolicy(
         [r.apiVersion, r.kind, r.metadata.namespace ?? '', r.metadata.name].join('|'),
       )
       .sort(),
-    expected,
+    [
+      ...expected,
+      ...(context.providerLocal
+        ? ['cilium.io/v2|CiliumNetworkPolicy|fleetiq-local|fleetiq-gateway-ingress']
+        : []),
+    ].sort(),
     'Unexpected/missing resource, namespace, GVK or duplicate identity',
   );
   for (const resource of resources) {
@@ -92,7 +97,30 @@ export function manifestPolicy(
         );
         break;
       case 'NetworkPolicy':
-        networkPolicy(resource);
+        networkPolicy(resource, context);
+        break;
+      case 'CiliumNetworkPolicy':
+        assert.equal(context.providerLocal, true, 'Unselected Cilium ingress mode');
+        assert.deepEqual(
+          Object.keys(resource).sort(),
+          ['apiVersion', 'kind', 'metadata', 'spec'],
+          'Additional Cilium policy specifications refused',
+        );
+        assert.deepEqual(
+          resource.spec,
+          {
+            endpointSelector: {
+              matchLabels: { 'app.kubernetes.io/name': 'fleetiq-edge' },
+            },
+            ingress: [
+              {
+                fromEntities: ['ingress'],
+                toPorts: [{ ports: [{ port: '8080', protocol: 'TCP' }] }],
+              },
+            ],
+          },
+          'Cilium allowance must remain edge-only, ingress-identity-only and port-scoped',
+        );
         break;
       case 'Gateway': {
         assert(resource.spec.gatewayClassName);
@@ -101,7 +129,9 @@ export function manifestPolicy(
         assert.equal(listener.name, 'https');
         assert.equal(listener.hostname, 'fleet.local.test');
         assert.equal(listener.protocol, 'HTTPS');
-        assert.equal(listener.port, 443);
+        assert.equal(listener.port, context.providerLocal ? 8443 : 443);
+        if (context.providerLocal)
+          assert.equal(resource.spec.gatewayClassName, 'cilium');
         assert.equal(listener.tls.mode, 'Terminate');
         assert.equal(listener.tls.certificateRefs.length, 1);
         const cert = listener.tls.certificateRefs[0];
@@ -140,6 +170,10 @@ export function manifestPolicy(
         break;
       case 'ResourceQuota':
         assert(Object.keys(resource.spec.hard).length >= 5);
+        if (context.providerLocal && resource.metadata.namespace === 'fleetiq-data') {
+          assert.equal(resource.spec.hard['requests.storage'], '8Gi');
+          assert.equal(String(resource.spec.hard.persistentvolumeclaims), '4');
+        }
         break;
       default:
         assert.fail('Resource outside D04 boundary');
@@ -174,7 +208,9 @@ export function manifestPolicy(
     ],
     ports: [{ protocol: 'TCP', port: 5432 }],
   });
-  assert.deepEqual(backendNetwork.egress[2].ports, [{ protocol: 'TCP', port: 443 }]);
+  assert.deepEqual(backendNetwork.egress[2].ports, [
+    { protocol: 'TCP', port: context.providerLocal ? 19443 : 443 },
+  ]);
   const edgeNetwork = resources.find(
     (r) => r.kind === 'NetworkPolicy' && r.metadata.name === 'fleetiq-edge',
   ).spec;

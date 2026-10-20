@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { isIP } from 'node:net';
 
 /** Reject broad allows; actual CNI enforcement/translated destinations require D06. */
-export function networkPolicy(resource) {
+export function networkPolicy(resource, { providerLocal = false } = {}) {
   const spec = resource.spec;
   assert.deepEqual(spec.policyTypes, ['Ingress', 'Egress']);
   if (resource.metadata.name.endsWith('-default-deny')) {
@@ -13,6 +13,18 @@ export function networkPolicy(resource) {
   assert(Object.keys(spec.podSelector.matchLabels ?? {}).length > 0);
   for (const direction of ['ingress', 'egress']) {
     const rules = spec[direction];
+    if (
+      providerLocal &&
+      resource.metadata.name === 'fleetiq-edge' &&
+      direction === 'ingress'
+    ) {
+      assert.deepEqual(
+        rules,
+        [],
+        'Cilium edge ingress must not retain a phantom gateway Pod allow',
+      );
+      continue;
+    }
     assert(
       Array.isArray(rules) && rules.length > 0,
       'Explicit network directions required',

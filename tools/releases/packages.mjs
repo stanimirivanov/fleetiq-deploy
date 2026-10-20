@@ -24,7 +24,7 @@ export function packageVersion(revision, run, attempt) {
   return `0.1.0-r${revision}.run${run}.attempt${attempt}`;
 }
 
-function chartRender(tools, chart, role, directory) {
+function chartRender(tools, chart, role, directory, providerLocal) {
   return documents(
     tools.helm(
       [
@@ -37,6 +37,12 @@ function chartRender(tools, chart, role, directory) {
         toolsLock.kubernetes,
         '--values',
         resolve(root, `environments/local-preview/${role}.yaml`),
+        ...(providerLocal
+          ? [
+              '--values',
+              resolve(root, `environments/qualified-local-preview/${role}.yaml`),
+            ]
+          : []),
       ],
       { cwd: directory },
     ),
@@ -129,11 +135,13 @@ export async function publishReleasePackage(
       target,
       options,
     );
-    assert.deepEqual(
-      chartRender(tools, chart.pulled, role, directory),
-      chartRender(tools, sourceChart, role, directory),
-      'Packaged chart render differs from reviewed source',
-    );
+    for (const providerLocal of [false, true]) {
+      assert.deepEqual(
+        chartRender(tools, chart.pulled, role, directory, providerLocal),
+        chartRender(tools, sourceChart, role, directory, providerLocal),
+        'Packaged chart render differs from reviewed source',
+      );
+    }
     charts[role] = { reference: chart.reference, archive: chart.archive };
   }
   const bom = {

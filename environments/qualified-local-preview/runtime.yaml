@@ -1,0 +1,9 @@
+# OFFLINE OVERRIDE ONLY: inherits synthetic images and Secret references from local-preview.
+# Public DNS, browser-facing host port and node Gateway listener are distinct.
+public: { host: fleet.local.test, port: 18443 }
+gateway: { className: cilium, listenerPort: 8443, ingressMode: cilium }
+backend:
+  oidc:
+    issuer: https://identity.local.test:19443/realms/fleet
+# Remove portable fixture selectors: Cilium ingress has no Gateway Pod identity.
+network: { gatewayNamespace: null, gatewayPodLabels: null }

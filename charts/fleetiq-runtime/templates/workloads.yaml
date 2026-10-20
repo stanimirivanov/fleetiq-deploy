@@ -65,7 +65,7 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef: {{ toJson $settings.databaseSecret }}
-            - { name: FLEETIQ_BROWSER_ORIGIN, value: {{ printf "https://%s" $.Values.public.host | quote }} }
+            - { name: FLEETIQ_BROWSER_ORIGIN, value: {{ printf "https://%s" (include "fleetiq.browserAuthority" $) | quote }} }
             - { name: FLEETIQ_OIDC_ISSUER, value: {{ $settings.oidc.issuer | quote }} }
             - { name: FLEETIQ_OIDC_CLIENT_ID, value: {{ $settings.oidc.clientId | quote }} }
             - { name: FLEETIQ_OIDC_IDENTITY_AUTHORITY, value: {{ $settings.oidc.authority | quote }} }
@@ -90,6 +90,7 @@ spec:
             timeoutSeconds: 3
           {{- else }}
           env:
+            # Caddy's host matcher expects only the DNS hostname, even on high ports.
             - { name: FLEETIQ_PUBLIC_AUTHORITY, value: {{ $.Values.public.host | quote }} }
             - { name: FLEETIQ_API_UPSTREAM, value: {{ printf "%s-backend:8080" $.Release.Name | quote }} }
           # Producer probe listener is loopback-only; kubelet HTTP probes cannot reach it.

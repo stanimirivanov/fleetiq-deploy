@@ -21,11 +21,32 @@ export function documents(bytes) {
   return parsed.map((document) => document.toJS()).filter(Boolean);
 }
 
+/** Every supported fixture state is checked by CI and the publisher. */
+export const fixtureStates = [
+  { maintenance: false, nonlocal: false },
+  { maintenance: true, nonlocal: false },
+  { maintenance: false, nonlocal: true },
+  { maintenance: true, nonlocal: true },
+  { maintenance: false, nonlocal: false, providerLocal: true },
+  { maintenance: true, nonlocal: false, providerLocal: true },
+];
+
 /** Real Helm and Kustomize run without cluster access, plugins or remote bases. */
 export function renderFixture(
   tools,
-  { maintenance = false, nonlocal = false, runtime = {}, data = {}, lint = false } = {},
+  {
+    maintenance = false,
+    nonlocal = false,
+    providerLocal = false,
+    runtime = {},
+    data = {},
+    lint = false,
+  } = {},
 ) {
+  assert(
+    !(providerLocal && nonlocal),
+    'Local provider cannot qualify a nonlocal profile',
+  );
   // Kustomize supports remote bases by default; this preview deliberately does not.
   const [composition] = documents(
     readFileSync(
@@ -45,8 +66,33 @@ export function renderFixture(
   const parent = realpathSync(tmpdir());
   const temporary = mkdtempSync(join(parent, 'fleetiq-manifest-render-'));
   try {
+    const directory = providerLocal ? 'qualified-local-preview' : 'local-preview';
+    if (providerLocal) {
+      const [overlay] = documents(
+        readFileSync(
+          resolve(root, `environments/${directory}/kustomization.yaml`),
+          'utf8',
+        ),
+      );
+      assert.deepEqual(
+        overlay,
+        {
+          apiVersion: 'kustomize.config.k8s.io/v1beta1',
+          kind: 'Kustomization',
+          resources: ['../local-preview'],
+          patches: [
+            {
+              target: { kind: 'ResourceQuota', name: 'fleet-data-budget' },
+              patch:
+                "apiVersion: v1\nkind: ResourceQuota\nmetadata: { name: fleet-data-budget, namespace: fleetiq-data }\nspec:\n  hard:\n    requests.storage: 8Gi\n    persistentvolumeclaims: '4'",
+            },
+          ],
+        },
+        'Only reviewed provider-local composition inputs are allowed',
+      );
+    }
     const result = documents(
-      tools.kustomize(['build', resolve(root, 'environments/local-preview')]),
+      tools.kustomize(['build', resolve(root, `environments/${directory}`)]),
     );
     for (const [chart, namespace, override] of [
       ['runtime', 'fleetiq-local', { maintenance, ...runtime }],
@@ -62,9 +108,10 @@ export function renderFixture(
         toolsLock.kubernetes,
         '--values',
         resolve(root, `environments/local-preview/${chart}.yaml`),
-        '--values',
-        values,
       ];
+      if (providerLocal)
+        args.push('--values', resolve(root, `environments/${directory}/${chart}.yaml`));
+      args.push('--values', values);
       if (nonlocal)
         args.push(
           '--set',

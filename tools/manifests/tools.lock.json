@@ -120,6 +120,13 @@
       "file": "httproute_v1.json",
       "url": "https://raw.githubusercontent.com/datreeio/CRDs-catalog/501527ab9c40c827144c8f45945b25a023e344ce/gateway.networking.k8s.io/httproute_v1.json",
       "sha256": "e5692e62edd9b8a14bd2527d0a732e174a649131aa4d47159737dc6527c59ca5"
+    },
+    {
+      "kind": "CiliumNetworkPolicy",
+      "apiVersion": "cilium.io/v2",
+      "file": "ciliumnetworkpolicy_v2.json",
+      "url": "https://raw.githubusercontent.com/datreeio/CRDs-catalog/501527ab9c40c827144c8f45945b25a023e344ce/cilium.io/ciliumnetworkpolicy_v2.json",
+      "sha256": "9261eccbea2468f399aa2f22495b5a1c2c54bd180d015925392afb4f17326c85"
     }
   ]
 }

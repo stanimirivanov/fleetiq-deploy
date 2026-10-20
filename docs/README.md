@@ -7,6 +7,7 @@
 - [Verification](development/verification.md): deterministic checks and evidence.
 - [Kubernetes packages](operations/kubernetes-packages.md): reusable charts,
   offline preview, credentials, networking and retention boundaries.
+- [Local Kubernetes prerequisites](operations/local-kubernetes-prerequisites.md): qualified-provider package compatibility, publication order and remaining D06 live gates.
 - [Release packages](operations/release-packages.md): immutable OCI publication,
   producer verification and separate candidate/promotion contracts.
 - [D06 readiness](operations/d06-readiness.md): current provider/publication

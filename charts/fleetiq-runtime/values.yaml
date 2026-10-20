@@ -5,9 +5,14 @@ maintenance: false
 imagePullSecrets: []
 public:
   host: ''
+  # Browser-facing port, independent of the Gateway/node listener.
+  port: 443
 gateway:
   className: ''
   certificateSecret: ''
+  listenerPort: 443
+  # Cilium Gateway uses its reserved ingress identity, not a gateway Pod identity.
+  ingressMode: pod-selector
 backend:
   image: ''
   replicas: 1

@@ -1,0 +1,3 @@
+# OFFLINE OVERRIDE ONLY: this digest is synthetic, never an accepted image selection.
+image: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+storage: { className: local-retained, size: 2Gi }

@@ -11,6 +11,9 @@ trust, credentials and qualification limits; values.schema.json owns input types
 - Restricted application Pods, private Services and explicit network allow rules.
 - maintenance=true stops both application Deployments without deleting data.
 - profile=nonlocal requires two or more replicas of each application component.
+- public.port and gateway.listenerPort distinguish browser and provider listener ports.
+- gateway.ingressMode=cilium adds an edge-only reserved-ingress identity allow.
+- Trusted OIDC egress derives its port from the configured HTTPS issuer URL.
 
 The offline local-preview values are fixtures, not a release selection. No
 migration, operator bootstrap, CRD/controller installation or Helm hook occurs.

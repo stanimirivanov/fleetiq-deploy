@@ -4,7 +4,12 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { manifestPolicy } from '../manifests/policy.mjs';
-import { documents, renderFixture, validateSchemas } from '../manifests/render.mjs';
+import {
+  documents,
+  fixtureStates,
+  renderFixture,
+  validateSchemas,
+} from '../manifests/render.mjs';
 import {
   assertLocalReferences,
   manifestTools,
@@ -18,6 +23,7 @@ import { root } from '../process.mjs';
 // Real prerequisites are mandatory. No mock executable or missing-tool skip.
 const tools = manifestTools();
 const active = renderFixture(tools, { lint: true });
+const providerActive = renderFixture(tools, { providerLocal: true, lint: true });
 const resource = (resources, kind, name) =>
   resources.find(
     (item) => item.kind === kind && (!name || item.metadata.name === name),
@@ -25,19 +31,17 @@ const resource = (resources, kind, name) =>
 const backend = (resources) =>
   resource(resources, 'Deployment', 'fleetiq-backend').spec.template.spec;
 
-test('real Helm, Kustomize and pinned schemas qualify the complete active, maintenance and nonlocal compositions', () => {
-  for (const state of [
-    { maintenance: false, nonlocal: false },
-    { maintenance: true, nonlocal: false },
-    { maintenance: false, nonlocal: true },
-    { maintenance: true, nonlocal: true },
-  ]) {
+test('real Helm, Kustomize and pinned schemas qualify the complete portable and provider-local compositions', () => {
+  for (const state of fixtureStates) {
     const rendered =
       state.maintenance || state.nonlocal
         ? renderFixture(tools, { ...state, lint: true })
-        : active;
-    assert.equal(validateSchemas(tools, rendered), 18);
-    assert.equal(manifestPolicy(rendered, state), 18);
+        : state.providerLocal
+          ? providerActive
+          : active;
+    const count = state.providerLocal ? 19 : 18;
+    assert.equal(validateSchemas(tools, rendered), count);
+    assert.equal(manifestPolicy(rendered, state), count);
   }
 });
 
@@ -97,6 +101,162 @@ for (const [label, change] of [
     assert.throws(() => renderFixture(tools, change));
   });
 }
+
+for (const [label, runtime] of [
+  ['zero public port', { public: { port: 0 } }],
+  ['oversized public port', { public: { port: 65536 } }],
+  ['string public port', { public: { port: '18443' } }],
+  ['zero listener port', { gateway: { listenerPort: 0 } }],
+  ['oversized listener port', { gateway: { listenerPort: 65536 } }],
+  ['unregistered ingress mode', { gateway: { ingressMode: 'world' } }],
+  [
+    'zero issuer port',
+    { backend: { oidc: { issuer: 'https://identity.local.test:0/realms/fleet' } } },
+  ],
+  [
+    'oversized issuer port',
+    { backend: { oidc: { issuer: 'https://identity.local.test:65536/realms/fleet' } } },
+  ],
+  [
+    'invalid issuer port',
+    {
+      backend: { oidc: { issuer: 'https://identity.local.test:invalid/realms/fleet' } },
+    },
+  ],
+]) {
+  test(`real Helm rejects ${label}`, () =>
+    assert.throws(() => renderFixture(tools, { runtime })));
+}
+
+for (const [label, mutate] of [
+  [
+    'empty Cilium selector',
+    (items) => {
+      resource(items, 'CiliumNetworkPolicy').spec.endpointSelector = {};
+    },
+  ],
+  [
+    'Cilium backend access',
+    (items) => {
+      resource(items, 'CiliumNetworkPolicy').spec.endpointSelector.matchLabels[
+        'app.kubernetes.io/name'
+      ] = 'fleetiq-backend';
+    },
+  ],
+  [
+    'Cilium world access',
+    (items) => {
+      resource(items, 'CiliumNetworkPolicy').spec.ingress[0].fromEntities = ['world'];
+    },
+  ],
+  [
+    'Cilium all-port access',
+    (items) => {
+      resource(items, 'CiliumNetworkPolicy').spec.ingress[0].toPorts = [];
+    },
+  ],
+  [
+    'additional Cilium policy',
+    (items) => {
+      resource(items, 'CiliumNetworkPolicy').specs = [
+        { endpointSelector: {}, ingress: [{}] },
+      ];
+    },
+  ],
+  [
+    'Cilium egress escape',
+    (items) => {
+      resource(items, 'CiliumNetworkPolicy').spec.egress = [{ toEntities: ['all'] }];
+    },
+  ],
+  [
+    'missing Cilium allow',
+    (items) => {
+      items.splice(
+        items.findIndex((item) => item.kind === 'CiliumNetworkPolicy'),
+        1,
+      );
+    },
+  ],
+  [
+    'phantom gateway Pod allow',
+    (items) => {
+      resource(items, 'NetworkPolicy', 'fleetiq-edge').spec.ingress = [
+        { from: [{}], ports: [{ protocol: 'TCP', port: 8080 }] },
+      ];
+    },
+  ],
+  [
+    'lost browser port',
+    (items) => {
+      backend(items).containers[0].env.find(
+        (item) => item.name === 'FLEETIQ_BROWSER_ORIGIN',
+      ).value = 'https://fleet.local.test';
+    },
+  ],
+  [
+    'external port used as listener',
+    (items) => {
+      resource(items, 'Gateway').spec.listeners[0].port = 18443;
+    },
+  ],
+  [
+    'wrong issuer egress port',
+    (items) => {
+      resource(items, 'NetworkPolicy', 'fleetiq-backend').spec.egress[2].ports[0].port =
+        443;
+    },
+  ],
+  [
+    'unqualified local storage',
+    (items) => {
+      resource(items, 'Cluster').spec.storage.storageClass = 'standard';
+    },
+  ],
+  [
+    'oversized local claim',
+    (items) => {
+      resource(items, 'Cluster').spec.storage.size = '10Gi';
+    },
+  ],
+  [
+    'overstated provider quota',
+    (items) => {
+      resource(items, 'ResourceQuota', 'fleet-data-budget').spec.hard[
+        'requests.storage'
+      ] = '40Gi';
+    },
+  ],
+]) {
+  test(`qualified local policy rejects ${label}`, () => {
+    const items = structuredClone(providerActive);
+    mutate(items);
+    assert.throws(() =>
+      manifestPolicy(items, {
+        providerLocal: true,
+        maintenance: false,
+        nonlocal: false,
+      }),
+    );
+  });
+}
+
+test('Cilium resources are absent unless explicitly selected', () => {
+  assert(!active.some((item) => item.kind === 'CiliumNetworkPolicy'));
+  assert.throws(() => manifestPolicy(providerActive));
+});
+
+test('Pod-selector mode cannot omit Gateway peer inputs', () => {
+  assert.throws(() =>
+    renderFixture(tools, {
+      runtime: { network: { gatewayNamespace: null, gatewayPodLabels: null } },
+    }),
+  );
+});
+
+test('provider-local mode never implies nonlocal acceptance', () => {
+  assert.throws(() => renderFixture(tools, { providerLocal: true, nonlocal: true }));
+});
 
 test('chart defaults alone refuse to render; no identity-disabled or image fallback', () => {
   for (const chart of ['runtime', 'data'])
