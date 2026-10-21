@@ -15,7 +15,10 @@ const secretReference = (entry) => {
 };
 
 /** Check application restrictions and producer interfaces rather than YAML text. */
-export function workloadPolicy(resource, { maintenance, nonlocal }) {
+export function workloadPolicy(
+  resource,
+  { maintenance, nonlocal, providerLocal = false },
+) {
   assert.deepEqual(
     resource.spec.strategy,
     { type: 'RollingUpdate', rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } },
@@ -94,7 +97,10 @@ export function workloadPolicy(resource, { maintenance, nonlocal }) {
       'Runtime must never migrate',
     );
     assert.equal(env.FLEETIQ_BIND_ADDRESS.value, '0.0.0.0:8080');
-    assert.equal(env.FLEETIQ_BROWSER_ORIGIN.value, 'https://fleet.local.test');
+    assert.equal(
+      env.FLEETIQ_BROWSER_ORIGIN.value,
+      providerLocal ? 'https://fleet.local.test:18443' : 'https://fleet.local.test',
+    );
     secretReference(env.DATABASE_URL);
     secretReference(env.FLEETIQ_OIDC_CLIENT_SECRET);
     const issuer = new URL(env.FLEETIQ_OIDC_ISSUER.value);
@@ -103,8 +109,7 @@ export function workloadPolicy(resource, { maintenance, nonlocal }) {
         !issuer.username &&
         !issuer.password &&
         !issuer.search &&
-        !issuer.hash &&
-        !issuer.port,
+        !issuer.hash,
       'Trusted HTTPS OIDC required',
     );
     assert(

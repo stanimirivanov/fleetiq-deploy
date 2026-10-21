@@ -1,19 +1,14 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { manifestPolicy } from './policy.mjs';
-import { renderFixture, validateSchemas } from './render.mjs';
+import { fixtureStates, renderFixture, validateSchemas } from './render.mjs';
 import { manifestTools, toolsLock } from './toolchain.mjs';
 
-/** All three positive states must validate with real tools and local schemas. */
+/** All registered positive states must validate with real tools and local schemas. */
 export function checkManifests() {
   const tools = manifestTools();
   const measurements = [];
-  for (const state of [
-    { maintenance: false, nonlocal: false },
-    { maintenance: true, nonlocal: false },
-    { maintenance: false, nonlocal: true },
-    { maintenance: true, nonlocal: true },
-  ]) {
+  for (const state of fixtureStates) {
     const rendered = renderFixture(tools, { ...state, lint: true });
     const schemas = validateSchemas(tools, rendered);
     manifestPolicy(rendered, state);

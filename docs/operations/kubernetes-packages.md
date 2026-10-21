@@ -57,8 +57,12 @@ CA ConfigMap for that mount. The optional OIDC public CA is mounted independentl
 and augments normal TLS trust. Secret contents and certificate validity cannot
 be verified offline; D06 must prove them against actual services.
 
-The gateway owns HTTPS. Only its explicit namespace/pod selector may reach the
-private UX listener. The edge preserves the producer's same-origin API/cookie
+The gateway owns HTTPS. Its ordinary mode admits only the selected namespace/Pod
+identity. Explicit Cilium mode admits the reserved ingress identity to the private
+edge listener only. Browser port and Gateway listener port are independent inputs;
+OIDC egress follows the actual HTTPS issuer port. See the
+[qualified-local handoff](local-kubernetes-prerequisites.md) for the provider contract.
+The private UX listener remains unpublished. The edge preserves the producer's same-origin API/cookie
 contract. Its readiness listener binds loopback: probes use the producer's wget
 command rather than an unreachable kubelet HTTP probe. Backend startup/readiness
 uses /health/ready, liveness /health/live, and termination has a bounded grace.

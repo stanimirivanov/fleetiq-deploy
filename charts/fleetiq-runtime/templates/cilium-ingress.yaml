@@ -1,0 +1,15 @@
+{{- if eq .Values.gateway.ingressMode "cilium" }}
+# The provider owns Cilium and its CRDs. This grants no backend/database access.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Release.Name }}-gateway-ingress
+spec:
+  endpointSelector:
+    matchLabels: { app.kubernetes.io/name: {{ .Release.Name }}-edge }
+  ingress:
+    - fromEntities: [ingress]
+      toPorts:
+        - ports: [{ port: '8080', protocol: TCP }]
+{{- end }}

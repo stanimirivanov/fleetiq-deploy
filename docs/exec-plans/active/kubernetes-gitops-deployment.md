@@ -3,6 +3,11 @@
 Status: In progress; planning issue #3. D01-D05 merged. D06 is blocked on provider
 qualification and accepted artifact selections; the prerequisite assessment is
 tracked in [issue #9](https://github.com/stanimirivanov/fleetiq-deploy/issues/9).
+Status: In progress; planning issue #3. D01-D05 are merged. Provider I01-I04
+are merged; D06's packaging/onboarding prerequisite is tracked in
+[issue #11](https://github.com/stanimirivanov/fleetiq-deploy/issues/11).
+Persistent installation acceptance remains incomplete; follow the
+[publication/onboarding handoff](../../operations/local-kubernetes-prerequisites.md).
 
 ## TL;DR
 

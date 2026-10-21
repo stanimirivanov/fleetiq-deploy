@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { digestImage, resources } from './resource-policy.mjs';
 
 /** Database ownership, authentication and resources remain separate from application Pods. */
-export function dataPolicy(cluster, { nonlocal }) {
+export function dataPolicy(cluster, { nonlocal, providerLocal = false }) {
   const spec = cluster.spec;
   digestImage(spec.imageName);
   assert.match(
@@ -14,6 +14,14 @@ export function dataPolicy(cluster, { nonlocal }) {
   assert.equal(spec.enableSuperuserAccess, false);
   assert.equal(spec.primaryUpdateStrategy, 'supervised');
   assert(spec.storage.storageClass && /^[1-9]\d*Gi$/u.test(spec.storage.size));
+  if (providerLocal) {
+    assert.equal(spec.storage.storageClass, 'local-retained');
+    assert.match(
+      spec.storage.size,
+      /^[1-4]Gi$/u,
+      'Local provider permits only whole 1-4Gi claims',
+    );
+  }
   resources(spec.resources);
   assert.deepEqual(Object.keys(spec.bootstrap), ['initdb']);
   const initdb = spec.bootstrap.initdb;

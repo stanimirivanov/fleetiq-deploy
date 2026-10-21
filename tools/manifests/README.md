@@ -6,7 +6,7 @@ Run pnpm manifests:install, then pnpm manifests:check or pnpm check.
 - Archive checksums come from official Helm, Kustomize and Kubeconform release
   records. Extracted executable hashes are also pinned and rechecked before use.
 - Kubernetes 1.35.0 schemas use an immutable yannh/kubernetes-json-schema revision.
-  GVK-specific CNPG/Gateway schemas use a pinned Datree CRDs-catalog revision.
+  GVK-specific CNPG/Gateway/Cilium schemas use a pinned Datree CRDs-catalog revision.
   Their exact URLs and content checksums are recorded in the lock.
 - Schema catalogues are offline shape validation, not proof of a particular
   provider's CRD version, CEL/defaulting behavior, admission or controller support.
