@@ -10,8 +10,8 @@
 - [Local Kubernetes prerequisites](operations/local-kubernetes-prerequisites.md): qualified-provider package compatibility, publication order and remaining D06 live gates.
 - [Release packages](operations/release-packages.md): immutable OCI publication,
   producer verification and separate candidate/promotion contracts.
-- [D06 readiness](operations/d06-readiness.md): current provider/publication
-  blockers and [focused provider handoff](handoffs/k8s-infrastructure-d06-unblock.md).
+- [D06 readiness](operations/d06-readiness.md): observed publication runs, current
+  blockers and persistent-target review inputs. The [earlier provider handoff](handoffs/k8s-infrastructure-d06-unblock.md) is historical.
 - [Kubernetes delivery plan](exec-plans/active/kubernetes-gitops-deployment.md): D01-D14 sequence and provider prerequisites.
 - [Active delivery plan](exec-plans/active/m02-development-installation.md):
   scope, remaining browser qualification and acceptance.

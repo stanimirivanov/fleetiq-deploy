@@ -2,7 +2,9 @@
 
 ## TL;DR
 
-Copy this prompt to the project that owns `k8s-infrastructure`. It requests
+Historical request from 2026-10-19: I01-I04 are now merged. Use the
+[current D06 readiness record](../operations/d06-readiness.md) before acting.
+The original prompt below was addressed to the owner of `k8s-infrastructure`. It requests
 provider-owned capability work, not FleetIQ workloads or a change to the retained
 Perfeng environment. The detailed I01–I04 requirements remain in the
 [original handoff](k8s-infrastructure-consumer-onboarding.md).

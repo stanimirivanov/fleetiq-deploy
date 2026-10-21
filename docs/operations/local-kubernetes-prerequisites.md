@@ -7,7 +7,7 @@
 - This prerequisite fixes package compatibility and verifies offline/OCI behavior.
   **D06 remains incomplete: no persistent FleetIQ installation is accepted.**
 - Merge and publish the corrected charts from reviewed main, then select actual
-  backend, UX and package receipts. No publisher runs were observed on 2026-10-20.
+  backend, UX and package receipts. See the [current readiness record](d06-readiness.md) for publication progress.
 - Never deploy preview digests, adopt the disposed infrastructure qualification
   cluster, disable TLS/OIDC, or remove the candidate/activation boundary guard.
 
@@ -116,7 +116,8 @@ schema is checksum-pinned alongside the existing schema catalog; missing inputs
 fail rather than fetching or skipping during verification.
 
 [Issue 11](https://github.com/stanimirivanov/fleetiq-deploy/issues/11) owns this
-prerequisite. The prior blocker-record PR 10/issue 9 remain separate. No activation
+prerequisite. The merged PR 10/issue 9 assessment is historical; the
+[current readiness record](d06-readiness.md) supersedes its missing-provider status. No activation
 record, Argo source graph or live apply command is introduced here. The existing
 no-Argo-graph guard stays enforced until protected source-graph validation exists.
 
