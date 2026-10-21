@@ -17,6 +17,13 @@ have maintain/admin permission. The source must be a merged same-repository PR;
 the latest authoritative PR CI must have passed on a checkout whose tree equals
 the merged source. The CI run title records the tested merge checkout SHA.
 
+Publication uses a detached exact-source checkout. Release-boundary verification
+resolves the fetched `refs/remotes/origin/main` once to an ancestor commit; it
+requires no local `main` branch. An explicit trusted `FLEETIQ_BASE_SHA` remains
+supported. Missing or unrelated bases fail with fetch/base guidance, without a
+`HEAD` fallback. Candidate activation restrictions apply to untracked, staged
+and committed changes against the resolved base.
+
 The read-only authorization job has no registry-write permission. Its dependent
 publisher reruns structural and real OCI qualification, checks clean source and
 exact successful source-bound receipts, then repeats authorization before pushing.
