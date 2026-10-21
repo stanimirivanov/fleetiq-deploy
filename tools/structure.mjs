@@ -6,6 +6,15 @@ import { verifyPublicationWorkflow, verifyWorkflow } from './ci.mjs';
 import { lock, sourceCompose, validateLock } from './policy.mjs';
 import { root, run } from './process.mjs';
 
+/** Keep the existing opening-summary boundary and identify the guide to repair. */
+export function guideSummary(file, contents) {
+  if (contents.split('\n').length > 100)
+    assert(
+      contents.slice(0, 500).includes('TL;DR'),
+      `Long guide requires a TL;DR in its first 500 characters: ${file}`,
+    );
+}
+
 export function structure() {
   validateLock();
   verifyWorkflow();
@@ -115,8 +124,7 @@ export function structure() {
     );
     if (!file.endsWith('.md') || !existsSync(resolve(root, file))) continue;
     const bytes = readFileSync(resolve(root, file), 'utf8');
-    if (bytes.split('\n').length > 100)
-      assert(bytes.slice(0, 500).includes('TL;DR'), 'Long guides require a TL;DR');
+    guideSummary(file, bytes);
     for (const match of bytes.matchAll(/\]\(([^)#]+)(?:#[^)]*)?\)/gu)) {
       if (/^(?:https?:|mailto:)/u.test(match[1])) continue;
       assert(

@@ -12,6 +12,7 @@ import {
   validateLock,
 } from '../policy.mjs';
 import { root } from '../process.mjs';
+import { guideSummary } from '../structure.mjs';
 
 const settings = {
   httpsPort: 58443,
@@ -207,3 +208,18 @@ test('qualification override removes each identity setting instead of setting em
   );
   for (const key of identityKeys) assert(override.includes(`${key}: !reset null`));
 });
+
+for (const newline of ['\n', '\r\n']) {
+  test(`long-guide summary keeps its opening boundary and names the file (${JSON.stringify(newline)})`, () => {
+    const file = 'docs/example.md';
+    const body = Array(101).fill('Detail.').join(newline);
+    guideSummary(file, body.split(newline).slice(0, 100).join(newline));
+    guideSummary(file, `# Guide${newline}${newline}## TL;DR${newline}${body}`);
+    guideSummary(file, `${'x'.repeat(495)}TL;DR${body}`);
+    for (const value of [body, `${'x'.repeat(496)}TL;DR${body}`])
+      assert.throws(() => guideSummary(file, value), {
+        message:
+          'Long guide requires a TL;DR in its first 500 characters: docs/example.md',
+      });
+  });
+}
