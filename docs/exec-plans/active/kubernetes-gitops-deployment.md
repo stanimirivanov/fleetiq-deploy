@@ -1,7 +1,8 @@
 # FleetIQ Kubernetes GitOps delivery plan
 
-Status: In progress; planning issue #3. D01-D04 merged; D05 is tracked in
-[issue #7](https://github.com/stanimirivanov/fleetiq-deploy/issues/7).
+Status: In progress; planning issue #3. D01-D05 merged. D06 is blocked on provider
+qualification and accepted artifact selections; the prerequisite assessment is
+tracked in [issue #9](https://github.com/stanimirivanov/fleetiq-deploy/issues/9).
 
 ## TL;DR
 
@@ -176,6 +177,11 @@ describe real offline qualification and its limits; no live environment is activ
   cleanup behavior. Controlled initial migration/bootstrap is explicit and audited.
 - **Dependencies / Parallelism:** D01-D05 plus qualified I01-I04. Initial install
   is deliberately operator-guided; D08 replaces release mutations with the workflow.
+- **Readiness (2026-10-19):** Blocked, not implemented or live-qualified. Provider
+  main remains `73a28e76059a880141f280c075aa563428396034`; I01-I04 evidence and
+  accepted producer publication selections are absent. See the
+  [readiness assessment](../../operations/d06-readiness.md) and
+  [focused provider prompt](../../handoffs/k8s-infrastructure-d06-unblock.md).
 
 ### PR D07: Prove backup, isolated restore and durable evidence storage
 
