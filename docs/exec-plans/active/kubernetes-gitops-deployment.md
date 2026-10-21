@@ -6,7 +6,7 @@ Status: In progress; planning issue #3. D01-D05 are merged. Provider I01-I04
 are merged; D06's packaging/onboarding prerequisite is tracked in
 [issue #11](https://github.com/stanimirivanov/fleetiq-deploy/issues/11).
 Persistent installation acceptance remains incomplete; publication readiness and
-remaining gates are tracked in [issue #13](https://github.com/stanimirivanov/fleetiq-deploy/issues/13).
+chart publication prerequisite is tracked in [issue #15](https://github.com/stanimirivanov/fleetiq-deploy/issues/15).
 Follow the [current readiness record](../../operations/d06-readiness.md) and
 [publication/onboarding handoff](../../operations/local-kubernetes-prerequisites.md).
 
@@ -181,11 +181,11 @@ describe real offline qualification and its limits; no live environment is activ
   cleanup behavior. Controlled initial migration/bootstrap is explicit and audited.
 - **Dependencies / Parallelism:** D01-D05 plus qualified I01-I04. Initial install
   is deliberately operator-guided; D08 replaces release mutations with the workflow.
-- **Readiness (2026-10-19):** Blocked, not implemented or live-qualified. Provider
-  main remains `73a28e76059a880141f280c075aa563428396034`; I01-I04 evidence and
-  accepted producer publication selections are absent. See the
-  [readiness assessment](../../operations/d06-readiness.md) and
-  [focused provider prompt](../../handoffs/k8s-infrastructure-d06-unblock.md).
+- **Readiness (2026-10-21):** The backend is published from reviewed main;
+  provider I01-I04 are merged. Chart publication needs issue 15's detached-base
+  correction, and UX still lacks qualified installed tools. No full release BOM
+  or persistent installation is accepted. The [readiness record](../../operations/d06-readiness.md)
+  retains actual producer evidence and the exact remaining gates.
 
 ### PR D07: Prove backup, isolated restore and durable evidence storage
 
