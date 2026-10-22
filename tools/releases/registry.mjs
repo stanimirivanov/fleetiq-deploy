@@ -70,7 +70,9 @@ export function registryClient(repository, { loopback = false, credential } = {}
           'application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json',
         ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
       },
-      redirect: 'error',
+      // Inspect redirects here so only the blob callers below may follow the
+      // approved storage host, without forwarding the registry credential.
+      redirect: 'manual',
       signal: AbortSignal.timeout(30_000),
     });
   }

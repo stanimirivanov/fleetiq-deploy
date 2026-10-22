@@ -508,6 +508,52 @@ test('evidence reader rejects traversal, links, ambiguous reports, non-JSON and 
     await assert.rejects(() => reportArchive(zip(entries)));
 });
 
+test('UX evidence selects the trusted publication run directory without qualification fallback', async () => {
+  const options = { directory: '12-1' };
+  const reports = await reportArchive(
+    zip([
+      ['qualification-id/qualification.json', '{"outcome":"passed"}'],
+      ['12-11/publication.json', '{"wrong":"attempt"}'],
+      ['12-1/publication.json', '{"exact":"publication"}'],
+      ['12-1/qualification.json', '{"exact":"qualification"}'],
+    ]),
+    options,
+  );
+  assert.deepEqual([...reports.keys()], ['publication.json', 'qualification.json']);
+  assert.equal(
+    reports.get('qualification.json').toString(),
+    '{"exact":"qualification"}',
+  );
+  for (const entries of [
+    [['qualification-id/publication.json', '{}']],
+    [['12-11/publication.json', '{}']],
+    [['12-1/nested/publication.json', '{}']],
+    [
+      ['12-1/publication.json', '{}'],
+      ['12-1/publication.json', '{}'],
+    ],
+    [
+      ['12-1/publication.json', '{}'],
+      ['other/secret.txt', 'no'],
+    ],
+    [
+      ['12-1/publication.json', '{}'],
+      ['other/link.json', '{}', 0o120777],
+    ],
+    [
+      ['12-1/publication.json', '{}'],
+      ['../escape.json', '{}'],
+    ],
+    [
+      ['12-1/publication.json', '{}'],
+      ['other/huge.json', 'x'.repeat(32 * 1024 * 1024)],
+    ],
+  ])
+    await assert.rejects(() => reportArchive(zip(entries), options));
+  for (const directory of ['../12-1', '12-1/', '12-1/other', '12-0'])
+    await assert.rejects(() => reportArchive(zip([]), { directory }));
+});
+
 test('schema-valid producer claims cannot substitute for independent GitHub publication evidence', () => {
   const { release } = fixture();
   const selected = structuredClone(release.images.backend);
@@ -589,4 +635,62 @@ test('live OCI descriptor checks reject missing blobs, wrong sizes and retagged 
   identity = digest(Buffer.from('changed'));
   await assert.rejects(() => registry.descriptor(descriptor));
   await assert.rejects(() => registry.descriptor({ digest: 'latest', size: 2 }));
+});
+
+test('GHCR blob redirects reach only approved storage without forwarding registry credentials', async (context) => {
+  const content = Buffer.from('{}');
+  const reference = digest(content);
+  let location = 'https://pkg-containers.githubusercontent.com/blob';
+  let storageStatus = 200;
+  let storageRequests = 0;
+  context.mock.method(globalThis, 'fetch', async (input, options = {}) => {
+    const url = new URL(input);
+    if (url.hostname === 'ghcr.io' && url.pathname === '/token')
+      return Response.json({ token: 'fixture' });
+    if (url.hostname === 'ghcr.io') {
+      assert.equal(options.redirect, 'manual');
+      assert.equal(options.headers.Authorization, 'Bearer fixture');
+      return new Response(null, { status: 307, headers: { Location: location } });
+    }
+    assert.equal(url.hostname, 'pkg-containers.githubusercontent.com');
+    assert.equal(options.redirect, 'error');
+    assert.equal(options.headers, undefined);
+    storageRequests += 1;
+    return new Response(options.method === 'HEAD' ? null : content, {
+      status: storageStatus,
+      headers: { 'Content-Length': String(content.length) },
+    });
+  });
+  const registry = registryClient('ghcr.io/stanimirivanov/fixture');
+  assert.equal((await registry.object(reference, 'blobs')).digest, reference);
+  await registry.descriptor({ digest: reference, size: content.length });
+  assert.equal(storageRequests, 2);
+  await assert.rejects(() => registry.object(reference), /OCI object unavailable/);
+  assert.equal(storageRequests, 2, 'Manifest redirects must never reach storage');
+  for (const forbidden of [
+    'https://example.com/blob',
+    'http://pkg-containers.githubusercontent.com/blob',
+    'https://pkg-containers.githubusercontent.com:8443/blob',
+  ]) {
+    location = forbidden;
+    await assert.rejects(
+      () => registry.object(reference, 'blobs'),
+      /Untrusted registry blob redirect/,
+    );
+    await assert.rejects(
+      () => registry.descriptor({ digest: reference, size: 2 }),
+      /Untrusted registry blob redirect/,
+    );
+  }
+  assert.equal(storageRequests, 2, 'Untrusted destinations must never be fetched');
+  location = 'https://pkg-containers.githubusercontent.com/blob';
+  storageStatus = 307;
+  await assert.rejects(
+    () => registry.object(reference, 'blobs'),
+    /OCI object unavailable/,
+  );
+  await assert.rejects(
+    () => registry.descriptor({ digest: reference, size: 2 }),
+    /Referenced OCI blob is unavailable/,
+  );
 });

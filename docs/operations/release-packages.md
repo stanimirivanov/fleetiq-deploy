@@ -80,6 +80,13 @@ current maintainer identities, merged source review, GitHub artifact digest,
 bounded in-memory ZIP reports, receipt/qualification hashes and live OCI manifests.
 Archive limits are 128 MiB compressed, 256 MiB expanded and fewer than 32 MiB
 per JSON report, matching the producers' individual report boundary.
+UX uploads both original qualification and publication report directories. Only
+`<trusted-run>-<trusted-attempt>/` supplies its accepted reports. The directory is
+derived from the independently selected publication identity, never an arbitrary
+candidate path. Every archive member still undergoes path/type/expansion checks;
+missing directories, nested selected reports and duplicate selected names fail.
+There is no fallback to qualification or another attempt. Backend/package archives
+retain their existing unique-basename rule.
 Runtime config must name the selected producer/revision; the backend migration
 inventory must match published qualification bytes. Package archive/BOM hashes
 must match the publication receipt. Candidate fields cannot supply this evidence.
@@ -93,6 +100,45 @@ does not grant acceptance. Copy verified, digest-bound evidence into the future
 durable release store before producer artifact expiry (UX currently retains
 reports for seven days). This directory is not the durable environment ledger.
 Expired/missing GitHub evidence fails closed; no offline trust bypass exists.
+
+## Configure local GHCR read access
+
+Use a GitHub **personal access token (classic)** with `read:packages`, issued by
+an account with access to the selected private packages. GitHub documents this
+requirement in its [Container registry authentication guide](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
+A repository contents-only fine-grained token is not a GHCR credential.
+
+Set the actor and token in the terminal that will run verification. Prompt for
+the secret instead of typing it into a command or storing it in Git:
+
+```powershell
+$env:FLEETIQ_REGISTRY_ACTOR = 'stanimirivanov'
+$registrySecret = Read-Host 'GHCR read token' -AsSecureString
+$env:FLEETIQ_REGISTRY_READ_TOKEN =
+    [System.Net.NetworkCredential]::new('', $registrySecret).Password
+Remove-Variable registrySecret
+pnpm releases:verify-artifacts <release-bom.json>
+```
+
+`FLEETIQ_SOURCE_READ_TOKEN` is separately required for the private GitHub producer
+APIs described above. Do not reuse a registry-only token for those APIs unless it
+also has the required source permissions. Never echo either variable.
+
+Process variables reach only that terminal and subsequently launched child
+processes; setting them in another terminal does not update an already-running
+agent. Remove the registry token after verification:
+
+```powershell
+Remove-Item Env:FLEETIQ_REGISTRY_READ_TOKEN
+Remove-Item Env:FLEETIQ_REGISTRY_ACTOR
+```
+
+Alternatively, an operator using the existing GitHub CLI credential may add its
+package-read scope with `gh auth refresh --hostname github.com --scopes read:packages`
+and complete browser authorization. The CLI credential remains in its own store;
+it does not automatically populate the verifier's environment variables. Approved
+local orchestration can pass it in child memory without printing or writing it.
+Do not change global Docker credentials merely to run artifact verification.
 
 ## Candidate and promotion admission
 

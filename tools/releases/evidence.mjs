@@ -3,8 +3,17 @@ import { basename } from 'node:path';
 import yauzl from 'yauzl';
 import { digest } from './contracts.mjs';
 
-/** Inspect bounded JSON reports in memory; never extract a producer-controlled path. */
-export async function reportArchive(bytes) {
+/**
+ * Inspect bounded JSON in memory without extracting producer-controlled paths.
+ * UX retains qualification and publication directories in one archive. Select only
+ * the exact trusted run/attempt directory; never fall back to another directory.
+ * Every member still undergoes path, type and expansion checks before selection.
+ */
+export async function reportArchive(bytes, { directory } = {}) {
+  assert(
+    directory === undefined || /^[1-9][0-9]*-[1-9][0-9]*$/u.test(directory),
+    'Invalid publication report directory',
+  );
   assert(bytes.length <= 128 * 1024 * 1024, 'Publication archive exceeds bound');
   const zip = await new Promise((resolve, reject) =>
     yauzl.fromBuffer(
@@ -42,7 +51,15 @@ export async function reportArchive(bytes) {
           );
           total += entry.uncompressedSize;
           assert(total <= 256 * 1024 * 1024, 'Expanded evidence exceeds bound');
+          if (directory !== undefined && !entry.fileName.startsWith(`${directory}/`))
+            return zip.readEntry();
           const name = basename(entry.fileName);
+          if (directory !== undefined)
+            assert.equal(
+              entry.fileName,
+              `${directory}/${name}`,
+              'Nested publication report refused',
+            );
           assert(!files.has(name), 'Ambiguous duplicate evidence report');
           zip.openReadStream(entry, (error, stream) => {
             if (error) return reject(error);
@@ -60,6 +77,10 @@ export async function reportArchive(bytes) {
       });
       zip.readEntry();
     });
+    assert(
+      directory === undefined || files.size > 0,
+      'Missing exact publication report directory',
+    );
     return files;
   } finally {
     zip.close();
