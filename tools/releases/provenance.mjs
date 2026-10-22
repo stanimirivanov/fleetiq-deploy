@@ -4,7 +4,7 @@ import { publicationEvidence, reportArchive } from './evidence.mjs';
 import { github, maintainer } from './github.mjs';
 import { boundedBytes, registryClient, verifyBlobs } from './registry.mjs';
 
-async function artifactArchive(repository, artifact, token) {
+async function artifactArchive(repository, artifact, token, reportOptions) {
   const response = await fetch(
     `https://api.github.com/repos/${repository}/actions/artifacts/${artifact.id}/zip`,
     {
@@ -38,7 +38,7 @@ async function artifactArchive(repository, artifact, token) {
   assert(archive.ok, 'Publication evidence archive unavailable');
   const bytes = await boundedBytes(archive, 128 * 1024 * 1024);
   assert.equal(digest(bytes), artifact.digest, 'Publication archive digest mismatch');
-  return await reportArchive(bytes);
+  return await reportArchive(bytes, reportOptions);
 }
 
 /**
@@ -89,7 +89,12 @@ export async function verifyPublication(
     'Wrong publication artifact digest',
   );
   assert(artifact.size_in_bytes <= 128 * 1024 * 1024, 'Oversize publication artifact');
-  const reports = await artifactArchive(repository, artifact, token);
+  const reports = await artifactArchive(
+    repository,
+    artifact,
+    token,
+    role === 'ux' ? { directory: `${id}-${attempt}` } : undefined,
+  );
   const record = publicationEvidence(role, selected, run, reports);
   const merged = pulls.find(
     (pull) =>

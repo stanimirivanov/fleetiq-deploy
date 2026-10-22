@@ -6,8 +6,10 @@
   `41c558a54bc923fa69d7afc42bc663b763c3add5` before preparing a new target.
 - This prerequisite fixes package compatibility and verifies offline/OCI behavior.
   **D06 remains incomplete: no persistent FleetIQ installation is accepted.**
-- Merge and publish the corrected charts from reviewed main, then select actual
-  backend, UX and package receipts. See the [current readiness record](d06-readiness.md) for publication progress.
+- Corrected charts and the backend/UX images are published from reviewed main.
+  Complete independent artifact verification and the persistent-target prerequisites
+  in the [current readiness record](d06-readiness.md) and
+  [qualification preparation](d06-qualification.md).
 - Never deploy preview digests, adopt the disposed infrastructure qualification
   cluster, disable TLS/OIDC, or remove the candidate/activation boundary guard.
 

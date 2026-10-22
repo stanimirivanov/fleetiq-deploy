@@ -5,8 +5,9 @@
 Status: In progress; planning issue #3. D01-D05 are merged. Provider I01-I04
 are merged; D06's packaging/onboarding prerequisite is tracked in
 [issue #11](https://github.com/stanimirivanov/fleetiq-deploy/issues/11).
-Persistent installation acceptance remains incomplete; publication readiness and
-chart publication prerequisite is tracked in [issue #15](https://github.com/stanimirivanov/fleetiq-deploy/issues/15).
+Chart publication prerequisite [issue #15](https://github.com/stanimirivanov/fleetiq-deploy/issues/15) is merged and its packages are published.
+[Issue #17](https://github.com/stanimirivanov/fleetiq-deploy/issues/17) tracks UX publication, independent artifact verification and
+[persistent qualification preparation](../../operations/d06-qualification.md). Installation acceptance remains incomplete.
 Follow the [current readiness record](../../operations/d06-readiness.md) and
 [publication/onboarding handoff](../../operations/local-kubernetes-prerequisites.md).
 
