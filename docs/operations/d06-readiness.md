@@ -2,150 +2,119 @@
 
 ## TL;DR
 
-Backend and corrected chart publications remain selected. The earlier old-name
-UI publication is retained as historical evidence; current admission now requires
-`fleetiq-ui`. [UI issue 76](https://github.com/stanimirivanov/fleetiq-ui/issues/76)
-and [deployment issue 19](https://github.com/stanimirivanov/fleetiq-deploy/issues/19)
-coordinate the rename. Publish a newly qualified image after merge, rebuild the
-BOM from its actual receipt and rerun complete artifact verification. D06 remains
-incomplete; Auth0 setup is deferred and no persistent target is authorized here.
+The canonical fleetiq-ui image is published, and complete independent artifact
+verification passed on 2026-10-22 for the new UI, existing backend and existing
+chart package. No environment is promoted. D06 remains incomplete: Auth0
+configuration is deferred, protected Argo source-graph enforcement and exact
+persistent-target authorization are still required before installation.
 
-## Rename integration: 2026-10-22
+## Current verified preparation: 2026-10-22
 
-The repository is now `stanimirivanov/fleetiq-ui`. Current publication and
-verification require that exact identity, including runtime labels/provenance.
-The entries below record the earlier publication observation and retain original
-source/image identities; they are not a newly accepted canonical release.
-Previously prepared ignored BOM bytes still name the old producer and must not be
-submitted to current admission. No historical receipt or image digest is rewritten.
+[Issue 21](https://github.com/stanimirivanov/fleetiq-deploy/issues/21) refreshes
+D06 after merged UI PR 77 and deployment PR 20. The publisher uses the exact
+merged UI revision below; no old-name image alias or retag is accepted.
 
-The operator added `read:packages` to the CLI credential. A later read-only probe
-successfully resolved the exact backend manifest below, so the earlier package
-access blocker is cleared. Full release verification must still be rerun after
-receiving the new UI publication; manifest access alone is not full acceptance.
-
-## Historical publication observations: 2026-10-22
-
-Publication, independent verification, candidate admission and installation are
-separate outcomes. Re-resolve exact current main and its passing merged-PR tree
-before dispatching any new publication; do not rebuild successful inputs merely
-to update this document.
-
-| Producer | Reviewed source | Publication / verification |
+| Producer | Reviewed source | Successful publication |
 | --- | --- | --- |
-| Provider | `41c558a54bc923fa69d7afc42bc663b763c3add5` | Qualified I01-I04 revision, still remote main. Four new native offline previews passed; no live target queried. |
-| Backend | `9260d135a06dfb9f92271a561c306a69533743b0` | [Publication 39618474515, attempt 1](https://github.com/stanimirivanov/fleetiq-platform/actions/runs/39618474515) succeeded. Independent verification reached a live OCI 404; current CLI credential lacks `read:packages`. Neither artifact deletion nor successful private access is established. |
-| UX | `2cf767937473da98660f2152c78412609e77b94e` | [PR 75 qualification 39751424169](https://github.com/stanimirivanov/fleetiq-ux/actions/runs/39751424169) passed all five jobs. [Publication 39795529804, attempt 1](https://github.com/stanimirivanov/fleetiq-ux/actions/runs/39795529804) requested for this exact merged main revision; workflow completed successfully. Exact source/run/report hashes and live OCI index, manifests, blobs and source labels independently verified. |
-| Deployment | `7c51685608c61851319ac7313b4a1739cc0ec89b` | [Publication 39628417018, attempt 1](https://github.com/stanimirivanov/fleetiq-deploy/actions/runs/39628417018) succeeded after merged PR 16. Independent publisher/report/archive/OCI/chart verification passed on 2026-10-22. |
+| UI | `9cd5cb8684d7e39ac97e9f17cda04e34c5c9d0bd` | [39856130093, attempt 2](https://github.com/stanimirivanov/fleetiq-ui/actions/runs/39856130093/attempts/2) |
+| Backend | `9260d135a06dfb9f92271a561c306a69533743b0` | [39618474515, attempt 1](https://github.com/stanimirivanov/fleetiq-platform/actions/runs/39618474515) |
+| Charts / release metadata | `7c51685608c61851319ac7313b4a1739cc0ec89b` | [39628417018, attempt 1](https://github.com/stanimirivanov/fleetiq-deploy/actions/runs/39628417018) |
 
-[Issue 17](https://github.com/stanimirivanov/fleetiq-deploy/issues/17) tracks this
-publication and persistent-qualification preparation. Historical failed publisher
-runs remain failed; no failed result is reclassified as accepted.
+The backend and charts were reused without rebuilding. All producer runs,
+merged-source review, maintainer identity, artifact archive hashes, report
+bindings and live OCI indexes/manifests/blobs were independently verified by
+the existing combined verifier. Runtime source labels/provenance and all 30
+published backend migrations matched the selection. The CLI credential now
+has working private-package access; the earlier backend access blocker is cleared.
 
 ## Immutable published selections
 
 | Role | Reference |
 | --- | --- |
 | Backend image | `ghcr.io/stanimirivanov/fleetiq-platform@sha256:2dbfc81edaecfab70efe2f25c5fec03ec91257af43ad2ffdaa3aa06b3f04eefa` |
-| UX image | `ghcr.io/stanimirivanov/fleetiq-ux@sha256:761141c95348b6c64963787a4e9167b03ea5dc09ab4fd07a109268983d6fd3cd` |
-| Release metadata package | `ghcr.io/stanimirivanov/fleetiq-deploy/fleetiq-release@sha256:8a325a69b9dd2c86223e06133fe1c9c4878ae9801411a79c06df6a2f3e975a8a` |
+| UI image (wire role `ux`) | `ghcr.io/stanimirivanov/fleetiq-ui@sha256:3d2ad542f6f5e050c8635eb066f4cff9baa3e5595437659f0324e46185748bf8` |
+| Release metadata | `ghcr.io/stanimirivanov/fleetiq-deploy/fleetiq-release@sha256:8a325a69b9dd2c86223e06133fe1c9c4878ae9801411a79c06df6a2f3e975a8a` |
 | Runtime chart | `ghcr.io/stanimirivanov/fleetiq-deploy/fleetiq-runtime@sha256:d8aaa5f40b844524c484a49c6d6b32f2c651255c00c320cf1aa1af9180de960b` |
 | Data chart | `ghcr.io/stanimirivanov/fleetiq-deploy/fleetiq-data@sha256:b2f8637c484f9d6a43a9eeaf1f16e3b1560eef33781dca9117954d9dff594d73` |
 
-The chart version is
+UI platform: `linux/amd64`. Chart version:
 `0.1.0-r7c51685608c61851319ac7313b4a1739cc0ec89b.run39628417018.attempt1`.
-No discovery tag, local image or precommit preview digest is an install selection.
+Discovery tags and local qualification images are not install selections.
 
-| Evidence | Backend | Chart package |
-| --- | --- | --- |
-| GitHub report artifact | `backend-publication-39618474515-1` | `release-package-reports-39628417018-1` |
-| Artifact ID | `12353133957` | `12356879780` |
-| Archive digest | `sha256:b80a4b416881cea0e47471911343375da88fd37edbd1a3b07fea6fad05c5e749` | `sha256:c49a5eb5987f3156e2202b3a4d3feca1d525d348429b7fe3391c03c0396d4d17` |
-| Publication JSON digest | `sha256:84aa3f916297248e7a9e0ee0deccafe93cc980b1d18a6f5d87d8926455dc065e` | `sha256:198ebebbd423a8745533bf0e929c569b1386336b7e10b38a8f821cc0ed28ffed` |
-| Qualification JSON digest | `sha256:3dde5b268f0bf0a9c45e42842d59ca62935b4759186b679ee9323c5907c68f02` | `sha256:7e38f6721f1759f2b2a1e561a5281bdd03ec4387a73d1677e5b835e3f79965a9` |
+## Publication and combined-verification evidence
 
-The authentic backend SQLx inventory contains 30 migrations, exact JSON digest
+| Evidence | UI | Backend | Chart package |
+| --- | --- | --- | --- |
+| GitHub artifact | `ux-image-reports-39856130093-2` | `backend-publication-39618474515-1` | `release-package-reports-39628417018-1` |
+| Artifact ID | `12461466098` | `12353133957` | `12356879780` |
+| Archive SHA-256 | `sha256:249adc38af3eab6a85f8191f666eef0b42f07a0a41349e0defcfeeaa92e7ebc7` | `sha256:b80a4b416881cea0e47471911343375da88fd37edbd1a3b07fea6fad05c5e749` | `sha256:c49a5eb5987f3156e2202b3a4d3feca1d525d348429b7fe3391c03c0396d4d17` |
+| Publication JSON SHA-256 | `sha256:1d6b2ddf1c537f2dfaeccac794cb109ff6480513a01993d87bdee7af42aba48c` | `sha256:84aa3f916297248e7a9e0ee0deccafe93cc980b1d18a6f5d87d8926455dc065e` | `sha256:198ebebbd423a8745533bf0e929c569b1386336b7e10b38a8f821cc0ed28ffed` |
+| Qualification JSON SHA-256 | `sha256:ccad88556d1e525c65a80332839b9262e38a4c0da88e9bdb34db955456cd6e3f` | `sha256:3dde5b268f0bf0a9c45e42842d59ca62935b4759186b679ee9323c5907c68f02` | `sha256:7e38f6721f1759f2b2a1e561a5281bdd03ec4387a73d1677e5b835e3f79965a9` |
+
+Preparation BOM: `target/d06-preparation/release-bom-ui-39856130093-2.json`.
+Its exact bytes hash to `sha256:2d794c978f1a2b7ed59b5a1f96ea70a6d2182a843bbf30325e17efb3e43cd65e`.
+Combined receipt: `target/release-evidence/2d794c978f1a2b7ed59b5a1f96ea70a6d2182a843bbf30325e17efb3e43cd65e/run-Cs60Tw/artifact-verification.json`.
+Receipt SHA-256: `sha256:bd0ccae4b2a2fcee17e44a7bd07cf8d29127fe3bcad26590ad37020ccc69bb09`.
+The receipt records `outcome: verified`, `liveAdmission: not-performed` and
+`activation: not-performed`. It was produced by:
+
+`pnpm releases:verify-artifacts target/d06-preparation/release-bom-ui-39856130093-2.json`
+
+The credential was supplied only through the verifier child environment.
+Each producer's verified report bytes remain beside the combined receipt;
+the downloaded UI archive is retained under ignored `target/d06-preparation/`.
+These local files are preparation evidence, not a durable environment ledger.
+Preserve original archives and report bytes beyond producer artifact retention
+(seven days for UI). Later admission must recheck live prerequisites; this
+receipt does not authorize an installation or replace current target checks.
+
+## Source inputs and historical evidence
+
+Provider source: `41c558a54bc923fa69d7afc42bc663b763c3add5` in
+`stanimirivanov/k8s-infrastructure`; complete original Git TAR SHA-256:
+`sha256:95de6cf55807579b5f3e1f6e31ce1da4e12ca7ccc1063db7d523b5223fadc926`.
+Tool input: exact published deployment source's `tools/manifests/tools.lock.json`,
+SHA-256 `sha256:2089517fe740fdc182243e857b453f00a45825f7b4f4e3eb866d01775269f3ff`.
+Both preserved input hashes were rechecked. The backend's 30-entry original
+migration inventory JSON SHA-256 remains
 `sha256:9a224cf50e6197994cff3bdc7a8832791931a33d6fc2d22b745b91e2c027a1e8`.
-Reports remain under ignored `target/d06-preparation/`. A full schema-valid release inventory is now prepared in
-`target/d06-preparation/release-bom.json`, with all three actual producer
-selections, infrastructure/tool hashes and all 30 migrations. Schema validation
-is not independent artifact acceptance, candidate admission or live permission.
+`workflowTemplate: null` remains appropriate until D08 delivers its capability.
 
-## Independent verification and remaining prerequisites
+The earlier UI publication at source `2cf767937473da98660f2152c78412609e77b94e`,
+run 39795529804, old-name image digest
+`sha256:761141c95348b6c64963787a4e9167b03ea5dc09ab4fd07a109268983d6fd3cd`,
+and its original BOM/reports remain unchanged in ignored preparation storage.
+They are historical and are not accepted by current canonical-producer contracts.
+[Issue 17](https://github.com/stanimirivanov/fleetiq-deploy/issues/17) records the
+earlier evidence-reader and registry-redirect corrections;
+[issue 19](https://github.com/stanimirivanov/fleetiq-deploy/issues/19) records the
+coordinated repository rename.
 
-The existing `verifyPublication` boundary independently checked the package's
-successful authorized GitHub run, merged source, current maintainer identities,
-GitHub archive digest, bounded report bytes and live release/runtime/data OCI
-manifests and blobs. Its retained verification record is in
-`target/d06-preparation/independent-package/`.
-
-The same verifier reached backend manifest lookup and received HTTP 404.
-A separate read-only package API query returned HTTP 403 explicitly requiring
-`read:packages`. This is incomplete independent verification, not proof that the
-backend image is missing. Supply a GHCR-capable read credential through the
-private process environment before retrying; do not republish to hide access
-failures or substitute cached local images. See [release operations](release-packages.md)
-for registry and source credential requirements. Never paste credentials in chat.
-
-The UX report archive `ux-image-reports-39795529804-1`, artifact ID
-`12432114815`, has SHA-256
-`6938f9e3d0b5ed3bb36c012f7a3d04dabc17e5ec1c0525de9a5c5b4548fb5787`;
-the downloaded archive independently matches that GitHub digest. Its exact
-publication directory is `39795529804-1/`, publication JSON digest
-`sha256:8f24ffc7fd7291aa61b2170c4faf285eba91483bca99be0f04ca0b8401519aa7`,
-and qualification JSON digest
-`sha256:f51e9fb8000f040aa257901cb3370ffea9cafd905694350cce48ebf43c4fc9ae`.
-Reports are retained in ignored `target/d06-preparation/ux-39795529804-1/`;
-preserve them beyond seven-day producer retention.
-
-This actual archive reproduced a consumer integration defect: the existing reader
-flattened both qualification and publication directories and rejected duplicate
-basenames. Issue 17 selects only the exact trusted run/attempt directory for UX,
-while preserving all archive safety, receipt hashes and publisher identity gates.
-Adversarial fixtures reject foreign attempts, missing selected reports, nested
-selected reports, collisions, traversal, links and oversized foreign entries.
-Backend/package selection semantics are unchanged.
-
-The UX independent verification passed on 2026-10-22; its verified reports and
-selection are retained under `target/d06-preparation/independent-ux/`. Actual
-GHCR verification also exposed an unreachable intended blob-redirect path: the
-request used `redirect: error` before the approved-host handler could inspect the
-307. Issue 17 changes only the registry request to manual redirect inspection.
-Only blob callers may follow the existing approved storage host, without registry
-credentials; manifest redirects and a second storage redirect still fail.
-Regression tests cover GET/HEAD, forbidden hosts/schemes/ports, credential removal
-and repeated redirects. No registry or evidence check is bypassed.
-
-After both rename PRs merge and the new canonical UI publication succeeds,
-rebuild the release BOM from its authentic receipt and run the combined verifier:
-
-```powershell
-pnpm releases:verify-artifacts <release-bom.json>
-```
-
-Only a fully successful verifier produces the combined artifact-verification
-receipt. A successful chart check, partial evidence, JSON validation or local
-report copy is not combined release acceptance. Preserve verified evidence in the
-future durable store; ignored preparation files are not an environment ledger.
+Publication attempt 1 failed before image creation: the interruption fixture
+read a newly opened PID file before its contents were written and interpreted
+empty bytes as PID 0. Attempt 2 reran the unchanged reviewed source and all
+publication gates successfully. The fixture readiness race remains a known
+harness limitation; no checks, timeouts or source bytes were changed to publish.
 
 ## Persistent qualification preparation
 
-Use the [concrete qualification checklist](d06-qualification.md) for target
-identity, initial database delegation, provider-native preview results, resource
-accounting, identity references and ordered acceptance gates. The
-[provider/package handoff](local-kubernetes-prerequisites.md) describes compatibility,
-ingress, storage and trust; the [earlier provider request](../handoffs/k8s-infrastructure-d06-unblock.md)
-is historical and does not mean I01-I04 are missing.
+Follow the [concrete qualification checklist](d06-qualification.md) for target
+identity, provider-native previews, initial database delegation, capacity,
+identity references and ordered acceptance gates. The
+[provider/package handoff](local-kubernetes-prerequisites.md) covers compatibility,
+ingress, storage and trust. The earlier provider request is historical: I01-I04
+are merged, but their disposable qualification does not authorize a retained target.
 
-The current preparation contacts no cluster and grants no activation authority.
-OIDC configuration is intentionally deferred; it remains mandatory for normal
-startup. Protected Argo source-graph enforcement, combined resource review and
-an exact durable-target preview/authorization are still required before apply.
-The no-Argo-graph guard remains enabled until its replacement is implemented and
-verified. No AppProject/Application or accepted candidate is created here.
+Auth0 configuration remains deferred and mandatory for normal startup.
+Protected Argo source-graph enforcement must replace the existing no-Argo-graph
+guard before adding Applications. Final capacity review, exact durable-target
+preview/authorization and live ownership/incarnation checks remain outstanding.
+No cluster, namespace, Secret, AppProject, Application or candidate was created
+or queried during this publication/verification task.
 
-D06 is incomplete until real installation, trusted HTTPS/private API, identity,
-network allow/deny, database restart persistence and retained-data protections
-pass on the authorized persistent target. D07 owns external backup/restore, D08
-release workflows, D10 complete real-provider browser journeys, and M08 production
-acceptance. Local Retain storage does not protect against kind or host loss.
+D06 remains incomplete until real installation, trusted HTTPS/private API,
+identity, network allow/deny, database restart persistence and retained-data
+protections pass on the authorized persistent target. D07 owns external
+backup/restore, D08 release workflows, D10 complete real-provider browser journeys,
+and M08 production acceptance. Local Retain storage does not protect against
+kind or host loss.

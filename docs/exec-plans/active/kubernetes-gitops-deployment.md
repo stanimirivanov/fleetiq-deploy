@@ -9,6 +9,7 @@ Chart publication prerequisite [issue #15](https://github.com/stanimirivanov/fle
 [Issue #17](https://github.com/stanimirivanov/fleetiq-deploy/issues/17) tracks UX publication, independent artifact verification and
 [persistent qualification preparation](../../operations/d06-qualification.md). Installation acceptance remains incomplete.
 [Issue #19](https://github.com/stanimirivanov/fleetiq-deploy/issues/19) coordinates the canonical UI producer rename and post-merge publication handoff.
+[Issue #21](https://github.com/stanimirivanov/fleetiq-deploy/issues/21) records the canonical UI publication and passing combined artifact verification. Auth0, protected Argo source graphs and persistent installation remain pending.
 Follow the [current readiness record](../../operations/d06-readiness.md) and
 [publication/onboarding handoff](../../operations/local-kubernetes-prerequisites.md).
 
