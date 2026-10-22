@@ -173,7 +173,7 @@ test('partial checkout uses the same ephemeral credentials as clone/fetch withou
       String.raw`credential.helper=!f() { if test "$1" = get; then printf '%s\n' username=fixture "password=$FLEETIQ_TEST_GIT_PASSWORD"; fi; }; f`,
     ];
     // The same server proves the original boundary before exercising the production path.
-    const control = join(cache, 'ux');
+    const control = join(cache, 'ui');
     run(
       'git',
       [...auth, 'clone', '--no-checkout', '--filter=blob:none', url, control],
@@ -218,4 +218,23 @@ test('partial checkout uses the same ephemeral credentials as clone/fetch withou
       await closed;
     }
   }
+});
+
+test('renamed UI source uses a new cache and preserves dirty historical ux clones', (context) => {
+  const { repository, cache, commit } = fixture(context);
+  const historical = join(cache, 'ux');
+  run('git', ['clone', repository, historical]);
+  writeFileSync(join(historical, 'README.md'), 'Preserve historical UI edits\n');
+  const previousHead = run('git', ['-C', historical, 'rev-parse', 'HEAD']);
+  materializeSource(cache, 'ux', { repository, commit });
+  assert.equal(run('git', ['-C', join(cache, 'ui'), 'rev-parse', 'HEAD']), commit);
+  assert.equal(run('git', ['-C', historical, 'rev-parse', 'HEAD']), previousHead);
+  assert.equal(
+    run('git', ['-C', historical, 'remote', 'get-url', 'origin']),
+    repository,
+  );
+  assert.equal(
+    readFileSync(join(historical, 'README.md'), 'utf8'),
+    'Preserve historical UI edits\n',
+  );
 });

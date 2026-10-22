@@ -65,7 +65,7 @@ export function validateLock(value = lock) {
     exactKeys(source, ['repository', 'commit']);
     assert.equal(
       source.repository,
-      `https://github.com/stanimirivanov/fleetiq-${name}.git`,
+      `https://github.com/stanimirivanov/fleetiq-${name === 'ux' ? 'ui' : name}.git`,
     );
     assert.match(source.commit, /^[a-f0-9]{40}$/u);
   }

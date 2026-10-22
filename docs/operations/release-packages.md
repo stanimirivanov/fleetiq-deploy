@@ -58,6 +58,26 @@ Reports are retained as `release-package-reports-<run>-<attempt>` for 90 days:
 independent of a full release BOM. A full BOM needs actual D02/D03 image receipts
 and qualified provider/tool/template inputs; no accepted release is fabricated.
 
+## Canonical UI producer after the repository rename
+
+Current UI source and image identities are `stanimirivanov/fleetiq-ui` and
+`ghcr.io/stanimirivanov/fleetiq-ui@sha256:...`. The `ux` release role and existing
+record formats remain stable; they are not aliases permitting arbitrary producer
+repositories. Closed schemas and runtime verification reject the former
+`fleetiq-ux` source, image and mixed identities for new selections.
+
+Historical receipts and the previously published old-name digest remain unchanged
+in the D06 readiness record. GitHub repository redirects do not rewrite OCI labels,
+BuildKit provenance or source-bound receipts. Do not broaden redirect handling,
+retag old bytes or edit reports to make them pass current producer checks.
+
+Merge [UI issue 76](https://github.com/stanimirivanov/fleetiq-ui/issues/76) and
+[deployment issue 19](https://github.com/stanimirivanov/fleetiq-deploy/issues/19),
+then publish the exact eligible merged UI main source using the existing manual
+workflow. Resolve its actual run/attempt/digests and rebuild the inert release BOM;
+repeat full artifact verification before any candidate admission. This rename PR
+publishes no image/package and changes no active environment selection.
+
 ## Full release and producer verification
 
 Use the [release contracts](../../contracts/releases/README.md). For a real full

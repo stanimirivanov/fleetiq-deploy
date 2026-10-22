@@ -23,7 +23,11 @@ pnpm local init development
 
 Git must be authenticated for the private platform repository. Source preparation
 uses isolated ignored checkouts at exact commits. Existing sibling working trees
-are untouched. The first backend build can be lengthy; subsequent builds reuse
+are untouched. The `ux` source role now fetches the canonical `fleetiq-ui`
+repository into `.local/sources/ui`, retaining the existing immutable commit pin.
+Historical `.local/sources/ux` clones, including local edits, are neither adopted,
+retargeted nor deleted. Rerun `pnpm local build` after this packaging-lock change;
+old image inventory fingerprints are deliberately invalidated. The first backend build can be lengthy; subsequent builds reuse
 BuildKit layers and bounded Rust caches. Do not prune unrelated caches.
 
 ## Private instance configuration
@@ -133,7 +137,7 @@ uploaded as CI artifacts.
 
 CI uses `FLEETIQ_SOURCE_READ_TOKEN` for the locked private source repositories.
 Use a fine-grained personal access token with Contents:read and automatic
-Metadata:read for both selected repositories, `fleetiq-platform` and `fleetiq-ux`.
+Metadata:read for both selected repositories, `fleetiq-platform` and `fleetiq-ui`.
 No write permission or classic token is required. A configured secret name alone does not prove access. Check its
 expiration and any organization authorization privately; never paste its value.
 

@@ -6,7 +6,9 @@
   `41c558a54bc923fa69d7afc42bc663b763c3add5` before preparing a new target.
 - This prerequisite fixes package compatibility and verifies offline/OCI behavior.
   **D06 remains incomplete: no persistent FleetIQ installation is accepted.**
-- Corrected charts and the backend/UX images are published from reviewed main.
+- Corrected charts and the backend image are published. The previous old-name
+  UI publication is historical; publish the canonical `fleetiq-ui` image after
+  the coordinated rename PRs merge, then refresh full artifact verification.
   Complete independent artifact verification and the persistent-target prerequisites
   in the [current readiness record](d06-readiness.md) and
   [qualification preparation](d06-qualification.md).

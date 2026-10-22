@@ -5,8 +5,9 @@
 This is an execution checklist for a proposed retained FleetIQ target, not a
 live-installation receipt or permission to create it. Four native provider
 previews passed on 2026-10-22 with `execution: not-performed`. OIDC configuration
-is deferred at the operator's request. Publications are complete; independent backend artifact
-verification must finish before an exact-target execution request.
+is deferred at the operator's request. The UI repository rename requires a new post-merge
+publication and refreshed full artifact verification before an exact-target
+execution request; retain the earlier old-name publication as historical evidence.
 
 ## Selected source and evidence
 

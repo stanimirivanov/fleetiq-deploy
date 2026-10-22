@@ -56,8 +56,15 @@ test('complete provider-neutral HTTPS configuration; malformed and partial forms
   }
 });
 test('artifact pins reject drift and mutable inputs', () => {
+  assert.equal(
+    lock.sources.ux.repository,
+    'https://github.com/stanimirivanov/fleetiq-ui.git',
+  );
   validateLock();
   for (const change of [
+    (v) => {
+      v.sources.ux.repository = 'https://github.com/stanimirivanov/fleetiq-ux.git';
+    },
     (v) => {
       v.sources.platform.commit = 'main';
     },

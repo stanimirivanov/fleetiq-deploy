@@ -55,7 +55,7 @@ export async function verifyPublication(
   assert(['backend', 'ux', 'package'].includes(role), 'Unknown release producer');
   const repository = {
     backend: 'stanimirivanov/fleetiq-platform',
-    ux: 'stanimirivanov/fleetiq-ux',
+    ux: 'stanimirivanov/fleetiq-ui',
     package: 'stanimirivanov/fleetiq-deploy',
   }[role];
   assert.equal(selected.source.repository, repository, 'Wrong producer repository');
