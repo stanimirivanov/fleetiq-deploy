@@ -2,13 +2,29 @@
 
 ## TL;DR
 
-Backend and corrected charts have successful publications. The chart package has
-also passed independent GitHub/OCI verification. UX publication succeeded for the merged, passing PR 75 revision. The UX
-image also passed independent GitHub/OCI verification. D06 remains incomplete until the full
-release is independently verified and a separately authorized persistent install
-passes its live gates. Identity configuration is deferred by the operator.
+Backend and corrected chart publications remain selected. The earlier old-name
+UI publication is retained as historical evidence; current admission now requires
+`fleetiq-ui`. [UI issue 76](https://github.com/stanimirivanov/fleetiq-ui/issues/76)
+and [deployment issue 19](https://github.com/stanimirivanov/fleetiq-deploy/issues/19)
+coordinate the rename. Publish a newly qualified image after merge, rebuild the
+BOM from its actual receipt and rerun complete artifact verification. D06 remains
+incomplete; Auth0 setup is deferred and no persistent target is authorized here.
 
-## Observations: 2026-10-22
+## Rename integration: 2026-10-22
+
+The repository is now `stanimirivanov/fleetiq-ui`. Current publication and
+verification require that exact identity, including runtime labels/provenance.
+The entries below record the earlier publication observation and retain original
+source/image identities; they are not a newly accepted canonical release.
+Previously prepared ignored BOM bytes still name the old producer and must not be
+submitted to current admission. No historical receipt or image digest is rewritten.
+
+The operator added `read:packages` to the CLI credential. A later read-only probe
+successfully resolved the exact backend manifest below, so the earlier package
+access blocker is cleared. Full release verification must still be rerun after
+receiving the new UI publication; manifest access alone is not full acceptance.
+
+## Historical publication observations: 2026-10-22
 
 Publication, independent verification, candidate admission and installation are
 separate outcomes. Re-resolve exact current main and its passing merged-PR tree
@@ -100,8 +116,8 @@ credentials; manifest redirects and a second storage redirect still fail.
 Regression tests cover GET/HEAD, forbidden hosts/schemes/ports, credential removal
 and repeated redirects. No registry or evidence check is bypassed.
 
-Once private backend registry access is available, run the existing combined
-verifier:
+After both rename PRs merge and the new canonical UI publication succeeds,
+rebuild the release BOM from its authentic receipt and run the combined verifier:
 
 ```powershell
 pnpm releases:verify-artifacts <release-bom.json>

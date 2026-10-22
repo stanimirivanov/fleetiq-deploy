@@ -6,7 +6,7 @@
       "commit": "66cc8a8f15457707197e274c90228538487ef810"
     },
     "ux": {
-      "repository": "https://github.com/stanimirivanov/fleetiq-ux.git",
+      "repository": "https://github.com/stanimirivanov/fleetiq-ui.git",
       "commit": "a1ebe3bcb22781cc70ac00f8ed0e2fb396537dbe"
     }
   },

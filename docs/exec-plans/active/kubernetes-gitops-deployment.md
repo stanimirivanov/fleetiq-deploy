@@ -8,6 +8,7 @@ are merged; D06's packaging/onboarding prerequisite is tracked in
 Chart publication prerequisite [issue #15](https://github.com/stanimirivanov/fleetiq-deploy/issues/15) is merged and its packages are published.
 [Issue #17](https://github.com/stanimirivanov/fleetiq-deploy/issues/17) tracks UX publication, independent artifact verification and
 [persistent qualification preparation](../../operations/d06-qualification.md). Installation acceptance remains incomplete.
+[Issue #19](https://github.com/stanimirivanov/fleetiq-deploy/issues/19) coordinates the canonical UI producer rename and post-merge publication handoff.
 Follow the [current readiness record](../../operations/d06-readiness.md) and
 [publication/onboarding handoff](../../operations/local-kubernetes-prerequisites.md).
 
@@ -119,7 +120,7 @@ full test workflow on every push to main.
 
 ### PR D03: Publish the production UX/static edge artifact
 
-- **Repository / milestone:** `fleetiq-ux`; M02 - Product Foundation.
+- **Repository / milestone:** `fleetiq-ui`; M02 - Product Foundation.
 - **Objective & Scope:** Package the existing production UI and static edge once,
   with configurable private backend routing and externally terminated TLS support.
 - **Target Layers / Files:** Production Dockerfile/edge configuration, producer CI,

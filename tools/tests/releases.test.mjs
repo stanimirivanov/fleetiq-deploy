@@ -32,7 +32,7 @@ function fixture() {
     images: Object.fromEntries(
       [
         ['backend', 'fleetiq-platform'],
-        ['ux', 'fleetiq-ux'],
+        ['ux', 'fleetiq-ui'],
       ].map(([role, repo]) => [
         role,
         {
@@ -606,6 +606,73 @@ test('schema-valid producer claims cannot substitute for independent GitHub publ
     );
   assert.throws(() => publicationEvidence('ux', selected, run, reports));
   assert.throws(() => publicationEvidence('backend', selected, run, new Map()));
+});
+
+test('new UI selections reject historical or mixed repository and image identities', () => {
+  const { release } = fixture();
+  assert.equal(release.images.ux.source.repository, 'stanimirivanov/fleetiq-ui');
+  contract('release-bom', release);
+  for (const repository of ['stanimirivanov/fleetiq-ux', 'other/fleetiq-ui']) {
+    const changed = structuredClone(release);
+    changed.images.ux.source.repository = repository;
+    assert.throws(() => contract('release-bom', changed));
+  }
+  const selected = release.images.ux;
+  const qualification = Buffer.from('{"outcome":"passed"}\n');
+  const record = {
+    format: 'fleetiq-image-publication.v1',
+    outcome: 'published',
+    image: selected.reference,
+    source: { revision: sha, dirty: false },
+    authorization: {
+      repository: selected.source.repository,
+      revision: sha,
+      run: '12',
+      attempt: '1',
+      actor: 'operator',
+      triggeringActor: 'operator',
+    },
+    qualification: digest(qualification),
+  };
+  const bytes = Buffer.from(JSON.stringify(record));
+  selected.publication.recordDigest = digest(bytes);
+  const reports = new Map([
+    ['publication.json', bytes],
+    ['qualification.json', qualification],
+  ]);
+  const run = {
+    id: 12,
+    run_attempt: 1,
+    repository: { full_name: selected.source.repository },
+    path: '.github/workflows/publish-image.yml',
+    event: 'workflow_dispatch',
+    head_branch: 'main',
+    head_sha: sha,
+    status: 'completed',
+    conclusion: 'success',
+    actor: { login: 'operator' },
+    triggering_actor: { login: 'operator' },
+  };
+  publicationEvidence('ux', selected, run, reports);
+  for (const changed of [
+    {
+      ...selected,
+      source: { ...selected.source, repository: 'stanimirivanov/fleetiq-ux' },
+    },
+    { ...selected, reference: `ghcr.io/stanimirivanov/fleetiq-ux@${hash}` },
+  ])
+    assert.throws(() => publicationEvidence('ux', changed, run, reports));
+  assert.throws(() =>
+    publicationEvidence(
+      'ux',
+      selected,
+      {
+        ...run,
+        repository: { full_name: 'stanimirivanov/fleetiq-ux' },
+      },
+      reports,
+    ),
+  );
 });
 
 test('live OCI descriptor checks reject missing blobs, wrong sizes and retagged bytes', async (context) => {

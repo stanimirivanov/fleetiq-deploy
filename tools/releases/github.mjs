@@ -5,7 +5,7 @@ export const SHA = /^[a-f0-9]{40}$/u;
 const repositories = new Set([
   REPOSITORY,
   'stanimirivanov/fleetiq-platform',
-  'stanimirivanov/fleetiq-ux',
+  'stanimirivanov/fleetiq-ui',
 ]);
 
 /** Fixed GitHub authority; tokens never cross redirects or appear in diagnostics. */

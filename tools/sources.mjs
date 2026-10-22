@@ -52,10 +52,14 @@ function sourceCommand(name, operation, args, options) {
     );
   }
 }
+/** The ux wire role now uses a separate ui cache; never adopt or rewrite old clones. */
+function sourceDirectory(cache, name) {
+  assert(['platform', 'ux'].includes(name), 'Unknown source identity');
+  return resolve(cache, name === 'ux' ? 'ui' : name);
+}
 /** Materialize one already validated source selection; preserve dirty existing clones. */
 export function materializeSource(cache, name, pin, auth = []) {
-  assert(['platform', 'ux'].includes(name), 'Unknown source identity');
-  const path = resolve(cache, name);
+  const path = sourceDirectory(cache, name);
   const fresh = !existsSync(path);
   if (!fresh) validateSourceDirectory(cache, path);
   if (fresh)
@@ -110,7 +114,7 @@ export function validateSources() {
   validateLock();
   const cache = sourceCache();
   for (const [name, pin] of Object.entries(lock.sources)) {
-    const path = validateSourceDirectory(cache, resolve(cache, name));
+    const path = validateSourceDirectory(cache, sourceDirectory(cache, name));
     checkOrigin(path, pin);
     assert(
       run('git', ['-C', path, 'rev-parse', 'HEAD']) === pin.commit,
@@ -188,7 +192,7 @@ export function buildImages(docker) {
         `.local/${name}.iid`,
         '--tag',
         `fleetiq-deploy-${name}:${source.commit.slice(0, 12)}`,
-        `.local/sources/${name === 'backend' ? 'platform' : 'ux'}`,
+        sourceDirectory(sourceCache(), name === 'backend' ? 'platform' : 'ux'),
       ],
       { timeout: 3_600_000, stdio: 'inherit' },
     );

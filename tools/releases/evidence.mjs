@@ -91,7 +91,7 @@ export async function reportArchive(bytes, { directory } = {}) {
 export function publicationEvidence(role, selected, run, reports) {
   const repository = {
     backend: 'stanimirivanov/fleetiq-platform',
-    ux: 'stanimirivanov/fleetiq-ux',
+    ux: 'stanimirivanov/fleetiq-ui',
     package: 'stanimirivanov/fleetiq-deploy',
   }[role];
   assert(
@@ -100,7 +100,7 @@ export function publicationEvidence(role, selected, run, reports) {
   );
   const expectedImage = {
     backend: 'ghcr.io/stanimirivanov/fleetiq-platform',
-    ux: 'ghcr.io/stanimirivanov/fleetiq-ux',
+    ux: 'ghcr.io/stanimirivanov/fleetiq-ui',
     package: 'ghcr.io/stanimirivanov/fleetiq-deploy/fleetiq-release',
   }[role];
   assert(

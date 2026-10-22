@@ -12,7 +12,7 @@ backend:
     clientSecret: { name: fleet-oidc, key: client-secret }
     additionalTrust: { name: fleet-oidc-trust, key: ca.crt }
 edge:
-  image: ghcr.io/stanimirivanov/fleetiq-ux@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  image: ghcr.io/stanimirivanov/fleetiq-ui@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 network:
   databaseNamespace: fleetiq-data
   databaseCluster: fleetiq-db

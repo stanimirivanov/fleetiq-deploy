@@ -40,7 +40,7 @@ export const sourceFailureGuidance = {
   'authentication-failed':
     'Check whether FLEETIQ_SOURCE_READ_TOKEN is valid, unexpired and authorized for the source repository. Do not print the credential.',
   'repository-access-unavailable':
-    'Verify the reviewed repository exists and FLEETIQ_SOURCE_READ_TOKEN has Contents:read access to both fleetiq-platform and fleetiq-ux; check organization authorization if required. A private repository can report not found when access is denied.',
+    'Verify the reviewed repository exists and FLEETIQ_SOURCE_READ_TOKEN has Contents:read access to both fleetiq-platform and fleetiq-ui; check organization authorization if required. A private repository can report not found when access is denied.',
   'revision-unavailable':
     'Verify the exact locked commit is available from the reviewed origin; do not replace it with a branch or an unreviewed pin.',
   'tls-trust-failed':

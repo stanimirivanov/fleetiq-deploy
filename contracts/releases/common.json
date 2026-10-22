@@ -46,7 +46,7 @@
         "repository": {
           "enum": [
             "stanimirivanov/fleetiq-platform",
-            "stanimirivanov/fleetiq-ux",
+            "stanimirivanov/fleetiq-ui",
             "stanimirivanov/fleetiq-deploy"
           ]
         },

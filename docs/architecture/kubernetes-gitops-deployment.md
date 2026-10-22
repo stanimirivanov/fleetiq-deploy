@@ -46,7 +46,7 @@ not assumptions from a manifest's presence. Kubernetes explicitly requires a
 | Responsibility | Owner |
 | --- | --- |
 | Build/test/publish backend and migration image | `fleetiq-platform` producer CI |
-| Build/test/publish production UX/static edge image | `fleetiq-ux` producer CI |
+| Build/test/publish production UX/static edge image | `fleetiq-ui` producer CI |
 | Package/publish reusable FleetIQ charts and release-template artifacts | `fleetiq-deploy` packaging CI, separate from promotion authority |
 | Review candidate artifacts, environment policy and promotions | `fleetiq-deploy` environment records and reviewers |
 | Reconcile FleetIQ desired resources | FleetIQ-owned Argo CD Applications |
