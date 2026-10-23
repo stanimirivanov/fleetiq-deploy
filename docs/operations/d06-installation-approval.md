@@ -92,15 +92,34 @@ Preserve state on failure; no destruction, adoption or engine restart is include
 1. Native preflight must prove absent target/state or exact original ownership. Never interpret an empty label query or desired namespace labels as proof. Record the target's new incarnation through the provider's public handoff, not a raw journal export.
 2. After separate approval, use the exact provider command from the [preview](d06-target-preview.md) with `consumer_kind up --execute`. The implementation installs Cilium as part of creation; do not perform a competing CNI install. Recovery of a partial creation requires inspected ownership and the identical provider `network apply --execute` path.
 3. Prove provider base/network readiness and observe each node's limits, allocatable resources, actual placement and pressure. Stop on pressure, failed readiness, identity mismatch or resource drift.
-4. After proving all three namespaces absent (or exact prior authorized ownership on a retry), apply only the approved bootstrap bytes using the dedicated kubeconfig/context and field manager `fleetiq-bootstrap`. Do not relabel or force-conflict an existing namespace.
+4. After proving all three namespaces absent, create only the three reviewed Namespace objects with the dedicated kubeconfig/context and field manager `fleetiq-bootstrap`. If any creation returns AlreadyExists or fails, stop before quotas. Record all three newly created namespace UIDs against the target incarnation; verify those same identities before creating the quota objects. On retries, stop for an explicit ownership/reconciliation review; do not adopt, relabel or automatically apply to an existing namespace.
 5. Use provider `database apply --execute` with the same target and committed delegation. It installs its operators, retained StorageClass, native admission and separate `database-storage` quota before database Argo authority.
 6. Stop. Retain safe provider handoffs and actual API-server/DNS/operator identities. Check capacity again before proposing Stage B. No `down`, delete/rebind drill or disposable `qualify` command belongs to this retained target.
 
-The eventual bootstrap apply command, shown for review only:
+The two creation commands below use the exact source-byte digests listed above;
+the pure local Kustomize package validates their complete six-object composition.
+They are shown for review only. Do not paste both commands as an unattended batch.
 
 ```powershell
-kubectl --kubeconfig C:\Users\sonof\FleetIQ\state\d06\.local\fleetiq-local.kubeconfig --context kind-fleetiq-local apply --field-manager=fleetiq-bootstrap -f C:\Source\fleet-iq\fleetiq-deploy\target\d06-preparation\approval-20261023\bootstrap.yaml
+kubectl --kubeconfig C:\Users\sonof\FleetIQ\state\d06\.local\fleetiq-local.kubeconfig --context kind-fleetiq-local create --field-manager=fleetiq-bootstrap -f C:\Source\fleet-iq\fleetiq-deploy\environments\local-installation\bootstrap\namespaces.yaml
 ```
+
+Stop on nonzero exit or AlreadyExists. Obtain and retain the new namespace UIDs
+and recheck them against the same cluster incarnation before the quota step:
+
+```powershell
+kubectl --kubeconfig C:\Users\sonof\FleetIQ\state\d06\.local\fleetiq-local.kubeconfig --context kind-fleetiq-local get namespace fleetiq-apps fleetiq-data fleetiq-releases -o json
+```
+
+Only after that ownership checkpoint succeeds:
+
+```powershell
+kubectl --kubeconfig C:\Users\sonof\FleetIQ\state\d06\.local\fleetiq-local.kubeconfig --context kind-fleetiq-local create --field-manager=fleetiq-bootstrap -f C:\Source\fleet-iq\fleetiq-deploy\environments\local-installation\bootstrap\quotas.yaml
+```
+
+These writes are not an atomic transaction. Preserve partial creations, stop on
+identity changes and review the exact owned objects before any retry. No command
+in this procedure grants permission to reconcile an existing namespace by name.
 
 ## Stage B: hold for observed inputs and separate approval
 
