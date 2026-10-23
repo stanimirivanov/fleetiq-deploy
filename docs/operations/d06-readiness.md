@@ -5,7 +5,7 @@
 The canonical fleetiq-ui image is published, and complete independent artifact
 verification passed on 2026-10-22 for the new UI, existing backend and existing
 chart package. No environment is promoted. D06 remains incomplete: Auth0
-configuration is deferred, protected Argo source-graph enforcement and exact
+onboarding is in progress, protected Argo source-graph enforcement and exact
 persistent-target authorization are still required before installation.
 
 ## Current verified preparation: 2026-10-22
@@ -96,6 +96,38 @@ empty bytes as PID 0. Attempt 2 reran the unchanged reviewed source and all
 publication gates successfully. The fixture readiness race remains a known
 harness limitation; no checks, timeouts or source bytes were changed to publish.
 
+## Auth0 preparation: 2026-10-23
+
+[Issue 23](https://github.com/stanimirivanov/fleetiq-deploy/issues/23) prepares
+identity onboarding. Trusted HTTPS discovery confirmed issuer
+`https://dev-iqzkuoz81x7gifev.us.auth0.com/` and same-origin authorization/token/JWKS
+endpoints, with Basic and POST client-secret methods advertised. The provided
+public client ID is retained only in ignored preparation values. This does not
+prove that the specific application is configured as a confidential client.
+
+The selected release BOM remains unchanged. Its actual backend/UI image digests,
+the qualified database image, public Auth0 issuer/client ID and proposed Secret
+references passed native Helm lint/render, all 19 local schemas and complete
+manifest policy in namespace `fleetiq-apps`. Public discovery, DNS observation,
+overrides, rendered resources and a preparation record are retained under
+`target/d06-preparation/auth0-20261023/`. No secret or user subject is stored there.
+
+The verifier now takes a selected issuer and registered application namespace
+rather than requiring fixture port 19443 and namespace `fleetiq-local`. It binds
+runtime issuer, HTTPS egress port, database ingress peer and quota checks to those
+independent expectations. Native fixtures reject wrong issuers/ports/namespaces,
+broad egress, public backend exposure and insufficient quota; no checks are removed.
+
+This is an offline rehearsal, not an installation candidate: namespace/quota
+objects and the API-server CIDR include fixture inputs. DNS answers are transient
+observations and must be checked again from the actual target. The operator
+confirmed Regular Web Application and supplied the intended initial user's subject;
+the personal identifier is not stored in this repository. Token authentication
+method, enabled connection and private client-secret file remain unconfirmed.
+The subject still needs a private file for eventual bootstrap injection. No
+authentication/code exchange, bootstrap, Secret creation, target query or live
+installation was performed.
+
 ## Persistent qualification preparation
 
 Follow the [concrete qualification checklist](d06-qualification.md) for target
@@ -105,7 +137,8 @@ identity references and ordered acceptance gates. The
 ingress, storage and trust. The earlier provider request is historical: I01-I04
 are merged, but their disposable qualification does not authorize a retained target.
 
-Auth0 configuration remains deferred and mandatory for normal startup.
+Auth0 onboarding is in progress and remains mandatory for normal startup; see
+the [operator runbook](auth0-onboarding.md).
 Protected Argo source-graph enforcement must replace the existing no-Argo-graph
 guard before adding Applications. Final capacity review, exact durable-target
 preview/authorization and live ownership/incarnation checks remain outstanding.

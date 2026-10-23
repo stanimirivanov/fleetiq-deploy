@@ -38,11 +38,16 @@ export function renderFixture(
     maintenance = false,
     nonlocal = false,
     providerLocal = false,
+    applicationNamespace = 'fleetiq-local',
     runtime = {},
     data = {},
     lint = false,
   } = {},
 ) {
+  assert(
+    ['fleetiq-local', 'fleetiq-apps'].includes(applicationNamespace),
+    'Unregistered application namespace',
+  );
   assert(
     !(providerLocal && nonlocal),
     'Local provider cannot qualify a nonlocal profile',
@@ -94,9 +99,23 @@ export function renderFixture(
     const result = documents(
       tools.kustomize(['build', resolve(root, `environments/${directory}`)]),
     );
+    // These offline namespace/quota objects are rehearsal inputs, not owner receipts.
+    for (const item of result) {
+      if (item.metadata.namespace === 'fleetiq-local')
+        item.metadata.namespace = applicationNamespace;
+      if (item.kind === 'Namespace' && item.metadata.name === 'fleetiq-local')
+        item.metadata.name = applicationNamespace;
+    }
     for (const [chart, namespace, override] of [
-      ['runtime', 'fleetiq-local', { maintenance, ...runtime }],
-      ['data', 'fleetiq-data', data],
+      ['runtime', applicationNamespace, { maintenance, ...runtime }],
+      [
+        'data',
+        'fleetiq-data',
+        {
+          ...data,
+          network: { runtimeNamespace: applicationNamespace, ...data.network },
+        },
+      ],
     ]) {
       const values = join(temporary, `${chart}.json`);
       writeFileSync(values, JSON.stringify(override));

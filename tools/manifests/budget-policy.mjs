@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { cpu, memory } from './resource-policy.mjs';
 
 /** Preview quotas must admit the selected Pods plus one replacement per workload. */
-export function budgetPolicy(resources) {
-  for (const namespace of ['fleetiq-local', 'fleetiq-data']) {
+export function budgetPolicy(resources, applicationNamespace = 'fleetiq-local') {
+  for (const namespace of [applicationNamespace, 'fleetiq-data']) {
     const quota = resources.find(
       (item) => item.kind === 'ResourceQuota' && item.metadata.namespace === namespace,
     ).spec.hard;
