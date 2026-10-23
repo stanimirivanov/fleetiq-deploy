@@ -13,3 +13,8 @@ graphs; D08 integrates the release principal.
 No accepted sample selection is committed: upstream publication and provider
 qualification are independent prerequisites. Offline chart fixtures remain under
 `environments/local-preview/` and are not active selections.
+
+The guided D06 control graph is registered under `gitops/local/`. Reviewed Helm
+outputs become separate runtime/data `manifests.yaml` payloads on the locked
+activation ref. [Source verification](../docs/operations/argo-source-graphs.md)
+checks Git/protection observations; it never writes selections or activates them.

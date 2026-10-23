@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { documents } from '../manifests/render.mjs';
 import { root, run } from '../process.mjs';
 import { contract } from './contracts.mjs';
+import { sourceGraphPolicy } from './source-graphs.mjs';
 
 /** Candidate PRs cannot activate anything, including through a new Argo source. */
 export function releaseBoundary(files, changed) {
@@ -15,24 +15,8 @@ export function releaseBoundary(files, changed) {
   for (const [file, text] of files) {
     if (file.startsWith('releases/candidates/') && file.endsWith('.json'))
       contract('candidate', JSON.parse(text));
-    if (!/\.ya?ml$/u.test(file)) continue;
-    if (file.startsWith('charts/') && file.includes('/templates/')) {
-      assert(
-        !/\bapiVersion:\s*['"]?argoproj\.io\//u.test(text),
-        'Argo resources are not allowed in workload charts',
-      );
-      continue;
-    }
-    for (const resource of documents(text))
-      assert(
-        !(
-          typeof resource === 'object' &&
-          resource.apiVersion?.startsWith('argoproj.io/') &&
-          ['Application', 'ApplicationSet'].includes(resource.kind)
-        ),
-        'Argo source graphs require D06 registered protected activation refs; candidate/main tracking is forbidden',
-      );
   }
+  return sourceGraphPolicy(files);
 }
 
 /** Resolve a fetched base once; detached publishers need no local main branch. */
@@ -76,6 +60,6 @@ export function checkReleaseBoundaries(
   const files = names
     .filter((file) => /\.(?:json|ya?ml)$/u.test(file))
     .map((file) => [file, readFileSync(resolve(repository, file), 'utf8')]);
-  releaseBoundary(files, changed);
-  return { activation: 'not-performed', candidateMergeActivates: false };
+  const sourceGraphs = releaseBoundary(files, changed);
+  return { sourceGraphs, activation: 'not-performed', candidateMergeActivates: false };
 }

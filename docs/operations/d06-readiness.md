@@ -122,8 +122,10 @@ This is an offline rehearsal, not an installation candidate: namespace/quota
 objects and the API-server CIDR include fixture inputs. DNS answers are transient
 observations and must be checked again from the actual target. The operator
 confirmed Regular Web Application and supplied the intended initial user's subject;
-the personal identifier is not stored in this repository. Token authentication
-method, enabled connection and private client-secret file remain unconfirmed.
+the personal identifier is not stored in this repository. On 2026-10-23 the operator
+confirmed `client_secret_basic` and enabled the user connection. Metadata-only
+inspection confirmed a private client-secret file exists and its parent has ACL
+inheritance disabled; secret bytes and effective access were not inspected.
 The subject still needs a private file for eventual bootstrap injection. No
 authentication/code exchange, bootstrap, Secret creation, target query or live
 installation was performed.
@@ -139,8 +141,10 @@ are merged, but their disposable qualification does not authorize a retained tar
 
 Auth0 onboarding is in progress and remains mandatory for normal startup; see
 the [operator runbook](auth0-onboarding.md).
-Protected Argo source-graph enforcement must replace the existing no-Argo-graph
-guard before adding Applications. Final capacity review, exact durable-target
+[Issue #25](https://github.com/stanimirivanov/fleetiq-deploy/issues/25) implements
+registered role-isolated control graphs and a read-only locked-ref verifier; see
+[source operations](argo-source-graphs.md). Actual phase payloads, activation-ref
+protection and controller admission remain unqualified. Final capacity review, exact durable-target
 preview/authorization and live ownership/incarnation checks remain outstanding.
 No cluster, namespace, Secret, AppProject, Application or candidate was created
 or queried during this publication/verification task.
