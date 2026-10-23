@@ -7,8 +7,9 @@ live-installation receipt or permission to create it. Four native provider
 previews passed on 2026-10-22 with `execution: not-performed`. OIDC onboarding
 is in progress; see the [Auth0 runbook](auth0-onboarding.md). Public discovery and
 selected-input offline validation passed, and the operator confirmed the Regular Web Application type and supplied the
-initial subject. Private credential storage, connection/token-method confirmation
-and actual user mapping remain pending. The canonical UI publication and complete
+initial subject. Connection and `client_secret_basic` are operator-confirmed; a
+private client-secret file exists (metadata checked only). The subject file, actual
+Secret provisioning and user mapping remain pending. The canonical UI publication and complete
 independent release-artifact verification passed on 2026-10-22; see the readiness
 record for exact selections and evidence. Exact-target live admission and
 installation remain pending; earlier old-name reports remain historical.
@@ -43,7 +44,7 @@ approved consumer release WorkflowTemplate. No placeholder template is installed
 | Application / database / release namespaces | `fleetiq-apps`, `fleetiq-data`, `fleetiq-releases`, consumer-owned with exact provider labels. |
 | Provider namespaces | `fleetiq-gitops-system`, `fleetiq-workflow-system`, and provider-owned network/database/controller namespaces. |
 | Database | `fleetiq-db`, one instance, `local-retained`, 2Gi; provider admission allows 8Gi/four claims with replacement headroom. PVC size does not impose a physical disk quota. |
-| Identity | Auth0 discovery and provided public client ID are prepared; proposed authority `auth0-fleetiq-local`. Application type and initial subject are operator-confirmed; token-method/connection confirmation, private client-secret/subject files, live issuer egress and actual Secret provisioning remain pending; see the [runbook](auth0-onboarding.md). |
+| Identity | Auth0 discovery and provided public client ID are prepared; proposed authority `auth0-fleetiq-local`. Application type and initial subject are operator-confirmed; connection and `client_secret_basic` are confirmed, and private client-secret file metadata is checked. Subject file, live issuer egress and actual Secret provisioning remain pending; see the [runbook](auth0-onboarding.md). |
 | Lifecycle | Retain state and data on stop/failure. No disposable qualification removal or automatic cluster destruction. |
 
 The database image selected by the qualified provider inventory is
@@ -90,7 +91,10 @@ profile or resource limit change is implicitly authorized.
    identity, plaintext HTTP or a synthetic issuer as successful product startup.
 3. Implement and verify the registered Argo source-graph boundary against protected
    `environments/<environment>/active` refs. Main/candidate tracking and revision
-   overrides must fail. The existing no-Argo-graph guard remains until this works.
+   overrides must fail. The registered graph and read-only verifier are implemented
+   in [issue #25](https://github.com/stanimirivanov/fleetiq-deploy/issues/25); actual
+   locked phase ref and live controller admission remain pending. See
+   [source operations](argo-source-graphs.md).
 4. Generate final provider previews for the exact durable state path, delegation,
    capacity and ports. Obtain explicit authorization for that named live target.
 5. Prove absent-target ownership, establish cluster/network capability, then

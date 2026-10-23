@@ -1,0 +1,33 @@
+# Bootstrap control manifest only; no live target or activation is authorized.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: fleetiq-local-runtime
+  namespace: fleetiq-gitops-system
+  labels:
+    k8s-infrastructure.io/consumer: fleetiq
+spec:
+  sourceRepos:
+    - https://github.com/stanimirivanov/fleetiq-deploy.git
+  sourceNamespaces:
+    - fleetiq-gitops-system
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: fleetiq-apps
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: ServiceAccount
+    - group: ""
+      kind: Service
+    - group: apps
+      kind: Deployment
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+    - group: cilium.io
+      kind: CiliumNetworkPolicy
+  roles: []

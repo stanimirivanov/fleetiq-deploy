@@ -1,156 +1,91 @@
-# Auth0 onboarding for the D06 installation
+# Auth0 onboarding for D06
 
-## TL;DR
+## Prerequisites & Environment Inputs
 
-Use an Auth0 **Regular Web Application** and enable the connection containing
-its users. FleetIQ's backend performs OIDC authorization-code login and owns the
-browser session; Auth0 roles and successful login do not grant FleetIQ access.
-Complete the application settings below, save the client secret privately, and
-identify the first operator by its exact provider subject. This guide configures
-inputs; it does not authorize or perform a Kubernetes installation.
+- Auth0 tenant access to edit Applications, Connections and Users; local Windows account with permission to set folder access.
+- Tools: browser, local text editor and Windows File Explorer. No credential-handling script or CLI is required.
+- Public origin: `https://fleet.local.test:18443`; internal Gateway listener: `8443`.
+- Public configuration: `C:\Source\fleet-iq\fleetiq-deploy\target\d06-preparation\auth0-20261023\runtime-overrides.json` (existing ignored JSON rehearsal input).
+- Private directory: `C:\Users\sonof\AppData\Local\FleetIQ\d06-auth0` (outside Git).
+- Client-secret file: `C:\Users\sonof\AppData\Local\FleetIQ\d06-auth0\client-secret` (UTF-8 plain text, no extension).
+- Operator-subject file: `C:\Users\sonof\AppData\Local\FleetIQ\d06-auth0\operator-subject` (UTF-8 plain text, no extension).
 
-## 1. Configure the confidential application
+## Step-by-Step Execution Guide
 
-In Auth0 Dashboard, open **Applications → Applications → your application**.
-Confirm its client ID matches the operator's selected client, and set:
+### Step 1: Restrict access to the private directory
 
-| Setting | D06 selection |
-| --- | --- |
-| Application type | Regular Web Application |
-| Authorization flow | Authorization Code; FleetIQ adds PKCE S256 and requests `openid` |
-| Token endpoint authentication | Basic / `client_secret_basic`; see the application's Credentials settings or Token Endpoint Authentication Method |
-| Allowed Callback URLs | `https://fleet.local.test:18443/api/v1/auth/callback` |
-| Allowed Logout URLs | `https://fleet.local.test:18443/` if registering a return URL |
-| ID token signing | RS256 with published signing keys |
+1. Action:
+   - In File Explorer, create or open the private directory listed above.
+   - Open Properties → Security → Advanced. Disable inheritance; remove inherited access for other users and broad groups. Retain access for your Windows account and SYSTEM. Check existing explicit permissions and both files' effective access.
+2. Expected Result:
+   - The directory exists; other ordinary user accounts cannot read its files. Existing files are preserved.
 
-Save the settings. The public origin is the proposed D06 target, not an already
-running service. If the reviewed origin changes, register the new **exact**
-callback before login. Do not substitute `localhost`, port 8443, a wildcard or
-plain HTTP. Port 8443 is the internal Gateway listener; 18443 is the browser port.
+### Step 2: Configure the Auth0 application
 
-The backend prefers Basic when discovery advertises it, as Auth0 does. Tenant
-metadata alone does not prove the application's configured authentication method.
-Confirm the setting rather than choosing `none` or an unsupported private-key mode.
-No browser Auth0 SDK, SPA token storage, custom API audience or Management API
-token is required for this server-session integration.
+1. Action:
+   - Open Auth0 Dashboard → Applications → Applications → FleetIQ → Settings. Create the application as a Regular Web Application if it does not exist.
+   - Set Application Type to **Regular Web Application**.
+   - Set Allowed Callback URLs to `https://fleet.local.test:18443/api/v1/auth/callback`.
+   - Set Allowed Logout URLs to `https://fleet.local.test:18443/`.
+   - In Credentials / Token Endpoint Authentication Method, select **Basic** (`client_secret_basic`). Confirm Authorization Code is enabled and ID token signing uses **RS256**. Save changes.
+2. Expected Result:
+   - Saved settings show the exact callback, application type and authentication method; Settings displays Domain, Client ID and Client Secret.
 
-The logout URL registration does not enable provider single sign-out: FleetIQ's
-current logout clears its own session, and an Auth0 SSO session may remain.
+### Step 3: Enable the user's connection
 
-## 2. Enable the user's connection
+1. Action:
+   - Open User Management → Users → the intended operator. Note the Connection; confirm the user is not blocked.
+   - Open Applications → Applications → FleetIQ → Connections and enable that exact connection. For a database connection, its Authentication → Database → connection → Applications tab is an alternative.
+   - Complete any verification or MFA requirements configured for that user.
+2. Expected Result:
+   - The user's connection is enabled for FleetIQ and the user can meet its sign-in requirements.
 
-In **User Management → Users**, open the existing user and note its connection.
-For a database user this is often `Username-Password-Authentication`, but use the
-actual connection recorded for that user.
+### Step 4: Set the public runtime inputs
 
-Open **Authentication → Database → that connection → Applications** and enable
-the FleetIQ application. Alternatively enable the same connection from the
-application's **Connections** tab. A user belongs to a connection, not directly
-to an application; another user does not need to be created merely to connect it.
-Confirm the user is not blocked and can meet that connection's verification/MFA
-requirements. Enabling the connection is distinct from granting FleetIQ access.
+1. Action:
+   - Target File: `C:\Source\fleet-iq\fleetiq-deploy\target\d06-preparation\auth0-20261023\runtime-overrides.json`.
+   - Edit the existing JSON; preserve image, database and network selections. Set these dotted JSON keys:
+     - `public.host`: `fleet.local.test`; `public.port`: `18443`; `gateway.listenerPort`: `8443`.
+     - `backend.oidc.issuer`: `https://<Domain from Auth0 Application Settings>/` (selected domain: `dev-iqzkuoz81x7gifev.us.auth0.com`).
+     - `backend.oidc.clientId`: the exact **Client ID** from the same application's Settings.
+     - `backend.oidc.authority`: `auth0-fleetiq-local`.
+     - `backend.oidc.clientSecret.name`: `fleetiq-oidc`; `backend.oidc.clientSecret.key`: `client-secret`.
+     - `backend.oidc.additionalTrust.name`: `""`.
+2. Expected Result:
+   - Valid JSON contains the selected public inputs and Secret reference, with no client-secret value or user subject. This file remains an offline rehearsal, not an installation manifest.
 
-## 3. Identify the initial FleetIQ operator
+### Step 5: Save the client secret
 
-Copy the user's exact **user_id** from its Details/Raw JSON view. For an Auth0
-database user this usually starts with `auth0|`. It is the OIDC subject (`sub`),
-not its email, display name, connection name or the application's client ID.
-Keep this personal identifier in the private input directory, outside Git/logs.
+1. Action:
+   - Source: Auth0 Dashboard → Applications → Applications → FleetIQ → Settings / Credentials → **Client Secret**.
+   - Target File: `C:\Users\sonof\AppData\Local\FleetIQ\d06-auth0\client-secret`.
+   - Using a local editor, save only the exact secret as UTF-8 without BOM, quotes, key names, spaces or a trailing newline. Preserve an existing correct file. Do not add `.txt`.
+2. Expected Result:
+   - The private file contains one raw value. Its eventual Kubernetes target is namespace `fleetiq-apps`, Secret `fleetiq-oidc`, key `client-secret`; creating that Secret is a separate authorized installation step.
 
-The proposed installation mapping is:
+### Step 6: Save the operator subject
 
-| Input | Meaning |
-| --- | --- |
-| Actor ID | `initial-operator`, a stable internal FleetIQ identity |
-| Authority | `auth0-fleetiq-local`, bound to the selected exact issuer |
-| Subject | The verified user's exact `user_id`, supplied privately |
+1. Action:
+   - Source: Auth0 Dashboard → User Management → Users → intended operator → Details / Raw JSON → **user_id**.
+   - Target File: `C:\Users\sonof\AppData\Local\FleetIQ\d06-auth0\operator-subject`.
+   - Save only the exact `user_id` as UTF-8 without BOM, quotes, key names or a trailing newline. Do not substitute an email or client ID; do not add `.txt`.
+2. Expected Result:
+   - The private file contains the exact subject for bootstrap input `FLEETIQ_BOOTSTRAP_EXTERNAL_SUBJECT`. The separately authorized bootstrap uses `FLEETIQ_BOOTSTRAP_ACTOR_ID=initial-operator` and `FLEETIQ_BOOTSTRAP_AUTHORITY_ID=auth0-fleetiq-local`.
 
-After explicit database migration, the authorized installer runs the existing
-`fleetiq-server bootstrap-platform-operator --check-schema` command with the
-bootstrap-only database privileges and its required environment. It is a separate
-one-time administrative operation, never normal startup or an HTTP endpoint.
-An exact retry is idempotent; a different initial identity is rejected afterward.
+### Step 7: Hand off file locations
 
-See the published backend's [bootstrap contract](https://github.com/stanimirivanov/fleetiq-platform/blob/9260d135a06dfb9f92271a561c306a69533743b0/docs/operations/platform-bootstrap.md)
-and [browser identity contract](https://github.com/stanimirivanov/fleetiq-platform/blob/9260d135a06dfb9f92271a561c306a69533743b0/docs/operations/browser-identity.md).
-Subsequent tenant provisioning and tenant permission grants are separate. Provider
-roles, app metadata, account creation and login do not automatically create an
-actor or grant `metadata.read`. An unmapped identity can authenticate at Auth0
-and still receive FleetIQ 401; a missing tenant grant can yield 403.
+1. Action:
+   - Provide only the absolute client-secret and operator-subject file paths and confirmation that Steps 1–6 are complete. Do not send either file's contents.
+2. Expected Result:
+   - The installer has explicit input locations; no Secret creation, bootstrap or live installation is implied.
 
-## 4. Store the client secret privately
+## Verification Gate
 
-Find **Client Secret** in the application's Settings/Credentials. Do not send it
-in chat, issue/PR text, command arguments, chart values or frontend configuration.
-The proposed Kubernetes reference is Secret `fleetiq-oidc`, key `client-secret`,
-in namespace `fleetiq-apps`. Its existence is not yet established.
+After the separately authorized D06 installation, trusted HTTPS setup and operator bootstrap, open `https://fleet.local.test:18443/` → Sign in → authenticate as the selected Auth0 user → return to FleetIQ. Pass only when the callback succeeds and FleetIQ displays the authenticated operator session. Record this gate as **pending** until that browser flow passes; saved inputs alone are not a sign-in pass.
 
-On Windows, the following operator-run script creates a new private input folder
-and prompts without echoing the secret. It refuses to reuse an existing folder;
-review existing files/ACLs deliberately instead of overwriting them.
+## Reference & Rationale
 
-```powershell
-$private = Join-Path $env:LOCALAPPDATA 'FleetIQ\d06-auth0'
-if (Test-Path -LiteralPath $private) { throw 'Input folder already exists; review it before updating.' }
-New-Item -ItemType Directory -Path $private -Force | Out-Null
-$sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-icacls $private /inheritance:r /grant:r "*${sid}:(OI)(CI)F" /Q
-if ($LASTEXITCODE -ne 0) { throw 'Private input ACL setup failed.' }
-$secret = Read-Host 'Auth0 client secret' -AsSecureString
-$pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secret)
-try {
-    $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)
-    if ([string]::IsNullOrWhiteSpace($plain)) { throw 'Empty client secret.' }
-    [IO.File]::WriteAllText((Join-Path $private 'client-secret'), $plain, [Text.UTF8Encoding]::new($false))
-} finally {
-    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
-    $secret.Dispose()
-    Remove-Variable plain -ErrorAction SilentlyContinue
-}
-```
-
-Save the user subject separately in that same private directory, for example as
-`operator-subject`, using a local editor without printing it. Report only the
-file paths and completion status. These files are sensitive local inputs, not an
-automatic credential-provisioning interface. Their contents must enter the
-future authorized bootstrap/Secret operation privately, with no diagnostic echo.
-No Secret or cluster is created by this script; the directory is separate from
-the provider's ownership journal and must not replace it.
-
-## 5. Validate the public inputs and preserve the boundaries
-
-D06's public-only preparation lives under ignored
-`target/d06-preparation/auth0-20261023/`. It records verified issuer discovery,
-client ID, proposed Secret references, selected immutable application/database
-images, the observed IPv4 answers and a native offline render. It contains no
-client secret or user subject and is **not** the private credential directory.
-The preparation is a rehearsal using offline namespace/quota objects; the
-fixture API-server CIDR still needs a real target observation. Never apply this
-render as installation manifests.
-
-The manifest verifier accepts explicit trusted `applicationNamespace` and
-`oidcIssuer` inputs. Expectations come from the selected configuration, not
-from rendered workloads. It checks the exact issuer, issuer-derived HTTPS port,
-database peer namespace, schema/resource inventory and quota headroom, retaining
-all other isolation, runtime and retention restrictions. Default fixture checks
-continue to expect their original namespace and issuer.
-
-Auth0 uses publicly trusted HTTPS; leave additional OIDC CA trust unset unless a
-reviewed additional CA is actually necessary. DNS answers can change or differ
-from the target's resolver: observed `/32` CIDRs and TTLs are preparation data,
-not permanent Auth0 ranges. Recheck all consumed issuer endpoint destinations
-from the authorized target before applying egress rules; never use `0.0.0.0/0`
-or suppress TLS checks to make discovery succeed.
-
-Public discovery and native schema/policy validation have passed. Application
-settings, enabled connection, private Secret material and subject are still
-operator prerequisites. Actual code exchange, session creation, grants and
-sign-in have not been tested. Protected Argo source graphs, target capacity,
-exact live-target authorization and the [D06 acceptance checklist](d06-qualification.md)
-also remain required; this runbook grants no activation authority.
-
-## References
-
-- [Auth0 database connections](https://auth0.com/docs/authenticate/database-connections).
-- [Auth0 Regular Web Application setup](https://auth0.com/docs/quickstart/webapp/express/index).
-- [Auth0 connection enablement](https://support.auth0.com/center/s/article/SSO-not-working-with-SAML).
+- FleetIQ uses backend OIDC authorization-code login with PKCE and server-managed browser sessions. No browser Auth0 SDK, custom API audience or Management API token is required. FleetIQ logout clears its session; Auth0 SSO may remain.
+- Auth0 login does not grant FleetIQ permissions. Bootstrap establishes the initial operator; tenant creation and tenant grants are separate. See the published [bootstrap contract](https://github.com/stanimirivanov/fleetiq-platform/blob/9260d135a06dfb9f92271a561c306a69533743b0/docs/operations/platform-bootstrap.md) and [browser identity contract](https://github.com/stanimirivanov/fleetiq-platform/blob/9260d135a06dfb9f92271a561c306a69533743b0/docs/operations/browser-identity.md).
+- The public JSON rehearsal contains fixture namespace/quota/API-server inputs. Do not apply it directly. Revalidate issuer endpoint DNS/egress from the actual target; do not disable TLS verification or allow unrestricted egress. See [D06 qualification](d06-qualification.md).
+- [Auth0 application setup](https://auth0.com/docs/quickstart/webapp/express/index) and [database connections](https://auth0.com/docs/authenticate/database-connections).

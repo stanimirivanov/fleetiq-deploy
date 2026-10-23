@@ -1,0 +1,23 @@
+# Bootstrap control manifest only; no live target or activation is authorized.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: fleetiq-local-data
+  namespace: fleetiq-gitops-system
+  labels:
+    k8s-infrastructure.io/consumer: fleetiq
+spec:
+  sourceRepos:
+    - https://github.com/stanimirivanov/fleetiq-deploy.git
+  sourceNamespaces:
+    - fleetiq-gitops-system
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: fleetiq-data
+  clusterResourceWhitelist: []
+  namespaceResourceWhitelist:
+    - group: postgresql.cnpg.io
+      kind: Cluster
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+  roles: []

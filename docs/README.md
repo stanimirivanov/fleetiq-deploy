@@ -12,6 +12,7 @@
   producer verification and separate candidate/promotion contracts.
 - [D06 readiness](operations/d06-readiness.md): observed publication runs, current
   blockers and persistent-target review inputs. The [earlier provider handoff](handoffs/k8s-infrastructure-d06-unblock.md) is historical.
+- [Registered Argo sources](operations/argo-source-graphs.md): role-isolated control graphs, locked-ref verification and live-admission limits.
 - [Auth0 onboarding](operations/auth0-onboarding.md): confidential application, user connection, private credential handoff and initial operator mapping.
 - [D06 qualification preparation](operations/d06-qualification.md): proposed retained target, initial delegation, capacity review and ordered live acceptance gates.
 - [Kubernetes delivery plan](exec-plans/active/kubernetes-gitops-deployment.md): D01-D14 sequence and provider prerequisites.

@@ -1,0 +1,23 @@
+# Bootstrap control manifest only; no live target or activation is authorized.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fleetiq-local-runtime
+  namespace: fleetiq-gitops-system
+  labels:
+    k8s-infrastructure.io/consumer: fleetiq
+spec:
+  project: fleetiq-local-runtime
+  source:
+    repoURL: https://github.com/stanimirivanov/fleetiq-deploy.git
+    targetRevision: refs/heads/environments/local/active
+    path: releases/active/local/runtime
+    directory:
+      recurse: false
+      include: manifests.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fleetiq-apps
+  syncPolicy:
+    syncOptions:
+      - FailOnSharedResource=true

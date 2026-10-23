@@ -13,8 +13,10 @@ Read [release operations](../../docs/operations/release-packages.md) and the
   process-owned temporary state; never use the global Docker credential store.
 - Preserve cluster/current-receipt/replay/expiry/phase checks and rejection fixtures.
   Missing live adapters remain incomplete, never assumed successful.
-- Candidate PRs cannot write active selections. D06 must replace the temporary
-  no-Argo-graph guard with registered protected-ref source-graph checks before
-  adding Applications. Do not simply remove the guard.
+- Candidate PRs cannot write active selections. Argo control objects must match
+  the exact registration in `source-graphs.mjs`, including JSON/YAML and wrapper
+  rejection fixtures. Read [source operations](../../docs/operations/argo-source-graphs.md).
+  Static registration does not replace live locked-ref verification or cluster
+  admission. Never add an override, writable-ref bypass or automatic sync.
 - Run `pnpm check` and real `pnpm packages:check`. Publication requires maintainer
   workflow dispatch after merge; never dispatch merely to test this code.
