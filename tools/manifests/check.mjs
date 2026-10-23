@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkBootstrap } from './bootstrap.mjs';
 import { manifestPolicy } from './policy.mjs';
 import { fixtureStates, renderFixture, validateSchemas } from './render.mjs';
 import { manifestTools, toolsLock } from './toolchain.mjs';
@@ -7,6 +8,7 @@ import { manifestTools, toolsLock } from './toolchain.mjs';
 /** All registered positive states must validate with real tools and local schemas. */
 export function checkManifests() {
   const tools = manifestTools();
+  const bootstrap = checkBootstrap(tools);
   const measurements = [];
   for (const state of fixtureStates) {
     const rendered = renderFixture(tools, { ...state, lint: true });
@@ -16,6 +18,7 @@ export function checkManifests() {
   }
   return {
     kubernetes: toolsLock.kubernetes,
+    bootstrap,
     tools: Object.fromEntries(
       Object.entries(toolsLock.tools).map(([name, tool]) => [name, tool.version]),
     ),

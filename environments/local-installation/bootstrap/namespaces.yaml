@@ -1,0 +1,48 @@
+# Preparation only: apply after exact-target ownership checks and explicit approval.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fleetiq-apps
+  labels:
+    app.kubernetes.io/part-of: fleetiq
+    k8s-infrastructure.io/consumer: fleetiq
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.35
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.35
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.35
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fleetiq-data
+  labels:
+    app.kubernetes.io/part-of: fleetiq
+    k8s-infrastructure.io/consumer: fleetiq
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.35
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.35
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.35
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fleetiq-releases
+  labels:
+    app.kubernetes.io/part-of: fleetiq
+    k8s-infrastructure.io/consumer: fleetiq
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: v1.35
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: v1.35
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: v1.35
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false

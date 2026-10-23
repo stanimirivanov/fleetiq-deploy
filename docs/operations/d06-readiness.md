@@ -134,6 +134,13 @@ installation was performed.
 
 ## Persistent qualification preparation
 
+[Issue #29](https://github.com/stanimirivanov/fleetiq-deploy/issues/29) implements
+the real six-object namespace/quota bootstrap package and its native sensor. The
+[staged approval proposal](d06-installation-approval.md) uses rendered provider
+placement and keeps foundation creation separate from full Argo/application
+acceptance. Host disk/name/TLS and protected phase sources remain outstanding.
+
+
 Follow the [concrete qualification checklist](d06-qualification.md) for target
 identity, provider-native previews, initial database delegation, capacity,
 identity references and ordered acceptance gates. The

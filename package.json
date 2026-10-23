@@ -21,7 +21,8 @@
     "releases:check": "node tools/releases/cli.mjs contracts",
     "releases:verify-artifacts": "node tools/releases/cli.mjs verify-artifacts",
     "packages:check": "node tools/verify.mjs packages",
-    "releases:verify-sources": "node tools/releases/cli.mjs verify-sources"
+    "releases:verify-sources": "node tools/releases/cli.mjs verify-sources",
+    "installation:check": "node tools/manifests/bootstrap.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

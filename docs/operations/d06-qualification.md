@@ -85,6 +85,10 @@ profile or resource limit change is implicitly authorized.
 
 ## Ordered execution and acceptance
 
+Use the [staged approval proposal](d06-installation-approval.md) for exact effects,
+bootstrap bytes and the capacity hold before installing Argo.
+
+
 1. Verify all producer publications, exact release BOM bytes, migration inventory
    and source/tool inputs. Preserve evidence beyond the UX seven-day retention.
 2. Complete identity, private Secret references, CA handling and bounded issuer
