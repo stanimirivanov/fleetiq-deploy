@@ -5,8 +5,9 @@
 The canonical fleetiq-ui image is published, and complete independent artifact
 verification passed on 2026-10-22 for the new UI, existing backend and existing
 chart package. No environment is promoted. D06 remains incomplete: Auth0
-onboarding is in progress, protected Argo source-graph enforcement and exact
-persistent-target authorization are still required before installation.
+inputs are confirmed, the registered source guard is merged, and exact-target
+previews are prepared. Actual protected phase sources, host/trust prerequisites
+and persistent-target authorization remain required before installation.
 
 ## Current verified preparation: 2026-10-22
 
@@ -126,7 +127,8 @@ the personal identifier is not stored in this repository. On 2026-10-23 the oper
 confirmed `client_secret_basic` and enabled the user connection. Metadata-only
 inspection confirmed a private client-secret file exists and its parent has ACL
 inheritance disabled; secret bytes and effective access were not inspected.
-The subject still needs a private file for eventual bootstrap injection. No
+The operator subsequently confirmed both default private files; their existence
+was checked using the provider runtime without reading contents. No
 authentication/code exchange, bootstrap, Secret creation, target query or live
 installation was performed.
 
@@ -144,8 +146,12 @@ the [operator runbook](auth0-onboarding.md).
 [Issue #25](https://github.com/stanimirivanov/fleetiq-deploy/issues/25) implements
 registered role-isolated control graphs and a read-only locked-ref verifier; see
 [source operations](argo-source-graphs.md). Actual phase payloads, activation-ref
-protection and controller admission remain unqualified. Final capacity review, exact durable-target
-preview/authorization and live ownership/incarnation checks remain outstanding.
+protection and controller admission remain unqualified.
+[Issue #27](https://github.com/stanimirivanov/fleetiq-deploy/issues/27) prepares
+the [exact persistent-target preview](d06-target-preview.md) at the operator-confirmed
+non-AppData path. All four native offline previews passed; final capacity review,
+host disk/name/trust prerequisites, live authorization and ownership/incarnation
+checks remain outstanding.
 No cluster, namespace, Secret, AppProject, Application or candidate was created
 or queried during this publication/verification task.
 

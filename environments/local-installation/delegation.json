@@ -1,0 +1,6 @@
+{
+  "consumer": "fleetiq",
+  "workloadNamespaces": ["fleetiq-apps", "fleetiq-data"],
+  "databaseNamespaces": ["fleetiq-data"],
+  "approvedTemplates": ["fleetiq-release-v1"]
+}

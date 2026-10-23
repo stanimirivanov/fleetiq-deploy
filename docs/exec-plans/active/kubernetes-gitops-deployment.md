@@ -10,6 +10,7 @@ Chart publication prerequisite [issue #15](https://github.com/stanimirivanov/fle
 [persistent qualification preparation](../../operations/d06-qualification.md). Installation acceptance remains incomplete.
 [Issue #19](https://github.com/stanimirivanov/fleetiq-deploy/issues/19) coordinates the canonical UI producer rename and post-merge publication handoff.
 [Issue #21](https://github.com/stanimirivanov/fleetiq-deploy/issues/21) records the canonical UI publication and passing combined artifact verification. Auth0 onboarding, protected Argo source graphs and persistent installation remain pending.
+[Issue #27](https://github.com/stanimirivanov/fleetiq-deploy/issues/27) prepares the exact persistent-target preview and remaining host/trust/source prerequisites (M02). The operator confirmed the non-AppData state path; live execution remains unapproved.
 [Issue #25](https://github.com/stanimirivanov/fleetiq-deploy/issues/25) adds closed runtime/data control graphs and read-only locked-source verification (M02). Live phase selection/protection and installation remain pending.
 [Issue #23](https://github.com/stanimirivanov/fleetiq-deploy/issues/23) prepares Auth0/operator onboarding and qualifies selected external-issuer inputs without live activation.
 Follow the [current readiness record](../../operations/d06-readiness.md) and
