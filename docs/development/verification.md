@@ -4,6 +4,8 @@
 
 Run `pnpm check` and, after `pnpm local build`, `pnpm qualify`.
 Install pinned offline manifest prerequisites first with `pnpm manifests:install`.
+`pnpm installation:check` is the focused, offline D06 namespace/bootstrap gate;
+its sensor also runs inside the existing manifests check.
 A focused pass is not a complete acceptance pass. Missing prerequisites, failed
 commands, changed source bytes or failed cleanup produce a nonzero exit.
 
@@ -22,9 +24,10 @@ commands, changed source bytes or failed cleanup produce a nonzero exit.
 | No secret exemptions | Pinned Gitleaks across candidate files, index and incoming history; allow comments ignored |
 | CI does not omit checks | Exact reviewed workflow renderer plus mutation fixtures |
 | Formatting and dependency policy | Biome CI, frozen lock install and pnpm advisory audit |
+| Bootstrap intent is not ownership | Native Kustomize/strict schemas for exactly three namespace/quota pairs; closed ownership/Pod Security/retention/quota policy, with no live execution or adoption claim |
 | Kubernetes package fitness | Real Helm/Kustomize rendering, pinned local Kubeconform schemas and parsed manifest policy with rejection fixtures |
 | Immutable publication | Pinned Helm OCI push/pull/render in an owned registry, exact archive/manifest hashes, missing/retag/overwrite rejection |
-| Candidate is not activation | Closed Ajv contracts, active-path rejection, temporary fail-closed Argo source-graph guard and independent admission-context fixtures |
+| Candidate is not activation | Closed Ajv contracts, active-path rejection, registered protected-ref Argo source-graph checks and independent admission-context fixtures |
 
 The executable catalogue is in `tools/verification-catalogue.mjs`. Groups are structural, manifests,
 packages, docker and acceptance. Reports include group/check outcomes, source fingerprints,

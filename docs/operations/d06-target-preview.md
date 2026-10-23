@@ -70,6 +70,14 @@ All reports use provider revision `41c558a54bc923fa69d7afc42bc663b763c3add5`;
 the source archive and extracted files were byte-checked before preview. Reports
 assert no execution; they do not prove registry availability or live admission.
 
+## Current installation preparation
+
+The [staged approval](d06-installation-approval.md) adds a native-validated
+namespace/quota package and replaces the earlier aggregate-only capacity estimate
+with actual pinned provider placements. Follow [host preparation](d06-host-preparation.md)
+for explicit disk/name/TLS actions. Historical observations below are not current
+completion or live approval.
+
 ## Remaining prerequisites
 
 | Gate | Observed status / required next action |

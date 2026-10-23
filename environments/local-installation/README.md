@@ -16,3 +16,12 @@ selection to the registered Argo namespaces, loopback ports and provider budget.
 They do not prove native provider compatibility, live ownership or free capacity.
 Keep generated preview reports, kubeconfigs, journals and private inputs outside
 Git. The ignored reports use the exact file-byte hashes of these JSON inputs.
+
+
+`bootstrap/` is the real initial namespace/quota Kustomize package, separate from
+inert target/delegation records. Run `pnpm installation:check` to build and validate
+its six objects with native tools; the regular manifest gate includes it. Apply
+only after exact-target approval and absence/original-ownership checks. Consumer
+labels declare intent and never authorize relabeling or adopting existing state.
+See the [staged approval](../../docs/operations/d06-installation-approval.md) and
+[host preparation](../../docs/operations/d06-host-preparation.md).
