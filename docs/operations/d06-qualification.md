@@ -4,8 +4,11 @@
 
 This is an execution checklist for a proposed retained FleetIQ target, not a
 live-installation receipt or permission to create it. Four native provider
-previews passed on 2026-10-22 with `execution: not-performed`. OIDC configuration
-is deferred at the operator's request. The canonical UI publication and complete
+previews passed on 2026-10-22 with `execution: not-performed`. OIDC onboarding
+is in progress; see the [Auth0 runbook](auth0-onboarding.md). Public discovery and
+selected-input offline validation passed, and the operator confirmed the Regular Web Application type and supplied the
+initial subject. Private credential storage, connection/token-method confirmation
+and actual user mapping remain pending. The canonical UI publication and complete
 independent release-artifact verification passed on 2026-10-22; see the readiness
 record for exact selections and evidence. Exact-target live admission and
 installation remain pending; earlier old-name reports remain historical.
@@ -40,7 +43,7 @@ approved consumer release WorkflowTemplate. No placeholder template is installed
 | Application / database / release namespaces | `fleetiq-apps`, `fleetiq-data`, `fleetiq-releases`, consumer-owned with exact provider labels. |
 | Provider namespaces | `fleetiq-gitops-system`, `fleetiq-workflow-system`, and provider-owned network/database/controller namespaces. |
 | Database | `fleetiq-db`, one instance, `local-retained`, 2Gi; provider admission allows 8Gi/four claims with replacement headroom. PVC size does not impose a physical disk quota. |
-| Identity | Deferred: trusted HTTPS issuer, public client ID, authority, confidential Secret reference, actual issuer egress CIDRs and optional public CA still required. |
+| Identity | Auth0 discovery and provided public client ID are prepared; proposed authority `auth0-fleetiq-local`. Application type and initial subject are operator-confirmed; token-method/connection confirmation, private client-secret/subject files, live issuer egress and actual Secret provisioning remain pending; see the [runbook](auth0-onboarding.md). |
 | Lifecycle | Retain state and data on stop/failure. No disposable qualification removal or automatic cluster destruction. |
 
 The database image selected by the qualified provider inventory is

@@ -32,15 +32,39 @@ const expected = [
   ['gateway.networking.k8s.io/v1', 'Gateway', 'fleetiq-local', 'fleetiq'],
   ['gateway.networking.k8s.io/v1', 'HTTPRoute', 'fleetiq-local', 'fleetiq'],
   ['postgresql.cnpg.io/v1', 'Cluster', 'fleetiq-data', 'fleetiq-db'],
-]
-  .map((identity) => identity.join('|'))
-  .sort();
+];
 
 /** D04 validates the complete offline composition; it grants no activation authority. */
 export function manifestPolicy(
   resources,
   context = { maintenance: false, nonlocal: false },
 ) {
+  // Trusted selection inputs, never expectations inferred from rendered workloads.
+  const applicationNamespace = context.applicationNamespace ?? 'fleetiq-local';
+  assert(
+    ['fleetiq-local', 'fleetiq-apps'].includes(applicationNamespace),
+    'Unregistered application namespace',
+  );
+  const oidcIssuer =
+    context.oidcIssuer ??
+    (context.providerLocal
+      ? 'https://identity.local.test:19443/realms/fleet'
+      : 'https://identity.local.test/realms/fleet');
+  const issuer = new URL(oidcIssuer);
+  const oidcPort = Number(issuer.port || 443);
+  assert(
+    issuer.protocol === 'https:' &&
+      !issuer.username &&
+      !issuer.password &&
+      !issuer.search &&
+      !issuer.hash &&
+      !oidcIssuer.includes('?') &&
+      !oidcIssuer.includes('#') &&
+      oidcPort > 0 &&
+      oidcPort <= 65535,
+    'Selected issuer must use trusted HTTPS',
+  );
+  context = { ...context, oidcIssuer };
   assert.deepEqual(
     resources
       .map((r) =>
@@ -48,9 +72,20 @@ export function manifestPolicy(
       )
       .sort(),
     [
-      ...expected,
+      ...expected.map(([api, kind, namespace, name]) =>
+        [
+          api,
+          kind,
+          namespace === 'fleetiq-local' ? applicationNamespace : namespace,
+          kind === 'Namespace' && name === 'fleetiq-local'
+            ? applicationNamespace
+            : name,
+        ].join('|'),
+      ),
       ...(context.providerLocal
-        ? ['cilium.io/v2|CiliumNetworkPolicy|fleetiq-local|fleetiq-gateway-ingress']
+        ? [
+            `cilium.io/v2|CiliumNetworkPolicy|${applicationNamespace}|fleetiq-gateway-ingress`,
+          ]
         : []),
     ].sort(),
     'Unexpected/missing resource, namespace, GVK or duplicate identity',
@@ -185,7 +220,25 @@ export function manifestPolicy(
         'Retained data/namespace must not be auto-pruned',
       );
   }
-  budgetPolicy(resources);
+  const databaseNetwork = resources.find(
+    (r) => r.kind === 'NetworkPolicy' && r.metadata.name === 'fleetiq-db-instances',
+  ).spec;
+  assert.deepEqual(
+    databaseNetwork.ingress[0],
+    {
+      from: [
+        {
+          namespaceSelector: {
+            matchLabels: { 'kubernetes.io/metadata.name': applicationNamespace },
+          },
+          podSelector: { matchLabels: { 'app.kubernetes.io/name': 'fleetiq-backend' } },
+        },
+      ],
+      ports: [{ protocol: 'TCP', port: 5432 }],
+    },
+    'Database ingress must match the selected application namespace',
+  );
+  budgetPolicy(resources, applicationNamespace);
   const backendNetwork = resources.find(
     (r) => r.kind === 'NetworkPolicy' && r.metadata.name === 'fleetiq-backend',
   ).spec;
@@ -209,7 +262,7 @@ export function manifestPolicy(
     ports: [{ protocol: 'TCP', port: 5432 }],
   });
   assert.deepEqual(backendNetwork.egress[2].ports, [
-    { protocol: 'TCP', port: context.providerLocal ? 19443 : 443 },
+    { protocol: 'TCP', port: oidcPort },
   ]);
   const edgeNetwork = resources.find(
     (r) => r.kind === 'NetworkPolicy' && r.metadata.name === 'fleetiq-edge',

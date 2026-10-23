@@ -17,7 +17,7 @@ const secretReference = (entry) => {
 /** Check application restrictions and producer interfaces rather than YAML text. */
 export function workloadPolicy(
   resource,
-  { maintenance, nonlocal, providerLocal = false },
+  { maintenance, nonlocal, providerLocal = false, oidcIssuer },
 ) {
   assert.deepEqual(
     resource.spec.strategy,
@@ -103,6 +103,11 @@ export function workloadPolicy(
     );
     secretReference(env.DATABASE_URL);
     secretReference(env.FLEETIQ_OIDC_CLIENT_SECRET);
+    assert.equal(
+      env.FLEETIQ_OIDC_ISSUER.value,
+      oidcIssuer,
+      'Rendered issuer differs from selected identity',
+    );
     const issuer = new URL(env.FLEETIQ_OIDC_ISSUER.value);
     assert(
       issuer.protocol === 'https:' &&
