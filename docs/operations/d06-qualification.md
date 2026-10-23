@@ -3,13 +3,14 @@
 ## TL;DR
 
 This is an execution checklist for a proposed retained FleetIQ target, not a
-live-installation receipt or permission to create it. Four native provider
-previews passed on 2026-10-22 with `execution: not-performed`. OIDC onboarding
+live-installation receipt or permission to create it. Four exact-target provider
+previews passed on 2026-10-23 with `execution: not-performed`; see the
+[target review](d06-target-preview.md). OIDC onboarding
 is in progress; see the [Auth0 runbook](auth0-onboarding.md). Public discovery and
 selected-input offline validation passed, and the operator confirmed the Regular Web Application type and supplied the
 initial subject. Connection and `client_secret_basic` are operator-confirmed; a
-private client-secret file exists (metadata checked only). The subject file, actual
-Secret provisioning and user mapping remain pending. The canonical UI publication and complete
+private client-secret file exists (metadata checked only). Both default private input files are operator-confirmed and visible to the
+provider runtime (metadata only). Secret provisioning and user mapping remain pending. The canonical UI publication and complete
 independent release-artifact verification passed on 2026-10-22; see the readiness
 record for exact selections and evidence. Exact-target live admission and
 installation remain pending; earlier old-name reports remain historical.
@@ -39,12 +40,12 @@ approved consumer release WorkflowTemplate. No placeholder template is installed
 | --- | --- |
 | Consumer / cluster / Kubernetes context | `fleetiq` / `fleetiq-local` / `kind-fleetiq-local`; prove absence or exact original ownership before mutation. |
 | Docker / profile | `desktop-linux` / `isolated-network-local`; no existing Perfeng cluster is used. |
-| Private state | Proposed `%LOCALAPPDATA%/k8s-infrastructure/fleetiq-d06`; require an ordinary dedicated directory and private ACL review. The rehearsal instead used an empty ignored preparation directory. |
+| Private state | Operator-confirmed `C:\Users\sonof\FleetIQ\state\d06`; empty, ordinary canonical directory with private ACLs. The AppData proposal resolves into the Codex package cache and is not the target. See the [exact preview](d06-target-preview.md). |
 | HTTPS | `127.0.0.1:18443` to node listener `8443`, hostname `fleet.local.test`; check availability and name resolution. No automatic hosts-file or host trust-store edit. |
 | Application / database / release namespaces | `fleetiq-apps`, `fleetiq-data`, `fleetiq-releases`, consumer-owned with exact provider labels. |
 | Provider namespaces | `fleetiq-gitops-system`, `fleetiq-workflow-system`, and provider-owned network/database/controller namespaces. |
 | Database | `fleetiq-db`, one instance, `local-retained`, 2Gi; provider admission allows 8Gi/four claims with replacement headroom. PVC size does not impose a physical disk quota. |
-| Identity | Auth0 discovery and provided public client ID are prepared; proposed authority `auth0-fleetiq-local`. Application type and initial subject are operator-confirmed; connection and `client_secret_basic` are confirmed, and private client-secret file metadata is checked. Subject file, live issuer egress and actual Secret provisioning remain pending; see the [runbook](auth0-onboarding.md). |
+| Identity | Auth0 discovery and provided public client ID are prepared; proposed authority `auth0-fleetiq-local`. Application type and initial subject are operator-confirmed; connection and `client_secret_basic` are confirmed, and private client-secret file metadata is checked. Both default private files are confirmed and their existence checked without reading contents. Live issuer egress and actual Secret provisioning remain pending; see the [runbook](auth0-onboarding.md). |
 | Lifecycle | Retain state and data on stop/failure. No disposable qualification removal or automatic cluster destruction. |
 
 The database image selected by the qualified provider inventory is
@@ -117,12 +118,14 @@ profile or resource limit change is implicitly authorized.
 11. Reject wrong owner/context, stale incarnation, foreign resources and incomplete
     receipts. Record actual source/target-bound outcomes and retained evidence.
 
-The four new reports under ignored
+The earlier four reports under ignored
 `target/d06-preparation/persistent-preview/` cover cluster, networking, database
 and delegated Argo **offline** input composition. Database admission includes
 `fleetiq-data`, unlike the earlier rehearsal. No cluster, kubeconfig, Secret,
 private ownership journal, live listener or namespace was queried or changed.
-The rehearsal is not a final durable-target preview or live installation.
+That rehearsal is historical. The four exact durable-target previews and current
+prerequisite observations are now under `target/d06-preparation/exact-target-20261023/`;
+see the [target review](d06-target-preview.md). Neither preview is a live installation.
 
 D06 remains incomplete until these gates pass. D07 owns external backup/restore,
 D08 owns release workflow execution, D10 owns full real-provider browser journeys,

@@ -1,0 +1,72 @@
+{
+  "format": "fleetiq-d06-target-preparation.v1",
+  "environment": "local",
+  "consumer": "fleetiq",
+  "provider": {
+    "repository": "stanimirivanov/k8s-infrastructure",
+    "revision": "41c558a54bc923fa69d7afc42bc663b763c3add5",
+    "archiveSha256": "95de6cf55807579b5f3e1f6e31ce1da4e12ca7ccc1063db7d523b5223fadc926"
+  },
+  "target": {
+    "cluster": "fleetiq-local",
+    "kubernetesContext": "kind-fleetiq-local",
+    "dockerContext": "desktop-linux",
+    "profile": "isolated-network-local",
+    "stateRoot": "C:\\Users\\sonof\\FleetIQ\\state\\d06",
+    "stateRootSelection": "operator-confirmed-outside-redirected-AppData"
+  },
+  "https": {
+    "hostname": "fleet.local.test",
+    "bindAddress": "127.0.0.1",
+    "hostPort": 18443,
+    "nodeListenerPort": 8443
+  },
+  "capacity": {
+    "nodes": {
+      "control-plane": {
+        "cpus": 2,
+        "memoryBytes": 4294967296
+      },
+      "worker": {
+        "cpus": 2,
+        "memoryBytes": 4294967296
+      }
+    },
+    "minimumEngine": {
+      "cpus": 4,
+      "memoryBytes": 12884901888
+    },
+    "pidsPerNode": 2048,
+    "swap": false,
+    "bootstrap": "temporarily-uncapped"
+  },
+  "namespaces": {
+    "runtime": "fleetiq-apps",
+    "data": "fleetiq-data",
+    "releases": "fleetiq-releases",
+    "gitops": "fleetiq-gitops-system",
+    "workflows": "fleetiq-workflow-system"
+  },
+  "database": {
+    "name": "fleetiq-db",
+    "instances": 1,
+    "storageClass": "local-retained",
+    "storage": "2Gi",
+    "image": "ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie@sha256:42708a75345b7a48fdd9257b071830783a97fd228529196b6313187a7198e185"
+  },
+  "identity": {
+    "issuer": "https://dev-iqzkuoz81x7gifev.us.auth0.com/",
+    "authority": "auth0-fleetiq-local",
+    "clientSecret": {
+      "namespace": "fleetiq-apps",
+      "name": "fleetiq-oidc",
+      "key": "client-secret"
+    }
+  },
+  "releaseBomDigest": "sha256:2d794c978f1a2b7ed59b5a1f96ea70a6d2182a843bbf30325e17efb3e43cd65e",
+  "activationRef": "refs/heads/environments/local/active",
+  "workflowTemplate": null,
+  "execution": "not-performed",
+  "authorization": "pending",
+  "disposal": "retain-state-and-data; no automatic cluster removal; node-local storage is not off-host backup"
+}
