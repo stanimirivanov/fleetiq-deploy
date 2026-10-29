@@ -11,12 +11,6 @@
           "sha256": "0403a88ae20913d11b10a2467b50087721fea7581736da6b9d3992f5357fe54b",
           "executable": "linux-amd64/helm",
           "binarySha256": "b66cb19f2b31f9d427632ea6c4b4a1ff89b74ecaeaee323cd166da41a7af53bd"
-        },
-        "win32-x64": {
-          "url": "https://get.helm.sh/helm-v4.3.1-windows-amd64.zip",
-          "sha256": "fcfd7b796dcf0f225abc40b5636a3b01f55f3de2fb1dfb18475df94e62c14112",
-          "executable": "windows-amd64/helm.exe",
-          "binarySha256": "912d7210c880c48b2ac91102b1297d6ac637edd9aaaf05beb12da0b496b53ba9"
         }
       }
     },
@@ -29,12 +23,6 @@
           "sha256": "cb9e31198d3f63b44848bd0afc4c8efc56e6cfef9c93a4a39a211940e6decd61",
           "executable": "kustomize",
           "binarySha256": "a5e53d28755098b003ae2b6bff7b1650a411a366a0c800c1ea1b677e0cfff747"
-        },
-        "win32-x64": {
-          "url": "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.8.3/kustomize_v5.8.3_windows_amd64.zip",
-          "sha256": "763c4040ff01435bfce39661072452ebdf1cf2808bb91f5708ab4420834fbd42",
-          "executable": "kustomize.exe",
-          "binarySha256": "60bc423d3abc67ee86ae34d46715ef8affd7fd9b1fbba5c1fa4fd00e99dcaa36"
         }
       }
     },
@@ -47,12 +35,6 @@
           "sha256": "9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883",
           "executable": "kubeconform",
           "binarySha256": "457722b36e98d7bdbc91525e594951ef5d7ea3a29da2d13b9b28a2fb8a5097b7"
-        },
-        "win32-x64": {
-          "url": "https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-windows-amd64.zip",
-          "sha256": "e3f56102bcf4f50b034a567e2482a1c5330799983ddd655952310211aef73d93",
-          "executable": "kubeconform.exe",
-          "binarySha256": "642bf8ea0d614a8c75d2bd012eb6042a90589ff846c69f04863afa446b30f2c1"
         }
       }
     }

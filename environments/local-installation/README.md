@@ -1,12 +1,18 @@
 # Proposed persistent D06 target
 
+Linux migration: `/var/lib/fleetiq/d06` and Docker context `default` are proposed
+inputs, pending operator confirmation. Earlier host preparation and preview
+evidence do not qualify this Linux target. Re-run provider previews and capacity,
+path ownership, TLS and identity checks before requesting live approval.
+
+
 `target.json` records the exact proposed target, budgets, public Secret references
 and immutable input identities. `delegation.json` is the initial provider-native
 namespace/database delegation. These files are preparation inputs, not Kubernetes
 manifests, credentials, an admitted release candidate or installation authority.
 
 Follow the [target preview runbook](../../docs/operations/d06-target-preview.md).
-The state directory is outside redirected AppData; the operator confirmed its
+The proposed state directory is outside the checkout; confirm its
 selection. Live execution still needs exact-target approval. Native previews remain offline without `--execute`.
 `approvedTemplates` reserves the future release template name; no template is
 installed, and `workflowTemplate: null` keeps D06 guided.

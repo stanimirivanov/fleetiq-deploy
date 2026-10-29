@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 // Linux image build executes the actual entrypoint with only mounted-path/exec
-// substitutions. Never substitute the shell logic or claim Windows ran Bash.
+// substitutions. Never substitute the shell logic.
 const directory = mkdtempSync(join(tmpdir(), 'fleetiq-entrypoint-'));
 try {
   const password = join(directory, 'database_password'),

@@ -41,11 +41,7 @@ function cli(file, version = '12.5.1', exit = 0) {
 
 test('pnpm discovery supports native PATH and adjacent npm package executables without a shell', (context) => {
   const directory = fixture(context);
-  const native = join(
-    directory,
-    'node_modules/pnpm',
-    process.platform === 'win32' ? 'pnpm.exe' : 'pnpm',
-  );
+  const native = join(directory, 'node_modules/pnpm', 'pnpm');
   mkdirSync(dirname(native), { recursive: true });
   copyFileSync(process.execPath, native);
   // A real native process validates execution; it is deliberately Node, not a forged pnpm binary.

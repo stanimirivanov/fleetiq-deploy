@@ -156,7 +156,7 @@ registered role-isolated control graphs and a read-only locked-ref verifier; see
 protection and controller admission remain unqualified.
 [Issue #27](https://github.com/stanimirivanov/fleetiq-deploy/issues/27) prepares
 the [exact persistent-target preview](d06-target-preview.md) at the operator-confirmed
-non-AppData path. All four native offline previews passed; final capacity review,
+previous host path. Fresh Linux offline previews are required; final capacity review,
 host disk/name/trust prerequisites, live authorization and ownership/incarnation
 checks remain outstanding.
 No cluster, namespace, Secret, AppProject, Application or candidate was created

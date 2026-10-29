@@ -116,7 +116,7 @@ test('owned browser diagnostics report the exact safe action without provider de
   assert(!summary.includes(marker));
 });
 
-test('local browser verification checks the Linux Docker runtime on Unix or Windows transports', () => {
+test('local browser verification checks the Linux Docker runtime on a local Unix transport', () => {
   const execute =
     ({
       os = 'linux',
@@ -132,12 +132,11 @@ test('local browser verification checks the Linux Docker runtime on Unix or Wind
       throw new Error('Unexpected Docker prerequisite command');
     };
   assert.equal(context({ execute: execute(), environment: {} }), 'local-test');
-  assert.equal(
+  assert.throws(() =>
     context({
       execute: execute({ endpoint: 'npipe:////./pipe/dockerDesktopLinuxEngine' }),
       environment: {},
     }),
-    'local-test',
   );
   assert.throws(() =>
     context({ execute: execute({ os: 'windows' }), environment: {} }),

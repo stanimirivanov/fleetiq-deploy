@@ -1,5 +1,6 @@
 # D06 persistent installation qualification preparation
 
+
 ## TL;DR
 
 This is an execution checklist for a proposed retained FleetIQ target, not a
@@ -14,6 +15,11 @@ provider runtime (metadata only). Secret provisioning and user mapping remain pe
 independent release-artifact verification passed on 2026-10-22; see the readiness
 record for exact selections and evidence. Exact-target live admission and
 installation remain pending; earlier old-name reports remain historical.
+
+Linux migration: `/var/lib/fleetiq/d06` and Docker context `default` are proposed
+inputs, pending operator confirmation. Earlier host preparation and preview
+evidence do not qualify this Linux target. Re-run provider previews and capacity,
+path ownership, TLS and identity checks before requesting live approval.
 
 ## Selected source and evidence
 
@@ -39,13 +45,13 @@ approved consumer release WorkflowTemplate. No placeholder template is installed
 | Input | Proposed selection / required proof |
 | --- | --- |
 | Consumer / cluster / Kubernetes context | `fleetiq` / `fleetiq-local` / `kind-fleetiq-local`; prove absence or exact original ownership before mutation. |
-| Docker / profile | `desktop-linux` / `isolated-network-local`; no existing Perfeng cluster is used. |
-| Private state | Operator-confirmed `C:\Users\sonof\FleetIQ\state\d06`; empty, ordinary canonical directory with private ACLs. The AppData proposal resolves into the Codex package cache and is not the target. See the [exact preview](d06-target-preview.md). |
+| Docker / profile | `default` / `isolated-network-local`; no existing Perfeng cluster is used. |
+| Private state | Proposed `/var/lib/fleetiq/d06`; requires operator confirmation and fresh canonical-path/ownership checks. See the [target preview](d06-target-preview.md). |
 | HTTPS | `127.0.0.1:18443` to node listener `8443`, hostname `fleet.local.test`; check availability and name resolution. No automatic hosts-file or host trust-store edit. |
 | Application / database / release namespaces | `fleetiq-apps`, `fleetiq-data`, `fleetiq-releases`, consumer-owned with exact provider labels. |
 | Provider namespaces | `fleetiq-gitops-system`, `fleetiq-workflow-system`, and provider-owned network/database/controller namespaces. |
 | Database | `fleetiq-db`, one instance, `local-retained`, 2Gi; provider admission allows 8Gi/four claims with replacement headroom. PVC size does not impose a physical disk quota. |
-| Identity | Auth0 discovery and provided public client ID are prepared; proposed authority `auth0-fleetiq-local`. Application type and initial subject are operator-confirmed; connection and `client_secret_basic` are confirmed, and private client-secret file metadata is checked. Both default private files are confirmed and their existence checked without reading contents. Live issuer egress and actual Secret provisioning remain pending; see the [runbook](auth0-onboarding.md). |
+| Identity | Auth0 discovery and provided public client ID are prepared; proposed authority `auth0-fleetiq-local`. Application type and initial subject are operator-confirmed; connection and `client_secret_basic` are confirmed, and private client-secret file metadata is checked. Confirm Linux private file paths, ownership and permissions without reading contents. Live issuer egress and actual Secret provisioning remain pending; see the [runbook](auth0-onboarding.md). |
 | Lifecycle | Retain state and data on stop/failure. No disposable qualification removal or automatic cluster destruction. |
 
 The database image selected by the qualified provider inventory is

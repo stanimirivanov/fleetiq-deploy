@@ -1,5 +1,6 @@
 # D06 staged persistent-installation approval
 
+
 ## TL;DR
 
 This is a concrete execution proposal, not approval. The namespace/quota package
@@ -7,12 +8,17 @@ is implemented and offline-validated. Host disk/name/TLS and protected phase
 sources remain outstanding. Foundation creation and complete application release
 have separate hold points; no phase may silently continue past a failed gate.
 
+Linux migration: `/var/lib/fleetiq/d06` and Docker context `default` are proposed
+inputs, pending operator confirmation. Earlier host preparation and preview
+evidence do not qualify this Linux target. Re-run provider previews and capacity,
+path ownership, TLS and identity checks before requesting live approval.
+
 ## Fixed target and artifacts
 
-Use the [confirmed target](../../environments/local-installation/target.json),
+Use the [proposed target](../../environments/local-installation/target.json),
 [delegation](../../environments/local-installation/delegation.json) and
 [exact preview](d06-target-preview.md). State is
-`C:\Users\sonof\FleetIQ\state\d06`; Docker is `desktop-linux`; cluster/context
+`/var/lib/fleetiq/d06`; Docker is `default`; cluster/context
 is `fleetiq-local` / `kind-fleetiq-local`; HTTPS is loopback 18443 to listener 8443.
 Two nodes remain capped at 2 CPUs/4Gi and 2048 PIDs each after creation; initial
 kind bootstrap is temporarily uncapped. No larger profile is proposed here.
@@ -41,14 +47,14 @@ No controller, Secret, workload, migration or Argo resource is in the package.
 | `provider-capacity.json` | `sha256:a3b159d3141b80aaf1987bd917660d0403be6978fd716c2c982b943c981fd22d` |
 
 The public receipt is retained at
-`target/d06-preparation/approval-20261023/bootstrap-preparation.json`. It records
-six valid schemas and the target/delegation digests; it grants no ownership or
+`target/d06-preparation/approval-20261023/bootstrap-preparation.json`. Its earlier target digest is stale after the Linux migration; regenerate it with
+six valid schemas and current target/delegation digests. It grants no ownership or
 execution authority. Rebuild and compare bytes from merged source before approval.
 
 ## Prerequisites before any live stage
 
 1. Merge this PR with passing CI and bind the selected source and rendered bootstrap bytes to the approval record.
-2. Complete disk/idle-window preparation from [host preparation](d06-host-preparation.md); hostname/TLS setup is required before Stage B, not to create the foundation. The 2026-10-23 recheck found only 5.83Gi free on C:, about 7.41Gi free physical RAM, no listener on 18443 and unresolved `fleet.local.test`. Recheck actual free host/engine resources; an engine maximum is not available capacity.
+2. Complete disk/idle-window preparation from [host preparation](d06-host-preparation.md); hostname/TLS setup is required before Stage B, not to create the foundation. Recheck actual free host/engine resources; an engine maximum is not available capacity.
 3. Reconfirm the selected provider archive/source, immutable release BOM and independent publisher/registry evidence. No new application image/chart is required for this bootstrap slice.
 4. Confirm the idle benchmark window and exact target effects below. An earlier disposable qualification or state-path confirmation is not live approval.
 
@@ -100,21 +106,21 @@ The two creation commands below use the exact source-byte digests listed above;
 the pure local Kustomize package validates their complete six-object composition.
 They are shown for review only. Do not paste both commands as an unattended batch.
 
-```powershell
-kubectl --kubeconfig C:\Users\sonof\FleetIQ\state\d06\.local\fleetiq-local.kubeconfig --context kind-fleetiq-local create --field-manager=fleetiq-bootstrap -f C:\Source\fleet-iq\fleetiq-deploy\environments\local-installation\bootstrap\namespaces.yaml
+```bash
+kubectl --kubeconfig /var/lib/fleetiq/d06/.local/fleetiq-local.kubeconfig --context kind-fleetiq-local create --field-manager=fleetiq-bootstrap -f /path/to/fleet-iq/fleetiq-deploy/environments/local-installation/bootstrap/namespaces.yaml
 ```
 
 Stop on nonzero exit or AlreadyExists. Obtain and retain the new namespace UIDs
 and recheck them against the same cluster incarnation before the quota step:
 
-```powershell
-kubectl --kubeconfig C:\Users\sonof\FleetIQ\state\d06\.local\fleetiq-local.kubeconfig --context kind-fleetiq-local get namespace fleetiq-apps fleetiq-data fleetiq-releases -o json
+```bash
+kubectl --kubeconfig /var/lib/fleetiq/d06/.local/fleetiq-local.kubeconfig --context kind-fleetiq-local get namespace fleetiq-apps fleetiq-data fleetiq-releases -o json
 ```
 
 Only after that ownership checkpoint succeeds:
 
-```powershell
-kubectl --kubeconfig C:\Users\sonof\FleetIQ\state\d06\.local\fleetiq-local.kubeconfig --context kind-fleetiq-local create --field-manager=fleetiq-bootstrap -f C:\Source\fleet-iq\fleetiq-deploy\environments\local-installation\bootstrap\quotas.yaml
+```bash
+kubectl --kubeconfig /var/lib/fleetiq/d06/.local/fleetiq-local.kubeconfig --context kind-fleetiq-local create --field-manager=fleetiq-bootstrap -f /path/to/fleet-iq/fleetiq-deploy/environments/local-installation/bootstrap/quotas.yaml
 ```
 
 These writes are not an atomic transaction. Preserve partial creations, stop on

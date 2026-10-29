@@ -22,14 +22,14 @@ The same chart sources support later local and non-local selections.
 
 ## Offline qualification
 
-```powershell
+```bash
 pnpm install --frozen-lockfile
 pnpm manifests:install
 pnpm manifests:check
 pnpm check
 ```
 
-Installation fetches reviewed checksum-pinned Linux/Windows x64 tools and schema
+Installation fetches reviewed checksum-pinned Linux x64 tools and schema
 snapshots into ignored target/tools/manifests. Validation then uses real Helm
 lint/template, Kustomize build and strict Kubeconform with only local schemas.
 Missing tools/schemas fail; there is no PATH, remote schema or cluster fallback.

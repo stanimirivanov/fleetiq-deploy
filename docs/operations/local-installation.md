@@ -10,10 +10,10 @@ this development composition as a production installation.
 ## Prerequisites and first build
 
 Use Node 24.18.0, pnpm 12.5.1 and Docker Linux containers with Compose 5.5.1.
-On Windows start Docker Desktop. On Linux CI the checksum-verified Compose
+Start a local Linux Docker engine. In CI the checksum-verified Compose
 installer is available as `node tools/install-compose.mjs`.
 
-```powershell
+```bash
 pnpm install --frozen-lockfile
 pnpm secrets:install
 pnpm local sources
@@ -43,8 +43,7 @@ single-line confidential client secret. Do not put the secret in config.json.
 The generated database password is random and must remain unchanged after
 initialization unless PostgreSQL credentials are rotated explicitly.
 
-Initialization removes inherited Windows ACLs on the instance directory and grants
-the current user full access, or creates mode 0700 on Unix. Mounted secret files
+Initialization creates the instance directory with mode 0700. Mounted secret files
 are readable inside their containers. Keep the parent private and do not copy
 configuration into a public/shared folder. Docker administrators remain trusted.
 
@@ -61,16 +60,14 @@ errors remain backend failures. Workload-bearer mode is not part of this composi
 
 ## Start, trust and bootstrap
 
-```powershell
+```bash
 pnpm local up development
 pnpm local trust development
 ```
 
 The trust command exports **only** `root-ca.crt` into the instance directory.
 Review its SHA-256 fingerprint with your OS certificate tooling, then import
-that certificate into your user/browser trusted roots. On Windows use
-`certutil -user -addstore Root <absolute-path-to-root-ca.crt>` after review.
-On Linux use your distribution/browser certificate store.
+that certificate into your distribution/browser trusted roots after review.
 Never export `root.key`. Never disable TLS verification or use a browser
 ignore-certificate-errors launch option.
 
@@ -84,7 +81,7 @@ Open the configured HTTPS origin. Before first privileged use create a private
 }
 ```
 
-```powershell
+```bash
 pnpm local bootstrap development
 ```
 

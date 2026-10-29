@@ -6,9 +6,7 @@ import { lock } from './policy.mjs';
 import { run } from './process.mjs';
 
 if (process.platform !== 'linux' || process.arch !== 'x64')
-  throw new Error(
-    'This installer targets Linux x64 CI; use Docker Desktop Compose 5.5.1 on Windows.',
-  );
+  throw new Error('This installer supports Linux x64.');
 const directory = join(homedir(), '.docker', 'cli-plugins');
 const response = await fetch(
   `https://github.com/docker/compose/releases/download/v${lock.tools.compose}/docker-compose-linux-x86_64`,

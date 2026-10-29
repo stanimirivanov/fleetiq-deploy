@@ -1,5 +1,8 @@
 # FleetIQ deployment
 
+Development and repository verification are supported on Linux.
+
+
 Run the production FleetIQ web build, Rust backend and PostgreSQL through a
 single local HTTPS origin. Only the edge publishes a loopback port.
 
@@ -8,7 +11,7 @@ single local HTTPS origin. Only the edge publishes a loopback port.
 Requires Git, Node **24.18.0**, pnpm **12.5.1**, Docker with Linux containers,
 and Docker Compose **5.5.1**.
 
-```powershell
+```bash
 pnpm install --frozen-lockfile
 pnpm secrets:install
 pnpm local sources
@@ -18,7 +21,7 @@ pnpm local init
 
 Configure the generated private files, register the OIDC callback, then start:
 
-```powershell
+```bash
 pnpm local up
 pnpm local trust
 ```

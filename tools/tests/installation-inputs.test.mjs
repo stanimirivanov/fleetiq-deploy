@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { win32 } from 'node:path';
+import { posix } from 'node:path';
 import test from 'node:test';
 import { sourceRegistration } from '../releases/source-graphs.mjs';
 
@@ -35,23 +35,21 @@ test('persistent preparation matches registered Argo namespaces and exact manual
 test('persistent preparation binds isolated loopback target, budgets and explicit local data retention', () => {
   assert.equal(target.target.cluster, `${target.consumer}-local`);
   assert.equal(target.target.kubernetesContext, `kind-${target.target.cluster}`);
-  assert.equal(target.target.dockerContext, 'desktop-linux');
+  assert.equal(target.target.dockerContext, 'default');
   assert.equal(target.target.profile, 'isolated-network-local');
-  assert.equal(win32.isAbsolute(target.target.stateRoot), true);
-  assert.equal(win32.normalize(target.target.stateRoot), target.target.stateRoot);
+  assert.equal(posix.isAbsolute(target.target.stateRoot), true);
+  assert.equal(posix.normalize(target.target.stateRoot), target.target.stateRoot);
   const segments = target.target.stateRoot
-    .split(win32.sep)
+    .split(posix.sep)
     .map((part) => part.toLowerCase());
   assert(
     !segments.some((part) =>
-      ['appdata', 'localcache', 'temp', 'node_modules', 'target', '.local'].includes(
-        part,
-      ),
+      ['tmp', 'temp', 'node_modules', 'target', '.local'].includes(part),
     ),
   );
   assert.equal(
     target.target.stateRootSelection,
-    'operator-confirmed-outside-redirected-AppData',
+    'linux-proposal-requires-operator-confirmation',
   );
   assert.equal(target.https.bindAddress, '127.0.0.1');
   assert.equal(target.https.hostPort, 18443);

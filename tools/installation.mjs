@@ -20,7 +20,7 @@ export function context({ execute = run, environment = process.env } = {}) {
   const selected = execute('docker', ['context', 'show']);
   const [details] = JSON.parse(execute('docker', ['context', 'inspect', selected]));
   assert(
-    /^(?:npipe:\/\/|unix:\/\/)/u.test(details.Endpoints.docker.Host),
+    /^unix:\/\//u.test(details.Endpoints.docker.Host),
     'Use a local Docker context',
   );
   assert.equal(
@@ -59,10 +59,7 @@ export function initialize(
   if (existsSync(resolve(root, '.local'))) ownedPath(root, resolve(root, '.local'));
   assert(!existsSync(path), 'Instance already exists; reuse or choose a new name');
   mkdirSync(path, { recursive: true, mode: 0o700 });
-  if (process.platform === 'win32') {
-    const account = run('whoami', []);
-    run('icacls', [path, '/inheritance:r', '/grant:r', `${account}:(OI)(CI)F`]);
-  } else chmodSync(path, 0o700);
+  chmodSync(path, 0o700);
   const owner = {
     schemaVersion: 1,
     name,

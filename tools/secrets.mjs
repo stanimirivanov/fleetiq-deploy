@@ -14,11 +14,7 @@ import { ownedPath } from './policy.mjs';
 import { root, run } from './process.mjs';
 
 export function checkSecrets(base = undefined, repository = root) {
-  const binary = resolve(
-    root,
-    'target/tools/gitleaks',
-    process.platform === 'win32' ? 'gitleaks.exe' : 'gitleaks',
-  );
+  const binary = resolve(root, 'target/tools/gitleaks', 'gitleaks');
   assert.equal(run(binary, ['version']), '8.30.1');
   const files = run(
     'git',
@@ -53,11 +49,7 @@ export function checkSecrets(base = undefined, repository = root) {
       for (const file of new Set(paths)) {
         assert(!file.split('/').includes('..'));
         const destination = resolve(snapshot, file);
-        assert(
-          destination.startsWith(
-            snapshot + (process.platform === 'win32' ? '\\' : '/'),
-          ),
-        );
+        assert(destination.startsWith(`${snapshot}/`));
         mkdirSync(resolve(destination, '..'), { recursive: true });
         if (scope === 'working') {
           const source = resolve(repository, file);

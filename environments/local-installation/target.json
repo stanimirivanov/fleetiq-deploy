@@ -10,10 +10,10 @@
   "target": {
     "cluster": "fleetiq-local",
     "kubernetesContext": "kind-fleetiq-local",
-    "dockerContext": "desktop-linux",
+    "dockerContext": "default",
     "profile": "isolated-network-local",
-    "stateRoot": "C:\\Users\\sonof\\FleetIQ\\state\\d06",
-    "stateRootSelection": "operator-confirmed-outside-redirected-AppData"
+    "stateRoot": "/var/lib/fleetiq/d06",
+    "stateRootSelection": "linux-proposal-requires-operator-confirmation"
   },
   "https": {
     "hostname": "fleet.local.test",

@@ -41,7 +41,7 @@ const temporary = await mkdtemp(join(parent, 'fleetiq-manifest-install-'));
 try {
   for (const [name, tool] of Object.entries(toolsLock.tools)) {
     const platform = tool.platforms[`${process.platform}-${process.arch}`];
-    assert(platform, 'Manifest tool installer supports Linux/Windows x64');
+    assert(platform, 'Manifest tool installer supports Linux x64');
     const directory = join(temporary, name);
     await mkdir(directory);
     const archive = join(directory, basename(new URL(platform.url).pathname));
@@ -61,7 +61,7 @@ try {
       platform.binarySha256,
       'Extracted executable checksum mismatch',
     );
-    const file = join(destination, name + (process.platform === 'win32' ? '.exe' : ''));
+    const file = join(destination, name);
     const pending = `${file}.pending`;
     await writeFile(pending, bytes, { mode: 0o755, flag: 'wx' });
     await chmod(pending, 0o755);
