@@ -121,6 +121,27 @@ export function productPolicy(spec) {
       'Credential volume scope changed',
     );
   }
+  const edge = spec.services.edge;
+  assert.equal(edge.environment.XDG_DATA_HOME, '/data');
+  assert.equal(edge.environment.XDG_CONFIG_HOME, '/config');
+  assert.deepEqual(
+    edge.tmpfs.filter((mount) => mount.split(':')[0] === '/data'),
+    ['/data:size=16m,uid=10001,gid=10001,mode=0700,noexec,nosuid,nodev'],
+    'Caddy data must be bounded, private, non-executable tmpfs',
+  );
+  assert(
+    !edge.volumes.some((mount) =>
+      typeof mount === 'string'
+        ? mount.split(':')[1] === '/data'
+        : mount.target === '/data',
+    ),
+    'No competing persistent or host-mounted edge data',
+  );
+  assert.equal(
+    edge.volumes.find((mount) => mount.target === '/run/tls')?.read_only,
+    true,
+    'TLS credentials must stay read-only',
+  );
   assert.deepEqual(spec.services.artifacts.network_mode, 'none');
   assert.deepEqual(spec.services.browser.networks, ['application']);
   assert.deepEqual(spec.services.postgres.networks, ['database']);

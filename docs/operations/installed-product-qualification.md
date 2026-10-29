@@ -19,6 +19,12 @@ pnpm qualify
 pnpm qualify:product
 ```
 
+The edge retains a read-only root and read-only `/run/tls` certificate mount.
+Caddy still initializes `/data/caddy` with manual certificates, so `/data` is a
+separate 16 MiB tmpfs owned by UID/GID 10001, mode 0700, with noexec/nosuid/nodev.
+`/config` also remains a bounded private tmpfs. No host directory or extra persistent
+volume supplies these caches; both fit inside the existing edge memory limit.
+
 The command verifies the local Docker context and daemon, builds the helper from
 `local/qualification/product/inputs.lock.json`, and creates a randomly named
 `product-<id>` project. No host ports are published. Do not run it against a

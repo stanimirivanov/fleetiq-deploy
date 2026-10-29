@@ -161,10 +161,14 @@ export function productCompose({ name, owner, images, helper, control }) {
       image: images.edge,
       user: '10001:10001',
       mem_limit: '256m',
+      environment: { XDG_DATA_HOME: '/data', XDG_CONFIG_HOME: '/config' },
       networks: { application: { aliases: ['fleet.test', 'wrong.test'] } },
       tmpfs: [
         ...restricted.tmpfs,
         '/config:size=1m,uid=10001,gid=10001,mode=0700,nosuid',
+        // Caddy initializes storage even with manually supplied TLS certificates.
+        // Keep it private and ephemeral; the root and certificate mount stay read-only.
+        '/data:size=16m,uid=10001,gid=10001,mode=0700,noexec,nosuid,nodev',
       ],
       volumes: [
         state('edge', '/run/tls'),

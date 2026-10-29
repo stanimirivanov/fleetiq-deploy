@@ -360,3 +360,60 @@ test('normal and product PostgreSQL readiness exclude the socket-only temporary 
   const qualifier = readFileSync(resolve(root, 'tools/product/qualify.mjs'), 'utf8');
   assert(qualifier.includes('socket-only-readiness-rejected'));
 });
+
+test('manual-TLS edge has private bounded writable storage without a writable root or credentials', () => {
+  const spec = fixture(),
+    edge = spec.services.edge;
+  productPolicy(spec);
+  assert.equal(edge.read_only, true);
+  assert.equal(edge.user, '10001:10001');
+  assert.deepEqual(edge.cap_drop, ['ALL']);
+  assert.equal(edge.environment.XDG_DATA_HOME, '/data');
+  assert(
+    edge.tmpfs.includes(
+      '/data:size=16m,uid=10001,gid=10001,mode=0700,noexec,nosuid,nodev',
+    ),
+  );
+  assert.equal(
+    edge.volumes.find((mount) => mount.target === '/run/tls').read_only,
+    true,
+  );
+  for (const change of [
+    (value) => {
+      value.tmpfs = value.tmpfs.filter((mount) => !mount.startsWith('/data:'));
+    },
+    (value) => {
+      value.tmpfs = value.tmpfs.map((mount) =>
+        mount.startsWith('/data:') ? mount.replace('uid=10001', 'uid=0') : mount,
+      );
+    },
+    (value) => {
+      value.tmpfs = value.tmpfs.map((mount) =>
+        mount.startsWith('/data:') ? mount.replace('size=16m', 'size=1g') : mount,
+      );
+    },
+    (value) => {
+      value.tmpfs = value.tmpfs.map((mount) =>
+        mount.startsWith('/data:') ? mount.replace('mode=0700', 'mode=0777') : mount,
+      );
+    },
+    (value) => {
+      value.tmpfs = value.tmpfs.map((mount) =>
+        mount.startsWith('/data:') ? mount.replace(',noexec', '') : mount,
+      );
+    },
+    (value) => {
+      value.environment.XDG_DATA_HOME = '/unmounted';
+    },
+    (value) => {
+      value.volumes.push({ type: 'bind', source: '/private', target: '/data' });
+    },
+    (value) => {
+      value.volumes.find((mount) => mount.target === '/run/tls').read_only = false;
+    },
+  ]) {
+    const altered = fixture();
+    change(altered.services.edge);
+    assert.throws(() => productPolicy(altered));
+  }
+});
