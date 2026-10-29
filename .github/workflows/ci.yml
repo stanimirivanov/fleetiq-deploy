@@ -68,11 +68,18 @@ jobs:
           GH_TOKEN: ${{ secrets.FLEETIQ_SOURCE_READ_TOKEN }}
       - name: Build reviewed application sources (no source credential)
         run: pnpm local build
-      - name: Qualify infrastructure (real browser sign-in is the next slice)
+      - name: Qualify infrastructure separately from product acceptance
         run: pnpm qualify
+      - name: Qualify installed device-to-web product with real OIDC and TCP
+        run: pnpm qualify:product
       - name: Record job verification outcome
         if: always()
         run: node tools/ci-evidence.mjs docker
+        env:
+          FLEETIQ_CI_STATUS: ${{ job.status }}
+      - name: Record installed product verification outcome
+        if: always()
+        run: node tools/ci-evidence.mjs product
         env:
           FLEETIQ_CI_STATUS: ${{ job.status }}
       - uses: actions/upload-artifact@v7

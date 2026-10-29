@@ -20,13 +20,21 @@ progressively discoverable validation harness.
 Record actual verification evidence in the PR; move this plan to completed when
 its implementation and required local checks pass.
 
-## Next slice: original PR 12, M04
+## Installed product slice: product plan PR 33, M04
 
 Qualify real browser sign-in, tenant selection, metadata read/commands, logout,
 CSRF, expiry/revocation and cross-tenant authorization using POM browser tests
-and a controlled HTTPS OIDC provider. Resolve trusted private-provider CA support
-with the backend first. Infrastructure-only identity mode and synthetic proxy
-probes do not fulfill those criteria.
+and a controlled HTTPS OIDC provider. The merged backend now supports additive
+private-provider CA trust. Issue #31 implements the separate disposable product
+gate and the real device-to-decode-to-semantics-to-projection-to-browser path,
+restart recovery, attribution correction and map disposal. Infrastructure-only
+identity mode and synthetic proxy probes do not fulfill those criteria.
+
+Implementation does not itself record installed acceptance: require the new
+Linux CI product receipt before marking this slice complete. Long-duration
+session expiry, full hardware coverage and production recovery remain separate
+from the bounded scenario. Persistent D06 and full-profile qualification are
+deferred; this task neither resumes nor replaces them.
 
 ## Relationship to the Kubernetes delivery plan
 

@@ -1,0 +1,16 @@
+export const requiredChecks = [
+  'trusted-https-oidc',
+  'session-cookie-boundary',
+  'csrf-and-cross-tenant-denial',
+  'real-wasm-admission',
+  'durable-tcp-to-property',
+  'original-provenance',
+  'browser-reading-and-history',
+  'live-update',
+  'restart-resnapshot',
+  'self-hosted-geographic-renderer',
+  'map-resource-disposal',
+  'mapping-correction-preserves-history',
+  'permission-revocation',
+  'logout-invalidates-session',
+];

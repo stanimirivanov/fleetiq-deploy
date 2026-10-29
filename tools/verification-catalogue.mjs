@@ -10,6 +10,7 @@ export const catalogue = {
     'dependencies',
   ],
   docker: ['toolchain', 'policy', 'installation'],
+  product: ['toolchain', 'policy', 'installed-product'],
   manifests: ['toolchain', 'policy', 'manifests'],
   packages: ['toolchain', 'policy', 'release-contracts', 'oci-packages'],
   acceptance: [
@@ -22,6 +23,7 @@ export const catalogue = {
     'secrets',
     'dependencies',
     'installation',
+    'installed-product',
     'oci-packages',
   ],
 };

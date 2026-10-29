@@ -1,0 +1,28 @@
+{
+  "version": 8,
+  "name": "Qualification-only raster grid",
+  "sources": {
+    "local-grid": {
+      "type": "raster",
+      "tileSize": 256,
+      "tiles": ["/maps/tiles/{z}/{x}/{y}.png"],
+      "minzoom": 0,
+      "maxzoom": 0,
+      "attribution": "Synthetic qualification grid; not navigational data"
+    }
+  },
+  "layers": [
+    {
+      "id": "background",
+      "type": "background",
+      "paint": {
+        "background-color": "#15202d"
+      }
+    },
+    {
+      "id": "grid",
+      "type": "raster",
+      "source": "local-grid"
+    }
+  ]
+}

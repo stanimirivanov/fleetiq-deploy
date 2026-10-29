@@ -1,0 +1,108 @@
+# Installed device-to-web qualification
+
+## TL;DR
+
+`pnpm qualify:product` runs a real disposable Compose installation, HTTPS issuer,
+Chromium and synthetic Teltonika tracker. It requires the reviewed images built by
+`pnpm local build`. CI runs it after the existing infrastructure smoke test.
+Neither test activates an environment or completes persistent D06 qualification.
+
+## Run
+
+On a Linux Docker host with the pinned tools and source-read access:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm local sources
+pnpm local build
+pnpm qualify
+pnpm qualify:product
+```
+
+The command verifies the local Docker context and daemon, builds the helper from
+`local/qualification/product/inputs.lock.json`, and creates a randomly named
+`product-<id>` project. No host ports are published. Do not run it against a
+remote engine. Windows runs its structural regression tests; the real installation
+runs in Linux CI. No Kubernetes cluster or retained FleetIQ state is accessed.
+
+The source-read credential needs contents:read on both locked source repositories.
+It is supplied only to source retrieval. Build and runtime steps do not receive it.
+
+## Actual acceptance path
+
+1. Generate a two-day test CA and exact-name leaf certificates in an owned volume.
+   Delete the CA signing key after signing. Install only the public CA into the
+   fresh browser container's NSS database and the backend's additive trust input.
+2. Start the private PostgreSQL database, maintained `oidc-provider` fixture,
+   real backend and static edge. Bootstrap the synthetic platform operator through
+   the backend CLI, not direct database fixture inserts.
+3. Sign in through native HTTPS discovery, authorization, consent, callback and
+   server-managed cookies. Verify cookie flags and reject a different TLS hostname.
+4. Through native same-origin browser fetch, create two tenants/actors, grant
+   exact actions, register the tracker and assets, define properties/types, upload
+   the compiled Teltonika component, admit both worlds and activate its route.
+   Assert CSRF rejection and actual cross-tenant denial.
+5. Start ingestion, replay, semantic and current-state workers. Send a real IMEI
+   handshake and CRC-protected Codec 8 packet over TCP. Require the durable record
+   acknowledgement and the resulting exact current property and provenance.
+6. Use the inspector UI to read history/provenance and start live delivery. Send
+   another TCP record and require its new value on the existing page.
+7. Stop only owned application workers/backend, restart the owned database, then
+   rebuild only its current-state generation and resume them. Require the existing
+   browser page to establish a fresh full SSE baseline and display another
+   record while original provenance remains unchanged. If the finite transport
+   retry budget expires during the outage, use the existing operator retry once;
+   do not increase that budget or mask authorization/parse failures.
+8. Render the real MapLibre map using the deployed raster/style endpoints and
+   projected device positions. Across three route cycles, require one map canvas
+   and one local map worker when active, and none after disposal.
+9. Append temporal binding corrections through the protected API. Existing
+   interpretations must remain unchanged; only the newly emitted record is
+   attributed to the new asset with revision 2. Recheck original history.
+10. Revoke telemetry permission during live delivery, require evidence removal
+    and HTTP denial, then log out and require an unauthorized session response.
+11. Require every inventoried assertion and a successful browser exit. Verify
+    ownership before removing only this project's containers, networks and volumes.
+    A failed assertion, prerequisite, process or cleanup fails the product group.
+
+The page object owns accessible UI actions. The scenario owns assertions; setup
+uses the real protected administration API because platform bootstrap screens are
+not an application feature. There is no Playwright routing or response replacement.
+
+## Evidence and failure diagnosis
+
+The authoritative receipt is `.verification/product-<uuid>.json`. It records
+source revisions, runtime image IDs, completed check names and cleanup outcome.
+CI uploads only `.verification/*.json`; private volumes and control directories
+are excluded. A docker/infrastructure receipt cannot satisfy the product group.
+
+Public coordination markers live in `.local/product-<id>/control/`. They contain
+only phases and fixed check names. A missing/failed marker or timeout is an error;
+markers cannot overwrite an earlier phase. The browser deliberately does not
+retain raw assertion output, network bodies, screenshots, videos, traces, cookies,
+OIDC URLs or provider diagnostics. Inspect the last completed check and CI stage
+rather than widening artifact collection to secret-bearing logs.
+
+The helper's Linux build executes Bash syntax and behavior tests for the backend
+entrypoint, including complete LF/CRLF secret files and rejected partial/empty or
+embedded-line-break inputs. Cross-platform Node fixtures verify frame bytes and
+split TCP acknowledgements, credential isolation, ownership and incomplete evidence.
+
+## Boundaries
+
+This is an integration qualification against exact reviewed source builds, not
+publication, promotion, an image-security attestation, hardware qualification,
+load/HA certification or a Kubernetes/persistent storage recovery claim.
+The synthetic tracker sends representative Codec 8 GPS records; real devices and
+additional codecs remain covered by their separate protocol/hardware program.
+The self-hosted raster grid is deliberately synthetic, with no external map calls;
+it verifies map transport/rendering and disposal, not geographic cartographic data.
+
+The issuer deliberately authenticates a fixed synthetic account through its test
+interaction button. It has no host ports and cannot be configured as the normal
+installation provider. Its private keys and disposable credentials never leave
+owned runtime volumes. Real deployments continue to require their own provider.
+
+No host trust store, Docker engine setting, other project, image cache or global
+volume list is modified. Existing diagnostic Compose roles and their infrastructure
+qualification remain intact. D06 and full-profile qualification stay deferred.

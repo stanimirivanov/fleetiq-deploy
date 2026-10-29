@@ -5,6 +5,8 @@ import { parse } from 'yaml';
 import { verifyPublicationWorkflow, verifyWorkflow } from './ci.mjs';
 import { lock, sourceCompose, validateLock } from './policy.mjs';
 import { root, run } from './process.mjs';
+import { productCompose } from './product/compose.mjs';
+import { productPolicy } from './product/policy.mjs';
 
 /** Keep the existing opening-summary boundary and identify the guide to repair. */
 export function guideSummary(file, contents) {
@@ -17,6 +19,15 @@ export function guideSummary(file, contents) {
 
 export function structure() {
   validateLock();
+  productPolicy(
+    productCompose({
+      name: 'product-0123456789abcdef',
+      owner: '01234567-89ab-cdef-0123-456789abcdef',
+      images: { backend: `sha256:${'a'.repeat(64)}`, edge: `sha256:${'b'.repeat(64)}` },
+      helper: `sha256:${'c'.repeat(64)}`,
+      control: resolve(root, '.local/product-policy/control'),
+    }),
+  );
   verifyWorkflow();
   verifyPublicationWorkflow();
   const packageFile = JSON.parse(readFileSync(resolve(root, 'package.json')));
@@ -101,6 +112,7 @@ export function structure() {
             : 'pnpm check',
       ),
     );
+    if (name === 'docker') assert(commands.includes('pnpm qualify:product'));
     if (name === 'structural') assert(commands.includes('pnpm manifests:install'));
   }
   assert(

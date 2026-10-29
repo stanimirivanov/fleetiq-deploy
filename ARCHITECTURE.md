@@ -54,5 +54,9 @@ synthetic upstream separately proves proxy semantics; it is neither an OIDC
 provider nor an authentication qualification. The real backend is restored
 before cleanup.
 
-Original plan PR 12 owns trusted-provider browser sign-in, session and tenant
-authorization qualification. See the [active plan](docs/exec-plans/active/m02-development-installation.md).
+`pnpm qualify:product` is the separate real browser/product boundary, implemented
+by product plan PR 33. Its ephemeral composition adds the controlled HTTPS issuer,
+bounded Linux protocol/semantic/projection workers, real Teltonika guest and
+Chromium without changing the normal three-service installation. It has no host
+ports or real provider credentials. See [installed qualification](docs/operations/installed-product-qualification.md)
+and the [active plan](docs/exec-plans/active/m02-development-installation.md).
