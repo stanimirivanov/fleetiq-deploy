@@ -1,4 +1,4 @@
-ARG BROWSER_IMAGE
+ARG BROWSER_IMAGE=mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
 FROM ${BROWSER_IMAGE}
 USER root
 RUN apt-get update && apt-get install --no-install-recommends -y openssl libnss3-tools && rm -rf /var/lib/apt/lists/*
@@ -7,6 +7,6 @@ COPY package.json pnpm-lock.yaml ./
 RUN npm install --global pnpm@12.5.1 --allow-scripts=pnpm@12.5.1 --strict-allow-scripts && pnpm install --frozen-lockfile
 COPY local/qualification/product ./local/qualification/product
 COPY local/backend-entrypoint.sh ./local/backend-entrypoint.sh
-RUN bash -n local/backend-entrypoint.sh && bash -n local/qualification/product/init.sh && bash -n local/qualification/product/backend.sh && node local/qualification/product/entrypoint-test.mjs
+RUN bash -n local/backend-entrypoint.sh && bash -n local/qualification/product/init.sh && bash -n local/qualification/product/backend.sh && bash -n local/qualification/product/postgres-initialization.sh && node local/qualification/product/entrypoint-test.mjs
 USER pwuser
 ENTRYPOINT ["node"]

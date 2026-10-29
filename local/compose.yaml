@@ -23,7 +23,7 @@ services:
     volumes: [database:/var/lib/postgresql]
     networks: [database]
     healthcheck:
-      test: [CMD-SHELL, "pg_isready -U fleetiq -d fleetiq"]
+      test: [CMD, pg_isready, -h, 127.0.0.1, -U, fleetiq, -d, fleetiq]
       interval: 3s
       timeout: 3s
       retries: 40

@@ -96,9 +96,25 @@ export function productCompose({ name, owner, images, helper, control }) {
         POSTGRES_PASSWORD_FILE: '/run/secrets/database_password',
       },
       networks: ['database'],
-      volumes: ['database:/var/lib/postgresql', state('database', '/run/secrets')],
+      volumes: [
+        'database:/var/lib/postgresql',
+        state('database', '/run/secrets'),
+        bind(
+          'local/qualification/product/postgres-initialization.sh',
+          '/docker-entrypoint-initdb.d/00-readiness.sh',
+        ),
+      ],
       healthcheck: {
-        test: ['CMD-SHELL', 'pg_isready -U fleetiq -d fleetiq'],
+        test: [
+          'CMD',
+          'pg_isready',
+          '-h',
+          '127.0.0.1',
+          '-U',
+          'fleetiq',
+          '-d',
+          'fleetiq',
+        ],
         interval: '2s',
         timeout: '3s',
         retries: 60,

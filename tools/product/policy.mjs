@@ -7,7 +7,23 @@ import { root } from '../process.mjs';
 export const inputs = JSON.parse(
   readFileSync(resolve(root, 'local/qualification/product/inputs.lock.json')),
 );
+export function browserBuildPolicy(
+  dockerfile = readFileSync(
+    resolve(root, 'local/qualification/product/Dockerfile'),
+    'utf8',
+  ),
+) {
+  const defaults = [...dockerfile.matchAll(/^ARG BROWSER_IMAGE=(\S+)$/gmu)];
+  assert.equal(defaults.length, 1, 'Browser base requires one immutable default');
+  assert.equal(
+    defaults[0][1],
+    inputs.browser,
+    'Browser default must match the reviewed lock',
+  );
+  assert.equal((dockerfile.match(/^FROM \$\{BROWSER_IMAGE\}$/gmu) ?? []).length, 1);
+}
 export function productPolicy(spec) {
+  browserBuildPolicy();
   assert.deepEqual(Object.keys(spec.services).sort(), [
     'artifacts',
     'backend',
@@ -109,6 +125,23 @@ export function productPolicy(spec) {
   assert.deepEqual(spec.services.browser.networks, ['application']);
   assert.deepEqual(spec.services.postgres.networks, ['database']);
   assert.equal(spec.services.postgres.image, lock.images.postgres);
+  assert.deepEqual(
+    spec.services.postgres.healthcheck.test,
+    ['CMD', 'pg_isready', '-h', '127.0.0.1', '-U', 'fleetiq', '-d', 'fleetiq'],
+    'Readiness must exclude the socket-only initialization server',
+  );
+  assert.equal(spec.services.backend.depends_on.postgres.condition, 'service_healthy');
+  assert(
+    spec.services.postgres.volumes.some(
+      (mount) =>
+        mount.type === 'bind' &&
+        mount.source ===
+          resolve(root, 'local/qualification/product/postgres-initialization.sh') &&
+        mount.target === '/docker-entrypoint-initdb.d/00-readiness.sh' &&
+        mount.read_only === true,
+    ),
+    'The real initialization-race regression is required',
+  );
   assert(spec.services.backend.environment.FLEETIQ_OIDC_ADDITIONAL_CA_BUNDLE);
   assert.deepEqual(spec.services.init.network_mode, 'none');
   assert.match(

@@ -16,9 +16,10 @@ import {
 } from '../../local/qualification/product/channel.mjs';
 import { context } from '../installation.mjs';
 import { digest, lock, ownedPath } from '../policy.mjs';
-import { root, run } from '../process.mjs';
+import { capture, root, run } from '../process.mjs';
 import { imageInventory } from '../sources.mjs';
 import { productCompose } from './compose.mjs';
+import { collectServiceDiagnostics, diagnosticSummary } from './diagnostics.mjs';
 import { assertResource, completeProduct, inputs, productPolicy } from './policy.mjs';
 
 function packaging() {
@@ -159,6 +160,7 @@ export async function qualifyProduct(onProgress = () => {}) {
     images: { backend: images.backend, edge: images.edge, helper },
     checks: [],
     cleanup: 'pending',
+    databaseReadiness: 'pending',
     stage: 'initialize',
   };
   const progress = () => onProgress(structuredClone(result));
@@ -191,6 +193,22 @@ export async function qualifyProduct(onProgress = () => {}) {
       { timeout: 300000 },
     );
     owned();
+    stage('verify-tcp-readiness-barrier');
+    assert.equal(
+      compose([
+        'exec',
+        '-T',
+        '--user',
+        'postgres',
+        'postgres',
+        'cat',
+        '/tmp/fleetiq-readiness-proof',
+      ]),
+      'socket-only-readiness-rejected',
+      'Fresh database must exercise the initialization race',
+    );
+    result.databaseReadiness = 'qualified';
+    progress();
     stage('bootstrap-operator');
     compose([
       'run',
@@ -261,6 +279,16 @@ export async function qualifyProduct(onProgress = () => {}) {
     const [finished] = JSON.parse(command(['inspect', browserContainer.Id]));
     assert.equal(finished.State.ExitCode, 0);
   } catch (error) {
+    result.failureDiagnostics = collectServiceDiagnostics({
+      project: name,
+      owner,
+      command,
+      capture: (args, options) =>
+        capture('docker', ['--context', docker, ...args], options),
+    });
+    console.error(
+      `Product services before cleanup: ${diagnosticSummary(result.failureDiagnostics)}`,
+    );
     const failure = readPhase(control, 'failed');
     if (failure) result.checks = failure.checks;
     progress();

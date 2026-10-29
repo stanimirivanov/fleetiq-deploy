@@ -53,6 +53,11 @@ export function structure() {
   assert(!compose.services.backend.ports && !compose.services.postgres.ports);
   assert.equal(compose.services.edge.ports[0].host_ip, '127.0.0.1');
   assert.equal(compose.networks.database.internal, true);
+  assert.deepEqual(
+    compose.services.postgres.healthcheck.test,
+    ['CMD', 'pg_isready', '-h', '127.0.0.1', '-U', 'fleetiq', '-d', 'fleetiq'],
+    'Database readiness must use TCP, not the temporary initialization socket',
+  );
   const caddy = readFileSync(resolve(root, 'local/Caddyfile'), 'utf8');
   for (const rule of [
     'admin off',

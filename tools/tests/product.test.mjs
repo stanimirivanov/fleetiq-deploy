@@ -321,3 +321,42 @@ test('Teltonika build uses the upstream import-free core-to-component path and f
   for (const command of ['admission', 'decode', 'live'])
     assert(dockerfile.includes(`target/release/fleetiq-protocol-${command}`));
 });
+
+test('normal and product PostgreSQL readiness exclude the socket-only temporary server', async () => {
+  const { sourceCompose } = await import('../policy.mjs');
+  const expected = [
+    'CMD',
+    'pg_isready',
+    '-h',
+    '127.0.0.1',
+    '-U',
+    'fleetiq',
+    '-d',
+    'fleetiq',
+  ];
+  assert.deepEqual(sourceCompose().services.postgres.healthcheck.test, expected);
+  assert.deepEqual(fixture().services.postgres.healthcheck.test, expected);
+  const socketProbe = fixture();
+  socketProbe.services.postgres.healthcheck.test = [
+    'CMD-SHELL',
+    'pg_isready -U fleetiq -d fleetiq',
+  ];
+  assert.throws(() => productPolicy(socketProbe));
+  const noDelay = fixture();
+  noDelay.services.postgres.volumes = noDelay.services.postgres.volumes.filter(
+    (mount) => mount.type !== 'bind',
+  );
+  assert.throws(() => productPolicy(noDelay));
+  const bypass = fixture();
+  bypass.services.backend.depends_on.postgres.condition = 'service_started';
+  assert.throws(() => productPolicy(bypass));
+  const initializer = readFileSync(
+    resolve(root, 'local/qualification/product/postgres-initialization.sh'),
+    'utf8',
+  );
+  assert(initializer.includes('pg_isready -U fleetiq -d fleetiq'));
+  assert(initializer.includes('pg_isready -h 127.0.0.1'));
+  assert(initializer.includes('sleep 5'));
+  const qualifier = readFileSync(resolve(root, 'tools/product/qualify.mjs'), 'utf8');
+  assert(qualifier.includes('socket-only-readiness-rejected'));
+});

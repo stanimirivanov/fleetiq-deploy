@@ -34,7 +34,11 @@ It is supplied only to source retrieval. Build and runtime steps do not receive 
    Delete the CA signing key after signing. Install only the public CA into the
    fresh browser container's NSS database and the backend's additive trust input.
 2. Start the private PostgreSQL database, maintained `oidc-provider` fixture,
-   real backend and static edge. Bootstrap the synthetic platform operator through
+   real backend and static edge. Database health probes use TCP loopback; the
+   image's temporary initialization socket cannot satisfy readiness. A fresh-data
+   fixture proves the socket is accepting while TCP is unavailable, pauses across
+   health intervals, and leaves a required non-secret marker. No domain rows are
+   inserted by the fixture. Bootstrap the synthetic platform operator through
    the backend CLI, not direct database fixture inserts.
 3. Sign in through native HTTPS discovery, authorization, consent, callback and
    server-managed cookies. Verify cookie flags and reject a different TLS hostname.
@@ -73,6 +77,11 @@ not an application feature. There is no Playwright routing or response replaceme
 
 The authoritative receipt is `.verification/product-<uuid>.json`. It records
 source revisions, runtime image IDs, completed check names and cleanup outcome.
+On failure, it also records identity-checked service state, health/exit codes, OOM
+flags and fixed diagnostic categories before cleanup. Raw container logs, health
+output and environment values are inspected only privately and are never retained.
+Diagnostic collection failures are marked incomplete and cannot replace the
+original failure or satisfy an acceptance check.
 CI uploads only `.verification/*.json`; private volumes and control directories
 are excluded. A docker/infrastructure receipt cannot satisfy the product group.
 
@@ -81,7 +90,10 @@ only phases and fixed check names. A missing/failed marker or timeout is an erro
 markers cannot overwrite an earlier phase. The browser deliberately does not
 retain raw assertion output, network bodies, screenshots, videos, traces, cookies,
 OIDC URLs or provider diagnostics. Inspect the last completed check and CI stage
-rather than widening artifact collection to secret-bearing logs.
+and the service summary rather than widening artifact collection to secret-bearing
+logs. A successful helper build followed by `start-trusted-services` failure is a
+runtime startup failure, not a Dockerfile base-argument warning. The helper now
+has a valid immutable default that is checked against its canonical input lock.
 
 The helper's Linux build executes Bash syntax and behavior tests for the backend
 entrypoint, including complete LF/CRLF secret files and rejected partial/empty or
