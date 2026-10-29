@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-Run `pnpm check` and, after `pnpm local build`, `pnpm qualify`.
+Run `pnpm check` and, after `pnpm local build`, `pnpm qualify` and `pnpm qualify:product`.
 Install pinned offline manifest prerequisites first with `pnpm manifests:install`.
 `pnpm installation:check` is the focused, offline D06 namespace/bootstrap gate;
 its sensor also runs inside the existing manifests check.
@@ -19,6 +19,7 @@ commands, changed source bytes or failed cleanup produce a nonzero exit.
 | HTTPS and routing | Trusted/untrusted/wrong-host TLS probes, SPA/API/static assertions |
 | No silent identity downgrade | Complete config checks, entrypoint validation and explicit reset override |
 | Cookie/Origin/Host/no-store | Synthetic upstream through the real HTTPS edge, then restored real backend |
+| Device-to-browser acceptance | Separate product inventory, real OIDC/TCP/worker/browser flow, map disposal and mandatory owned cleanup |
 | Owned cleanup | Context, owner labels, project names and post-cleanup resource inventory |
 | Durable restart | Database marker and public CA comparison after service restart |
 | No secret exemptions | Pinned Gitleaks across candidate files, index and incoming history; allow comments ignored |
@@ -30,7 +31,7 @@ commands, changed source bytes or failed cleanup produce a nonzero exit.
 | Candidate is not activation | Closed Ajv contracts, active-path rejection, registered protected-ref Argo source-graph checks and independent admission-context fixtures |
 
 The executable catalogue is in `tools/verification-catalogue.mjs`. Groups are structural, manifests,
-packages, docker and acceptance. Reports include group/check outcomes, source fingerprints,
+packages, docker, product and acceptance. Reports include group/check outcomes, source fingerprints,
 Git head and timestamps. Docker measurements name the real images and checks,
 but contain no raw command output, cookies, provider subjects or configuration.
 All acceptance requires unchanged candidate file bytes before/after execution.
@@ -46,10 +47,12 @@ Repository-owned policy can be changed by a PR. It cannot prove its own
 independence; configure required checks/reviews externally. These settings and
 the CI source-read secret are owner-managed and unverified by this repository.
 
-This slice does not attest real browser sign-in, CSRF, tenant isolation,
-production restore, throughput, availability, image vulnerability SBOM analysis
-or full build reproducibility. Those need their planned qualification work.
-Do not describe infrastructure results as authenticated acceptance.
+The product group separately requires real HTTPS/OIDC sign-in, CSRF and tenant
+isolation, TCP-to-property evidence, browser live recovery, correction and owned
+cleanup. See [installed qualification](../operations/installed-product-qualification.md).
+Infrastructure receipts still cannot attest authenticated acceptance. Neither
+proves production restore, throughput, availability, image vulnerability SBOM
+analysis or full build reproducibility.
 
 Run behavioral fixtures with `pnpm test`. Test-file concurrency is bounded to two
 so native renderers, scanners and loopback Git fixtures do not exhaust the host;

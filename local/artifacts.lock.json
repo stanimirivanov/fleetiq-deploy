@@ -3,15 +3,15 @@
   "sources": {
     "platform": {
       "repository": "https://github.com/stanimirivanov/fleetiq-platform.git",
-      "commit": "66cc8a8f15457707197e274c90228538487ef810"
+      "commit": "a1ca9e24035efdffca69ae50c2118228257936e4"
     },
     "ux": {
       "repository": "https://github.com/stanimirivanov/fleetiq-ui.git",
-      "commit": "a1ebe3bcb22781cc70ac00f8ed0e2fb396537dbe"
+      "commit": "e09ccec246ad024ef587701223e76aadadcc604a"
     }
   },
   "images": {
-    "rust": "rust:1.98.1-slim-bookworm@sha256:ff521445a372125ed4f76e1453a1f8098f2d05332d1601d30db1c1f62757e730",
+    "rust": "rust:1.99.1-slim-bookworm@sha256:86234e857a413004348b471d11a4ebe1aa92d2eae2b6b143cac68fd1ac3c48be",
     "runtime": "debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587",
     "node": "node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d",
     "edge": "caddy:2.11.7-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f",

@@ -1,0 +1,8 @@
+**
+!package.json
+!pnpm-lock.yaml
+!local
+!local/backend-entrypoint.sh
+!local/qualification
+!local/qualification/product
+!local/qualification/product/**

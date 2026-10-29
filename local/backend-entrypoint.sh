@@ -14,16 +14,9 @@ for name in FLEETIQ_BROWSER_ORIGIN FLEETIQ_OIDC_ISSUER FLEETIQ_OIDC_CLIENT_ID FL
 done
 if [[ "$count" == 4 ]]; then
   FLEETIQ_OIDC_CLIENT_SECRET="$(cat /run/secrets/oidc_client_secret)"
-  # Accept a single Windows text-file line ending without altering secret bytes.
-  FLEETIQ_OIDC_CLIENT_SECRET="${FLEETIQ_OIDC_CLIENT_SECRET%
-  [[ -n "$FLEETIQ_OIDC_CLIENT_SECRET" ]] || { echo "Empty OIDC secret" >&2; exit 1; }
-  export FLEETIQ_OIDC_CLIENT_SECRET
-elif [[ "$count" != 0 ]]; then
-  echo "Incomplete identity configuration" >&2; exit 1
-fi
-exec /usr/local/bin/fleetiq-server "$@"
-\r'}"
-  [[ -n "$FLEETIQ_OIDC_CLIENT_SECRET" ]] || { echo "Empty OIDC secret" >&2; exit 1; }
+  # Accept one Windows line ending; reject embedded line breaks.
+  FLEETIQ_OIDC_CLIENT_SECRET="${FLEETIQ_OIDC_CLIENT_SECRET%$'\r'}"
+  [[ -n "$FLEETIQ_OIDC_CLIENT_SECRET" && ${#FLEETIQ_OIDC_CLIENT_SECRET} -le 4096 && "$FLEETIQ_OIDC_CLIENT_SECRET" != *$'\r'* && "$FLEETIQ_OIDC_CLIENT_SECRET" != *$'\n'* ]] || { echo "Invalid OIDC secret file" >&2; exit 1; }
   export FLEETIQ_OIDC_CLIENT_SECRET
 elif [[ "$count" != 0 ]]; then
   echo "Incomplete identity configuration" >&2; exit 1

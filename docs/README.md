@@ -4,6 +4,7 @@
 - [Packaging decision](adr/0001-local-composition.md): source and image authority.
 - [Local installation](operations/local-installation.md): setup, identity, trust,
   bootstrap, lifecycle and recovery.
+- [Installed product qualification](operations/installed-product-qualification.md): real disposable HTTPS/OIDC, Teltonika TCP, browser evidence and owned cleanup.
 - [Verification](development/verification.md): deterministic checks and evidence.
 - [Kubernetes packages](operations/kubernetes-packages.md): reusable charts,
   offline preview, credentials, networking and retention boundaries.

@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { checkManifests } from './manifests/check.mjs';
 import { digest, lock } from './policy.mjs';
 import { pnpm, root, run } from './process.mjs';
+import { qualifyProduct } from './product/qualify.mjs';
 import { qualify } from './qualify.mjs';
 import { checkContracts } from './releases/contracts.mjs';
 import { checkReleaseBoundaries } from './releases/git-policy.mjs';
@@ -66,6 +67,10 @@ try {
       else if (check === 'secrets') checkSecrets(base);
       else if (check === 'dependencies')
         pnpm(['audit', '--audit-level', 'moderate'], { stdio: 'inherit' });
+      else if (check === 'installed-product')
+        item.measurements = await qualifyProduct((progress) => {
+          item.measurements = progress;
+        });
       else if (check === 'installation')
         item.measurements = await qualify((progress) => {
           item.measurements = progress;

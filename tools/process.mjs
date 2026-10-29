@@ -17,7 +17,7 @@ export class CommandFailure extends Error {
   }
 }
 
-export function run(program, args, options = {}) {
+function execute(program, args, options = {}) {
   const result = spawnSync(program, args, {
     cwd: root,
     encoding: 'utf8',
@@ -41,7 +41,17 @@ export function run(program, args, options = {}) {
         : 'command-failed';
     throw new CommandFailure(phase, result, category);
   }
-  return result.stdout?.trim() ?? '';
+  return result;
+}
+export function run(program, args, options = {}) {
+  return execute(program, args, options).stdout?.trim() ?? '';
+}
+/** Private diagnostic capture. Callers must return only allowlisted projections;
+ * never log or retain this object or attach it to an Error. Failures remain redacted.
+ */
+export function capture(program, args, options = {}) {
+  const result = execute(program, args, options);
+  return { stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 /** Select only a launcher that actually reports the repository's exact pnpm pin. */
 export function pinnedPnpm({ environment = process.env, execute = run } = {}) {

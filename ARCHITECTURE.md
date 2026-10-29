@@ -54,5 +54,18 @@ synthetic upstream separately proves proxy semantics; it is neither an OIDC
 provider nor an authentication qualification. The real backend is restored
 before cleanup.
 
-Original plan PR 12 owns trusted-provider browser sign-in, session and tenant
-authorization qualification. See the [active plan](docs/exec-plans/active/m02-development-installation.md).
+`pnpm qualify:product` is the separate real browser/product boundary, implemented
+by product plan PR 33. Its ephemeral composition adds the controlled HTTPS issuer,
+bounded Linux protocol/semantic/projection workers, real Teltonika guest and
+Chromium without changing the normal three-service installation. It has no host
+ports or real provider credentials. See [installed qualification](docs/operations/installed-product-qualification.md)
+and the [active plan](docs/exec-plans/active/m02-development-installation.md).
+
+## Product edge handoff
+
+The product qualification builds the reviewed UI repository's own NGINX runtime,
+not the historical Caddy diagnostic adapter shown above. Only the disposable TLS
+listener and self-hosted map fixture root adapt its source-owned template. The
+actual source/image identity and restricted process are verified before startup;
+CSP, proxy semantics, MIME types and SSE behavior remain upstream-owned. The
+separate diagnostic bridge is not image-security or product-acceptance evidence.
