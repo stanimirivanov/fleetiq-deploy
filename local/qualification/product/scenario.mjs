@@ -4,6 +4,11 @@ import { lookup } from 'node:dns/promises';
 import { mkdirSync } from 'node:fs';
 import { expect as baseExpect, chromium } from '@playwright/test';
 import { api, binding, currentPath, seed, tenant } from './api.mjs';
+import {
+  browserFailure,
+  browserUiCause,
+  formatBrowserFailure,
+} from './browser-failure.mjs';
 import { waitPhase, writePhase } from './channel.mjs';
 import { requiredChecks } from './contract.mjs';
 import { transmit } from './device.mjs';
@@ -12,7 +17,10 @@ import { InstalledFleetPage } from './page.mjs';
 const expect = baseExpect.configure({ timeout: 30000 });
 const directory = '/control',
   checks = [];
-let browser;
+let browser, page;
+let pageErrors = 0;
+let step = 'trust-store',
+  cspBlocked = false;
 try {
   // Import only this ephemeral CA into this container's fresh NSS database.
   const nss = '/home/pwuser/.pki/nssdb';
@@ -38,6 +46,7 @@ try {
     });
     assert.equal(result.status, 0, 'Isolated browser trust setup failed');
   }
+  step = 'browser-launch';
   browser = await chromium.launch({
     headless: true,
     args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
@@ -46,14 +55,24 @@ try {
     viewport: { width: 1440, height: 1000 },
     serviceWorkers: 'block',
   });
-  const page = await context.newPage(),
-    ui = new InstalledFleetPage(page);
+  page = await context.newPage();
+  const ui = new InstalledFleetPage(page);
   page.setDefaultTimeout(30000);
-  let pageErrors = 0;
   page.on('pageerror', () => {
     pageErrors++;
   });
-  await ui.signIn();
+  page.on('console', (message) => {
+    if (
+      message.type() === 'error' &&
+      /form-action/u.test(message.text()) &&
+      /violat/iu.test(message.text())
+    )
+      cspBlocked = true;
+  });
+  await ui.signIn((value) => {
+    step = value;
+  });
+  step = 'hostname-check';
   const fleetAddresses = (await lookup('fleet.test', { all: true }))
     .map((v) => v.address)
     .sort();
@@ -77,6 +96,7 @@ try {
   }
   assert(hostnameRejected, 'A different DNS name must fail certificate verification');
   await wrongHost.close();
+  step = 'session-check';
   assert.equal((await api(page, '/api/v1/auth/session')).actor_id, 'operator-a');
   checks.push('trusted-https-oidc');
   const cookies = await context.cookies('https://fleet.test:8443');
@@ -92,18 +112,22 @@ try {
     ),
   );
   checks.push('session-cookie-boundary');
+  step = 'commissioning';
   await seed(page);
   checks.push('csrf-and-cross-tenant-denial', 'real-wasm-admission');
   writePhase(directory, 'setup-ready', checks);
   await waitPhase(directory, 'workers-started');
+  step = 'device-to-web';
   const firstAt = Date.now() - 1000;
   await transmit(firstAt, 515000000, -1200000);
+  step = 'current-property';
   await expect
     .poll(async () => (await api(page, currentPath())).items[0]?.change.value.value, {
       timeout: 90000,
     })
     .toBe('515000000');
   checks.push('durable-tcp-to-property');
+  step = 'original-provenance';
   const initialSnapshot = await api(page, currentPath());
   const original = initialSnapshot.items[0].change;
   assert.equal(original.binding_revision, '1');
@@ -125,8 +149,22 @@ try {
     if (new URL(request.url()).pathname === currentPath().replace('/current', '/live'))
       liveRequests.push(Boolean(request.headers()['last-event-id']));
   });
-  await ui.inspector();
+  const discovery = await api(page, '/api/v1/me/tenants');
+  assert(
+    discovery.tenants.some(
+      (item) =>
+        item.tenant_id === 'tenant-a' &&
+        item.actions.includes('metadata.read') &&
+        item.actions.includes('telemetry.read'),
+    ),
+  );
+  step = 'inspector-open';
+  await ui.inspector('asset-main', (value) => {
+    step = value;
+  });
+  step = 'inspector-readings';
   await expect(ui.readings()).toContainText('515000000');
+  step = 'inspector-provenance';
   await ui
     .readings()
     .getByRole('button', { name: 'Inspect reading provenance', exact: true })
@@ -134,12 +172,15 @@ try {
   await expect(
     page.getByRole('region', { name: 'Interpretation provenance', exact: true }),
   ).toContainText('vendor.teltonika');
+  step = 'inspector-history';
   await expect(
     page.getByRole('region', { name: 'Hot property history', exact: true }),
   ).toContainText('515000000');
   checks.push('browser-reading-and-history');
+  step = 'live-start';
   await ui.startLive();
   await expect(ui.delivery()).toContainText('515000000');
+  step = 'live-update';
   await transmit(firstAt + 1, 515000100, -1200100);
   await expect(ui.delivery()).toContainText('515000100', { timeout: 90000 });
   checks.push('live-update');
@@ -252,7 +293,17 @@ try {
   await browser.close();
   browser = undefined;
   writePhase(directory, 'complete', checks);
-} catch {
+} catch (error) {
+  console.error(
+    formatBrowserFailure(
+      browserFailure(
+        step,
+        error,
+        cspBlocked,
+        pageErrors > 0 ? 'application-error' : await browserUiCause(page),
+      ),
+    ),
+  );
   // Never retain provider URLs, assertions with bodies, cookies, traces or credentials.
   writePhase(directory, 'failed', checks);
   process.exitCode = 1;

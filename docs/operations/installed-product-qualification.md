@@ -9,7 +9,8 @@ Neither test activates an environment or completes persistent D06 qualification.
 
 ## Run
 
-On a Linux Docker host with the pinned tools and source-read access:
+With a local Linux Docker engine (including Docker Desktop in Linux-container
+mode), pinned tools and source-read access:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -28,8 +29,10 @@ volume supplies these caches; both fit inside the existing edge memory limit.
 The command verifies the local Docker context and daemon, builds the helper from
 `local/qualification/product/inputs.lock.json`, and creates a randomly named
 `product-<id>` project. No host ports are published. Do not run it against a
-remote engine. Windows runs its structural regression tests; the real installation
-runs in Linux CI. No Kubernetes cluster or retained FleetIQ state is accessed.
+remote engine or Windows-container daemon. The portable Node driver validates the
+actual daemon OS, transport and Compose version, including when launched on
+Windows. CI runs the installed flow on Linux and structural regressions on both
+platforms. No Kubernetes cluster or retained FleetIQ state is accessed.
 
 The source-read credential needs contents:read on both locked source repositories.
 It is supplied only to source retrieval. Build and runtime steps do not receive it.
@@ -47,10 +50,14 @@ It is supplied only to source retrieval. Build and runtime steps do not receive 
    inserted by the fixture. Bootstrap the synthetic platform operator through
    the backend CLI, not direct database fixture inserts.
 3. Sign in through native HTTPS discovery, authorization, consent, callback and
-   server-managed cookies. Verify cookie flags and reject a different TLS hostname.
+   server-managed cookies. The test issuer's `form-action` permits its own origin
+   and exact registered FleetIQ callback: Chromium checks redirects following form
+   submission, including the final authorization redirect. Default resources and
+   base URLs remain denied. Verify cookie flags and reject a different TLS hostname.
 4. Through native same-origin browser fetch, create two tenants/actors, grant
    exact actions, register the tracker and assets, define properties/types, upload
-   the compiled Teltonika component, admit both worlds and activate its route.
+   the compiled Teltonika component with its exact-byte `X-Artifact-Sha256` header,
+   admit both worlds and activate its route.
    Assert CSRF rejection and actual cross-tenant denial.
 5. Start ingestion, replay, semantic and current-state workers. Send a real IMEI
    handshake and CRC-protected Codec 8 packet over TCP. Require the durable record
@@ -86,6 +93,12 @@ source revisions, runtime image IDs, completed check names and cleanup outcome.
 On failure, it also records identity-checked service state, health/exit codes, OOM
 flags and fixed diagnostic categories before cleanup. Raw container logs, health
 output and environment values are inspected only privately and are never retained.
+Browser failures additionally expose only a fixed browser step and cause, such
+as callback timeout or content-security-policy rejection. Provider URLs, codes,
+state/nonce values, cookies and assertion bodies remain excluded. API contract
+failures expose only a fixed operation identifier and numeric actual/expected
+status, without request paths, bodies or headers. Fixed UI fallback categories
+distinguish tenant-discovery schema rejection from loading or transport failure.
 Diagnostic collection failures are marked incomplete and cannot replace the
 original failure or satisfy an acceptance check.
 CI uploads only `.verification/*.json`; private volumes and control directories
@@ -124,3 +137,19 @@ owned runtime volumes. Real deployments continue to require their own provider.
 No host trust store, Docker engine setting, other project, image cache or global
 volume list is modified. Existing diagnostic Compose roles and their infrastructure
 qualification remain intact. D06 and full-profile qualification stay deferred.
+
+## Diagnosed integration prerequisites
+
+- Issuer interaction CSP permits its own origin and the exact registered FleetIQ
+  callback. Chromium checks the consent POST redirect chain; `form-action 'self'`
+  alone blocks the cross-origin callback. Default resource and base URI policies
+  remain closed, and the helper waits for the restored application route.
+- Raw component uploads include `X-Artifact-Sha256` computed over their exact bytes.
+  The actual backend validates this digest before admission.
+- Tenant discovery must describe all five supported grants. The installed local
+  run exposed the older `OperatorTenant.actions.maxItems: 3` constraint: a valid
+  five-grant operator is rejected by the UI decoder. Platform issue #348 owns the
+  schema correction. Merge it, regenerate the UI from that merged contract, and
+  update the reviewed UI source pin before claiming installed browser acceptance.
+  Do not remove real grants, patch generated code in the image, or mark this
+  failed qualification as passed. D06 remains deferred.

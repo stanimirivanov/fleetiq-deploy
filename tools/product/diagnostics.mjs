@@ -1,3 +1,5 @@
+import { parseApiFailure } from '../../local/qualification/product/api-failure.mjs';
+import { parseBrowserFailure } from '../../local/qualification/product/browser-failure.mjs';
 import { assertResource } from './policy.mjs';
 
 const services = new Set([
@@ -69,7 +71,12 @@ export function serviceDiagnostic(resource, privateLogs, { project, owner }) {
   ]
     .filter((value) => typeof value === 'string')
     .join('\n');
+  const apiFailure = service === 'browser' ? parseApiFailure(output) : undefined;
+  const browserFailure =
+    service === 'browser' ? parseBrowserFailure(output) : undefined;
   return {
+    ...(browserFailure ? { browserFailure } : {}),
+    ...(apiFailure ? { apiFailure } : {}),
     service,
     state: states.has(state.Status) ? state.Status : 'unknown',
     exitCode: exitCode(state.ExitCode),
@@ -130,7 +137,7 @@ export function diagnosticSummary(value) {
     value.services
       .map(
         (service) =>
-          `${service.service}: ${service.state}, health=${service.health}, exit=${service.exitCode ?? 'unknown'}, category=${service.category}`,
+          `${service.service}: ${service.state}, health=${service.health}, exit=${service.exitCode ?? 'unknown'}, category=${service.category}${service.browserFailure ? `, browser-step=${service.browserFailure.step}, browser-cause=${service.browserFailure.cause}` : ''}${service.apiFailure ? `, operation=${service.apiFailure.operation}, status=${service.apiFailure.status}, expected=${service.apiFailure.expected}` : ''}`,
       )
       .join('; ') || 'service diagnostics unavailable'
   );

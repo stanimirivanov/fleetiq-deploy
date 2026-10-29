@@ -6,7 +6,7 @@ import { composePolicy, config, identityKeys, lock, ownedPath } from './policy.m
 import { root, run } from './process.mjs';
 import { imageInventory } from './sources.mjs';
 
-export function context() {
+export function context({ execute = run, environment = process.env } = {}) {
   for (const key of [
     'COMPOSE_FILE',
     'COMPOSE_PROJECT_NAME',
@@ -16,19 +16,19 @@ export function context() {
     'DOCKER_TLS_VERIFY',
     'NODE_TLS_REJECT_UNAUTHORIZED',
   ])
-    assert(!process.env[key], `Unsupported ambient setting: ${key}`);
-  const selected = run('docker', ['context', 'show']);
-  const [details] = JSON.parse(run('docker', ['context', 'inspect', selected]));
+    assert(!environment[key], `Unsupported ambient setting: ${key}`);
+  const selected = execute('docker', ['context', 'show']);
+  const [details] = JSON.parse(execute('docker', ['context', 'inspect', selected]));
   assert(
     /^(?:npipe:\/\/|unix:\/\/)/u.test(details.Endpoints.docker.Host),
     'Use a local Docker context',
   );
   assert.equal(
-    run('docker', ['--context', selected, 'info', '--format', '{{.OSType}}']),
+    execute('docker', ['--context', selected, 'info', '--format', '{{.OSType}}']),
     'linux',
   );
   assert.equal(
-    run('docker', ['--context', selected, 'compose', 'version', '--short']).replace(
+    execute('docker', ['--context', selected, 'compose', 'version', '--short']).replace(
       /^v/u,
       '',
     ),

@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { apiOperation, formatApiFailure } from './api-failure.mjs';
 export const tenant = '/api/v1/tenants/tenant-a';
 export const packagePath = `${tenant}/protocol-packages/vendor.teltonika/versions/qualification-1`;
 /** Run native same-origin browser fetch: real cookies, Origin, CSRF and response parsing. */
@@ -9,10 +11,15 @@ export async function api(
   { method = 'GET', body, status, csrf = true, wasm = false } = {},
 ) {
   assert(path.startsWith('/api/v1/'));
+  // The host validates this required digest against the exact raw upload bytes.
+  const artifactSha256 = wasm
+    ? createHash('sha256').update(Uint8Array.from(body)).digest('hex')
+    : undefined;
   const result = await page.evaluate(
-    async ({ path, method, body, csrf, wasm }) => {
+    async ({ path, method, body, csrf, wasm, artifactSha256 }) => {
       const headers = {};
       if (csrf && method !== 'GET') headers['X-FleetIQ-CSRF'] = '1';
+      if (wasm) headers['X-Artifact-Sha256'] = artifactSha256;
       if (body !== undefined)
         headers['Content-Type'] = wasm ? 'application/wasm' : 'application/json';
       const response = await fetch(path, {
@@ -29,8 +36,16 @@ export async function api(
       if (text.length > 1048576) throw new Error('Response budget exceeded');
       return { status: response.status, body: text ? JSON.parse(text) : null };
     },
-    { path, method, body, csrf, wasm },
+    { path, method, body, csrf, wasm, artifactSha256 },
   );
+  if (
+    status !== undefined
+      ? result.status !== status
+      : result.status < 200 || result.status >= 300
+  )
+    console.error(
+      formatApiFailure(apiOperation(path, method, csrf), result.status, status),
+    );
   if (status !== undefined)
     assert.equal(result.status, status, `HTTP contract failed: ${method} ${path}`);
   else

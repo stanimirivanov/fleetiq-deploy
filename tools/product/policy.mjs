@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { requiredChecks } from '../../local/qualification/product/contract.mjs';
+import {
+  callbackUri,
+  interactionCsp,
+  issuerOrigin,
+} from '../../local/qualification/product/oidc-contract.mjs';
 import { lock } from '../policy.mjs';
 import { root } from '../process.mjs';
 export const inputs = JSON.parse(
@@ -22,7 +27,22 @@ export function browserBuildPolicy(
   );
   assert.equal((dockerfile.match(/^FROM \$\{BROWSER_IMAGE\}$/gmu) ?? []).length, 1);
 }
+export function issuerBrowserPolicy(policy = interactionCsp, callback = callbackUri) {
+  assert.equal(issuerOrigin, 'https://issuer.test:9443');
+  assert.equal(callback, 'https://fleet.test:8443/api/v1/auth/callback');
+  const directives = policy.split(';').map((value) => value.trim().split(/\s+/u));
+  assert.deepEqual(
+    directives,
+    [
+      ['default-src', "'none'"],
+      ['form-action', "'self'", callback],
+      ['base-uri', "'none'"],
+    ],
+    'Issuer form-action must allow exactly its origin and registered callback',
+  );
+}
 export function productPolicy(spec) {
+  issuerBrowserPolicy();
   browserBuildPolicy();
   assert.deepEqual(Object.keys(spec.services).sort(), [
     'artifacts',

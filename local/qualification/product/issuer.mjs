@@ -1,15 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:https';
 import Provider from 'oidc-provider';
+import { callbackUri, interactionCsp, issuerOrigin } from './oidc-contract.mjs';
 
 // This issuer is reachable only on the disposable internal test network. It is
 // intentionally not a production identity deployment or password authenticator.
-const provider = new Provider('https://issuer.test:9443', {
+const provider = new Provider(issuerOrigin, {
   clients: [
     {
       client_id: 'fleetiq-qualification',
       client_secret: readFileSync('/run/issuer/oidc_client_secret', 'utf8').trim(),
-      redirect_uris: ['https://fleet.test:8443/api/v1/auth/callback'],
+      redirect_uris: [callbackUri],
       response_types: ['code'],
       grant_types: ['authorization_code'],
       token_endpoint_auth_method: 'client_secret_basic',
@@ -44,16 +45,12 @@ createServer(
         res.writeHead(200, {
           'Content-Type': 'text/html',
           'Cache-Control': 'no-store',
-          'Content-Security-Policy':
-            "default-src 'none'; form-action 'self'; base-uri 'none'",
+          'Content-Security-Policy': interactionCsp,
         });
         res.end(
           '<!doctype html><html lang="en"><title>Disposable qualification issuer</title><form method="post"><button>Continue as test operator</button></form></html>',
         );
-      } else if (
-        req.method === 'POST' &&
-        req.headers.origin === 'https://issuer.test:9443'
-      ) {
+      } else if (req.method === 'POST' && req.headers.origin === issuerOrigin) {
         if (details.prompt.name === 'login') {
           await provider.interactionFinished(
             req,

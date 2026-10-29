@@ -41,11 +41,8 @@ function packaging() {
 }
 /** No local live operations are implied by structural validation. CI invokes this explicitly. */
 export async function qualifyProduct(onProgress = () => {}) {
-  assert.equal(
-    process.platform,
-    'linux',
-    'Installed qualification requires Linux Docker',
-  );
+  // The driver is portable Node/CLI orchestration; context() verifies the actual
+  // local daemon runs Linux containers before any artifact or runtime operation.
   const docker = context(),
     images = imageInventory(docker);
   const daemon = run('docker', ['--context', docker, 'info', '--format', '{{.ID}}']);
