@@ -119,7 +119,11 @@ try {
   await waitPhase(directory, 'workers-started');
   step = 'device-to-web';
   const firstAt = Date.now() - 1000;
-  await transmit(firstAt, 515000000, -1200000);
+  await transmit(firstAt, 515000000, -1200000, {
+    onStep: (value) => {
+      step = value;
+    },
+  });
   step = 'current-property';
   await expect
     .poll(async () => (await api(page, currentPath())).items[0]?.change.value.value, {

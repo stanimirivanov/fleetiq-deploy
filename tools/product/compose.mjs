@@ -161,18 +161,18 @@ export function productCompose({ name, owner, images, helper, control }) {
       image: images.edge,
       user: '10001:10001',
       mem_limit: '256m',
-      environment: { XDG_DATA_HOME: '/data', XDG_CONFIG_HOME: '/config' },
+      environment: {
+        FLEETIQ_PUBLIC_AUTHORITY: 'fleet.test:8443',
+        FLEETIQ_API_UPSTREAM: 'backend:8080',
+      },
       networks: { application: { aliases: ['fleet.test', 'wrong.test'] } },
-      tmpfs: [
-        ...restricted.tmpfs,
-        '/config:size=1m,uid=10001,gid=10001,mode=0700,nosuid',
-        // Caddy initializes storage even with manually supplied TLS certificates.
-        // Keep it private and ephemeral; the root and certificate mount stay read-only.
-        '/data:size=16m,uid=10001,gid=10001,mode=0700,noexec,nosuid,nodev',
-      ],
+      tmpfs: ['/tmp:size=32m,uid=10001,gid=10001,mode=0700,noexec,nosuid,nodev'],
       volumes: [
         state('edge', '/run/tls'),
-        bind('local/qualification/product/Caddyfile', '/etc/caddy/Caddyfile'),
+        bind(
+          resolve(control, '..', 'edge.conf.template'),
+          '/etc/fleetiq/nginx.conf.template',
+        ),
         bind('local/qualification/product/maps', '/fixture/maps'),
       ],
       depends_on: { backend: { condition: 'service_healthy' } },

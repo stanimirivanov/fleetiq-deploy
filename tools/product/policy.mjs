@@ -142,25 +142,41 @@ export function productPolicy(spec) {
     );
   }
   const edge = spec.services.edge;
-  assert.equal(edge.environment.XDG_DATA_HOME, '/data');
-  assert.equal(edge.environment.XDG_CONFIG_HOME, '/config');
+  assert.deepEqual(edge.environment, {
+    FLEETIQ_PUBLIC_AUTHORITY: 'fleet.test:8443',
+    FLEETIQ_API_UPSTREAM: 'backend:8080',
+  });
   assert.deepEqual(
-    edge.tmpfs.filter((mount) => mount.split(':')[0] === '/data'),
-    ['/data:size=16m,uid=10001,gid=10001,mode=0700,noexec,nosuid,nodev'],
-    'Caddy data must be bounded, private, non-executable tmpfs',
+    edge.tmpfs,
+    ['/tmp:size=32m,uid=10001,gid=10001,mode=0700,noexec,nosuid,nodev'],
+    'NGINX scratch must be private, bounded and non-executable',
+  );
+  const edgeTemplate = edge.volumes.find(
+    (mount) => mount.target === '/etc/fleetiq/nginx.conf.template',
+  );
+  const control = spec.services.browser.volumes.find(
+    (mount) => mount.target === '/control',
+  ).source;
+  assert(
+    edgeTemplate?.read_only &&
+      edgeTemplate.source === resolve(control, '..', 'edge.conf.template'),
+    'NGINX template must be the reviewed per-run TLS adapter',
   );
   assert(
-    !edge.volumes.some((mount) =>
-      typeof mount === 'string'
-        ? mount.split(':')[1] === '/data'
-        : mount.target === '/data',
-    ),
-    'No competing persistent or host-mounted edge data',
+    !edge.volumes.some((mount) => ['/data', '/config'].includes(mount.target)),
+    'No inherited Caddy storage',
   );
   assert.equal(
     edge.volumes.find((mount) => mount.target === '/run/tls')?.read_only,
     true,
     'TLS credentials must stay read-only',
+  );
+  assert.equal(edge.volumes.length, 3, 'No additional edge template/credential mounts');
+  const maps = edge.volumes.find((mount) => mount.target === '/fixture/maps');
+  assert(
+    maps?.read_only &&
+      maps.source === resolve(root, 'local/qualification/product/maps'),
+    'Only the controlled read-only map fixture is permitted',
   );
   assert.deepEqual(spec.services.artifacts.network_mode, 'none');
   assert.deepEqual(spec.services.browser.networks, ['application']);

@@ -11,6 +11,9 @@ const steps = new Set([
   'session-check',
   'commissioning',
   'device-to-web',
+  'device-connect',
+  'device-identification',
+  'device-record',
   'current-property',
   'original-provenance',
   'inspector-open',
@@ -41,22 +44,43 @@ const causes = new Set([
   'tenant-discovery-loading',
   'application-error',
   'unclassified',
+  'tcp-connection',
+  'tcp-closed',
+  'tcp-deadline',
+  'tcp-reply-budget',
+  'tcp-identification-rejected',
+  'tcp-record-rejected',
 ]);
 export function browserFailure(step, error, cspBlocked = false, uiCause) {
   const message = typeof error?.message === 'string' ? error.message : '';
-  const cause = cspBlocked
-    ? 'content-security-policy'
-    : /ERR_CERT_[A-Z_]+/u.test(message)
-      ? 'certificate-trust'
-      : uiCause && causes.has(uiCause)
-        ? uiCause
-        : error?.name === 'TimeoutError' || /[Tt]imeout|[Tt]imed out/u.test(message)
-          ? 'timeout'
-          : /Target.*closed|browser.*closed/iu.test(message)
-            ? 'browser-closed'
-            : error?.name === 'AssertionError' || /expect\(/u.test(message)
-              ? 'assertion'
-              : 'unclassified';
+  const deviceCause = step.startsWith('device-')
+    ? [
+        ['Device connection failed', 'tcp-connection'],
+        ['Device connection closed', 'tcp-closed'],
+        ['Device deadline exceeded', 'tcp-deadline'],
+        ['Device reply budget exceeded', 'tcp-reply-budget'],
+        [
+          'Registered device identification must be accepted',
+          'tcp-identification-rejected',
+        ],
+        ['Only durable acceptance releases the record ACK', 'tcp-record-rejected'],
+      ].find(([fixed]) => message.includes(fixed))?.[1]
+    : undefined;
+  const cause =
+    deviceCause ??
+    (cspBlocked
+      ? 'content-security-policy'
+      : /ERR_CERT_[A-Z_]+/u.test(message)
+        ? 'certificate-trust'
+        : uiCause && causes.has(uiCause)
+          ? uiCause
+          : error?.name === 'TimeoutError' || /[Tt]imeout|[Tt]imed out/u.test(message)
+            ? 'timeout'
+            : /Target.*closed|browser.*closed/iu.test(message)
+              ? 'browser-closed'
+              : error?.name === 'AssertionError' || /expect\(/u.test(message)
+                ? 'assertion'
+                : 'unclassified');
   return { step: steps.has(step) ? step : 'unknown', cause };
 }
 export function formatBrowserFailure(value) {

@@ -20,11 +20,19 @@ pnpm qualify
 pnpm qualify:product
 ```
 
-The edge retains a read-only root and read-only `/run/tls` certificate mount.
-Caddy still initializes `/data/caddy` with manual certificates, so `/data` is a
-separate 16 MiB tmpfs owned by UID/GID 10001, mode 0700, with noexec/nosuid/nodev.
-`/config` also remains a bounded private tmpfs. No host directory or extra persistent
-volume supplies these caches; both fit inside the existing edge memory limit.
+The product edge builds the merged UI's own NGINX Dockerfile at the exact lock
+revision, independently of the legacy diagnostic edge image. Its image ID, source
+labels, UID, entrypoint and graceful-stop signal are checked before startup. The
+TLS adapter changes only the upstream listener to HTTPS with the disposable leaf
+certificate and points `/maps/` at the controlled fixture root. Upstream CSP,
+proxy/header rules, asset-route handling, MIME types and SSE controls remain intact.
+Template anchor changes fail closed and require adapter review.
+
+The root and `/run/tls` certificate mount remain read-only. Only `/tmp` is writable:
+32 MiB, UID/GID 10001, mode 0700, noexec/nosuid/nodev. No Caddy data/config caches,
+additional service or host trust change are needed for this product composition.
+The separate three-service infrastructure diagnostic still uses its existing
+legacy adapter; its receipt cannot qualify the product image or publication.
 
 The command verifies the local Docker context and daemon, builds the helper from
 `local/qualification/product/inputs.lock.json`, and creates a randomly named
@@ -147,9 +155,35 @@ qualification remain intact. D06 and full-profile qualification stay deferred.
 - Raw component uploads include `X-Artifact-Sha256` computed over their exact bytes.
   The actual backend validates this digest before admission.
 - Tenant discovery must describe all five supported grants. The installed local
-  run exposed the older `OperatorTenant.actions.maxItems: 3` constraint: a valid
-  five-grant operator is rejected by the UI decoder. Platform issue #348 owns the
-  schema correction. Merge it, regenerate the UI from that merged contract, and
-  update the reviewed UI source pin before claiming installed browser acceptance.
-  Do not remove real grants, patch generated code in the image, or mark this
-  failed qualification as passed. D06 remains deferred.
+  run exposed the older `OperatorTenant.actions.maxItems: 3` constraint. Platform
+  PR #349 corrected it; UI PR #99 regenerated the official Effect contract.
+  Both merged fixes are now included in the reviewed source pins. UI PR #101
+  removes the unpatched Caddy/Smallstep JOSE dependency through native NGINX;
+  product qualification must exercise that source-owned runtime, not the older
+  deployment-owned Caddy build. Do not remove grants or patch generated code.
+  Installed acceptance still requires the complete real browser/TCP receipt.
+  D06 and full-profile qualification remain deferred.
+
+## Local NGINX handoff evidence: 2026-10-29
+
+The selected backend is platform PR #349 merge `a1ca9e24035efdffca69ae50c2118228257936e4`;
+the selected UI is PR #101 merge `e09ccec246ad024ef587701223e76aadadcc604a`.
+The reviewed local build, infrastructure qualification and structural group passed
+(207 tests, formatting, native manifests, release contracts, secrets and audit).
+
+Two independent full product runs passed every one of the 14 checks above and
+ownership-checked cleanup. Ignored local receipts are:
+
+- `.verification/product-cd10c355-44b4-4bbb-be5e-0b9f7a09556f.json`
+- `.verification/product-017af4f3-75f3-49fa-a866-1cd6e70ddd8c.json`
+- `.verification/docker-3298f18e-a7da-4b03-bfdd-0bc1c49bfe24.json`
+- `.verification/structural-0e0ae7ad-544c-4de2-916e-f24663b83fdb.json`
+
+An initial product trial failed during the first TCP exchange. Its displayed
+metadata-context category described the open page, not a proven TCP cause.
+Fixed connect/identification/record phases and closed TCP causes now take precedence
+in diagnostics. The initial close was not reproduced in the two subsequent full
+runs; its exact cause remains unconfirmed. No device retry, worker omission,
+longer deadline or relaxed assertion was added. CI must still pass the complete
+gate for the final commit; these local receipts do not imply infrastructure,
+publication or persistent D06 acceptance.

@@ -60,3 +60,12 @@ bounded Linux protocol/semantic/projection workers, real Teltonika guest and
 Chromium without changing the normal three-service installation. It has no host
 ports or real provider credentials. See [installed qualification](docs/operations/installed-product-qualification.md)
 and the [active plan](docs/exec-plans/active/m02-development-installation.md).
+
+## Product edge handoff
+
+The product qualification builds the reviewed UI repository's own NGINX runtime,
+not the historical Caddy diagnostic adapter shown above. Only the disposable TLS
+listener and self-hosted map fixture root adapt its source-owned template. The
+actual source/image identity and restricted process are verified before startup;
+CSP, proxy semantics, MIME types and SSE behavior remain upstream-owned. The
+separate diagnostic bridge is not image-security or product-acceptance evidence.

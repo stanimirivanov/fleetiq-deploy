@@ -236,3 +236,9 @@ export function imageInventory(docker) {
   }
   return images;
 }
+
+/** Return only a clean, exact reviewed source clone; never use sibling worktrees. */
+export function reviewedSource(name) {
+  validateSources();
+  return sourceDirectory(sourceCache(), name);
+}

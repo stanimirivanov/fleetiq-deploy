@@ -260,3 +260,27 @@ test('UI fallback diagnosis returns fixed categories without retaining arbitrary
   assert.equal(await browserUiCause({ isClosed: () => true }), undefined);
   assert.equal(await browserUiCause(undefined), undefined);
 });
+
+test('TCP failure phases cannot be obscured by an incidental metadata page fallback', () => {
+  for (const [message, cause] of [
+    ['Device connection failed', 'tcp-connection'],
+    ['Device connection closed', 'tcp-closed'],
+    ['Device deadline exceeded', 'tcp-deadline'],
+    ['Device reply budget exceeded', 'tcp-reply-budget'],
+    [
+      'Registered device identification must be accepted',
+      'tcp-identification-rejected',
+    ],
+    ['Only durable acceptance releases the record ACK', 'tcp-record-rejected'],
+  ]) {
+    assert.deepEqual(
+      browserFailure(
+        'device-identification',
+        new Error(message),
+        false,
+        'metadata-context',
+      ),
+      { step: 'device-identification', cause },
+    );
+  }
+});

@@ -20,6 +20,7 @@ import { capture, root, run } from '../process.mjs';
 import { imageInventory } from '../sources.mjs';
 import { productCompose } from './compose.mjs';
 import { collectServiceDiagnostics, diagnosticSummary } from './diagnostics.mjs';
+import { buildProductEdge } from './edge.mjs';
 import { assertResource, completeProduct, inputs, productPolicy } from './policy.mjs';
 
 function packaging() {
@@ -110,8 +111,9 @@ export async function qualifyProduct(onProgress = () => {}) {
     );
   }
   assert(Object.values(resources()).every((values) => values.length === 0));
-  const fingerprint = packaging(),
-    helperName = `fleetiq-product-fixture:${fingerprint.slice(0, 24)}`;
+  const fingerprint = packaging();
+  images.edge = buildProductEdge(docker, directory, fingerprint);
+  const helperName = `fleetiq-product-fixture:${fingerprint.slice(0, 24)}`;
   // Pull verifies remote availability independently of a warm local image cache.
   command(['pull', inputs.browser], { timeout: 300000, stdio: 'inherit' });
   command(

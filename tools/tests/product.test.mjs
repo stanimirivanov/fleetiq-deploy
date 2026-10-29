@@ -361,55 +361,65 @@ test('normal and product PostgreSQL readiness exclude the socket-only temporary 
   assert(qualifier.includes('socket-only-readiness-rejected'));
 });
 
-test('manual-TLS edge has private bounded writable storage without a writable root or credentials', () => {
+test('NGINX TLS edge preserves a read-only root and private bounded scratch', () => {
   const spec = fixture(),
     edge = spec.services.edge;
   productPolicy(spec);
-  assert.equal(edge.read_only, true);
-  assert.equal(edge.user, '10001:10001');
-  assert.deepEqual(edge.cap_drop, ['ALL']);
-  assert.equal(edge.environment.XDG_DATA_HOME, '/data');
-  assert(
-    edge.tmpfs.includes(
-      '/data:size=16m,uid=10001,gid=10001,mode=0700,noexec,nosuid,nodev',
-    ),
-  );
+  assert.deepEqual(edge.environment, {
+    FLEETIQ_PUBLIC_AUTHORITY: 'fleet.test:8443',
+    FLEETIQ_API_UPSTREAM: 'backend:8080',
+  });
   assert.equal(
     edge.volumes.find((mount) => mount.target === '/run/tls').read_only,
     true,
   );
   for (const change of [
-    (value) => {
-      value.tmpfs = value.tmpfs.filter((mount) => !mount.startsWith('/data:'));
+    (v) => {
+      v.tmpfs = [];
     },
-    (value) => {
-      value.tmpfs = value.tmpfs.map((mount) =>
-        mount.startsWith('/data:') ? mount.replace('uid=10001', 'uid=0') : mount,
-      );
+    (v) => {
+      v.tmpfs = v.tmpfs.map((x) => x.replace('uid=10001', 'uid=0'));
     },
-    (value) => {
-      value.tmpfs = value.tmpfs.map((mount) =>
-        mount.startsWith('/data:') ? mount.replace('size=16m', 'size=1g') : mount,
-      );
+    (v) => {
+      v.tmpfs = v.tmpfs.map((x) => x.replace('size=32m', 'size=1g'));
     },
-    (value) => {
-      value.tmpfs = value.tmpfs.map((mount) =>
-        mount.startsWith('/data:') ? mount.replace('mode=0700', 'mode=0777') : mount,
-      );
+    (v) => {
+      v.tmpfs = v.tmpfs.map((x) => x.replace('mode=0700', 'mode=0777'));
     },
-    (value) => {
-      value.tmpfs = value.tmpfs.map((mount) =>
-        mount.startsWith('/data:') ? mount.replace(',noexec', '') : mount,
-      );
+    (v) => {
+      v.tmpfs = v.tmpfs.map((x) => x.replace(',noexec', ''));
     },
-    (value) => {
-      value.environment.XDG_DATA_HOME = '/unmounted';
+    (v) => {
+      v.environment.FLEETIQ_PUBLIC_AUTHORITY = 'wrong.test';
     },
-    (value) => {
-      value.volumes.push({ type: 'bind', source: '/private', target: '/data' });
+    (v) => {
+      v.environment.XDG_DATA_HOME = '/data';
     },
-    (value) => {
-      value.volumes.find((mount) => mount.target === '/run/tls').read_only = false;
+    (v) => {
+      v.volumes.push({
+        type: 'bind',
+        source: '/foreign',
+        target: '/etc/fleetiq/proxy.conf.template',
+        read_only: true,
+      });
+    },
+    (v) => {
+      v.volumes.find((x) => x.target === '/fixture/maps').read_only = false;
+    },
+
+    (v) => {
+      v.volumes.push({ type: 'bind', source: '/private', target: '/data' });
+    },
+    (v) => {
+      v.volumes.find((x) => x.target === '/run/tls').read_only = false;
+    },
+    (v) => {
+      v.volumes.find((x) => x.target === '/etc/fleetiq/nginx.conf.template').read_only =
+        false;
+    },
+    (v) => {
+      v.volumes.find((x) => x.target === '/etc/fleetiq/nginx.conf.template').source =
+        '/foreign';
     },
   ]) {
     const altered = fixture();

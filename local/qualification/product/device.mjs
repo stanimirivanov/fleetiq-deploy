@@ -30,8 +30,9 @@ export async function transmit(
   timestamp,
   latitude,
   longitude,
-  { host = 'ingest', port = 55027, timeout = 30000 } = {},
+  { host = 'ingest', port = 55027, timeout = 30000, onStep = () => {} } = {},
 ) {
+  onStep('device-connect');
   const socket = net.createConnection({ host, port });
   let bytes = Buffer.alloc(0),
     connected = false,
@@ -85,6 +86,7 @@ export async function transmit(
         wake = ready;
       });
     }
+    onStep('device-identification');
     const identification = Buffer.alloc(17);
     identification.writeUInt16BE(15);
     identification.write(imei, 2, 'ascii');
@@ -94,6 +96,7 @@ export async function transmit(
       1,
       'Registered device identification must be accepted',
     );
+    onStep('device-record');
     socket.write(avlFrame(timestamp, latitude, longitude));
     assert.equal(
       (await read(4)).readUInt32BE(0),
