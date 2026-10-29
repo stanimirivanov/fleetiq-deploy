@@ -8,7 +8,7 @@ in the pull request. CI runs only on pull requests.
 
 ## Verification
 
-```powershell
+```bash
 pnpm install --frozen-lockfile
 pnpm secrets:install
 pnpm manifests:install

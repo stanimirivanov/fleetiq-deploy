@@ -48,7 +48,6 @@ const server = createServer((request, response) => {
       timeout: 15000,
       maxBuffer: 4 * 1024 * 1024,
       shell: false,
-      windowsHide: true,
     });
     audit.backendExit = result.status;
     audit.backendError = result.error?.code ?? null;

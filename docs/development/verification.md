@@ -58,16 +58,14 @@ Run behavioral fixtures with `pnpm test`. Test-file concurrency is bounded to tw
 so native renderers, scanners and loopback Git fixtures do not exhaust the host;
 all assertions and existing deadlines remain required. They include policy mutation tests;
 installation behavior is exercised against Docker by the docker group.
-Windows structural CI and Linux infrastructure CI use the same runner.
+Linux structural CI and infrastructure CI use the same runner.
 
 ## CI prerequisites and evidence recovery
 
 pnpm 12 installs a native executable. Its exact pinned global installation must
 run its own setup scripts. Bootstrap explicitly allows only `pnpm@12.5.1`
 with npm's strict script policy; do not add `--ignore-scripts` to that bootstrap
-command. Windows otherwise leaves an extensionless placeholder that can return
-without running a command. This does not enable lifecycle scripts for application
-dependencies. The shared adapter discovers native PATH/adjacent npm executables
+command. This does not enable lifecycle scripts for application dependencies. The shared adapter discovers native PATH/adjacent npm executables
 and JavaScript/Corepack entries without a shell; only an exact successful version
 probe qualifies a launcher. Broken or mismatched launchers fail closed.
 

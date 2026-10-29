@@ -23,7 +23,7 @@ function execute(program, args, options = {}) {
     encoding: 'utf8',
     timeout: 120_000,
     maxBuffer: 16 * 1024 * 1024,
-    windowsHide: true,
+
     shell: false,
     ...options,
   });

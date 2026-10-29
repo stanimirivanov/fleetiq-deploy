@@ -37,10 +37,9 @@ legacy adapter; its receipt cannot qualify the product image or publication.
 The command verifies the local Docker context and daemon, builds the helper from
 `local/qualification/product/inputs.lock.json`, and creates a randomly named
 `product-<id>` project. No host ports are published. Do not run it against a
-remote engine or Windows-container daemon. The portable Node driver validates the
-actual daemon OS, transport and Compose version, including when launched on
-Windows. CI runs the installed flow on Linux and structural regressions on both
-platforms. No Kubernetes cluster or retained FleetIQ state is accessed.
+remote engine or non-Linux daemon. The Node driver validates the actual daemon
+OS, local Unix transport and Compose version. CI runs installed and structural
+regressions on Linux. No Kubernetes cluster or retained FleetIQ state is accessed.
 
 The source-read credential needs contents:read on both locked source repositories.
 It is supplied only to source retrieval. Build and runtime steps do not receive it.

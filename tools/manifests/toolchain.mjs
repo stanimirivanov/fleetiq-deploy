@@ -60,11 +60,8 @@ export function manifestTools() {
   const result = {};
   for (const [name, tool] of Object.entries(toolsLock.tools)) {
     const platform = tool.platforms[`${process.platform}-${process.arch}`];
-    assert(platform, 'Manifest tools support Linux/Windows x64; unsupported platform');
-    const binary = resolve(
-      directory,
-      name + (process.platform === 'win32' ? '.exe' : ''),
-    );
+    assert(platform, 'Manifest tools support Linux x64; unsupported platform');
+    const binary = resolve(directory, name);
     verifiedBytes(binary, platform.binarySha256);
     assert.match(
       run(binary, tool.versionArgs),

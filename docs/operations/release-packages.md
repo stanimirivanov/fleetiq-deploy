@@ -83,7 +83,7 @@ publishes no image/package and changes no active environment selection.
 Use the [release contracts](../../contracts/releases/README.md). For a real full
 release BOM, run:
 
-```powershell
+```bash
 pnpm releases:verify-artifacts <release-bom.json>
 ```
 
@@ -131,12 +131,11 @@ A repository contents-only fine-grained token is not a GHCR credential.
 Set the actor and token in the terminal that will run verification. Prompt for
 the secret instead of typing it into a command or storing it in Git:
 
-```powershell
-$env:FLEETIQ_REGISTRY_ACTOR = 'stanimirivanov'
-$registrySecret = Read-Host 'GHCR read token' -AsSecureString
-$env:FLEETIQ_REGISTRY_READ_TOKEN =
-    [System.Net.NetworkCredential]::new('', $registrySecret).Password
-Remove-Variable registrySecret
+```bash
+export FLEETIQ_REGISTRY_ACTOR='stanimirivanov'
+read -r -s -p 'GHCR read token: ' FLEETIQ_REGISTRY_READ_TOKEN
+printf '\n'
+export FLEETIQ_REGISTRY_READ_TOKEN
 pnpm releases:verify-artifacts <release-bom.json>
 ```
 
@@ -148,9 +147,9 @@ Process variables reach only that terminal and subsequently launched child
 processes; setting them in another terminal does not update an already-running
 agent. Remove the registry token after verification:
 
-```powershell
-Remove-Item Env:FLEETIQ_REGISTRY_READ_TOKEN
-Remove-Item Env:FLEETIQ_REGISTRY_ACTOR
+```bash
+unset FLEETIQ_REGISTRY_READ_TOKEN
+unset FLEETIQ_REGISTRY_ACTOR
 ```
 
 Alternatively, an operator using the existing GitHub CLI credential may add its
@@ -190,7 +189,7 @@ Workflow execution needs a real template; guided contracts allow null until D08.
 ## Deterministic gates and external controls
 
 Structural CI checks schemas, candidate/active separation and adversarial fixtures
-on Linux/Windows. A read-only Linux PR job uses a UUID-owned, loopback-only,
+on Linux. A read-only Linux PR job uses a UUID-owned, loopback-only,
 digest-pinned registry with bounded resources. It pushes/pulls charts and the
 release envelope, compares renders, rejects missing objects/existing tags,
 mutates a disposable tag and proves digest selection survives. Owned cleanup is

@@ -60,7 +60,7 @@ test('real Gitleaks catches worktree, staged-only and removed historical materia
     rmSync(repository, { recursive: true, force: true });
   }
 });
-test('owned path checks reject a symlink or Windows junction escape', async () => {
+test('owned path checks reject a symlink escape', async () => {
   const { symlinkSync } = await import('node:fs');
   const directory = mkdtempSync(join(tmpdir(), 'fleetiq-deploy-path-fixture-'));
   try {
@@ -68,11 +68,7 @@ test('owned path checks reject a symlink or Windows junction escape', async () =
     mkdirSync(child);
     const outside = join(directory, 'outside');
     mkdirSync(outside);
-    symlinkSync(
-      outside,
-      join(child, 'escape'),
-      process.platform === 'win32' ? 'junction' : 'dir',
-    );
+    symlinkSync(outside, join(child, 'escape'), 'dir');
     assert.throws(() => ownedPath(child, join(child, 'escape')));
     assert.throws(() => validateSourceDirectory(child, join(child, 'escape')));
     const regular = join(child, 'regular');

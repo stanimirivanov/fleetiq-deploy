@@ -2,13 +2,13 @@
 
 ## Prerequisites & Environment Inputs
 
-- Auth0 tenant access to edit Applications, Connections and Users; local Windows account with permission to set folder access.
-- Tools: browser, local text editor and Windows File Explorer. No credential-handling script or CLI is required.
+- Auth0 tenant access to edit Applications, Connections and Users; local Linux account with permission to set folder access.
+- Tools: browser, local text editor and file manager. No credential-handling script or CLI is required.
 - Public origin: `https://fleet.local.test:18443`; internal Gateway listener: `8443`.
-- Public configuration: `C:\Source\fleet-iq\fleetiq-deploy\target\d06-preparation\auth0-20261023\runtime-overrides.json` (existing ignored JSON rehearsal input).
-- Private directory: `C:\Users\sonof\AppData\Local\FleetIQ\d06-auth0` (outside Git).
-- Client-secret file: `C:\Users\sonof\AppData\Local\FleetIQ\d06-auth0\client-secret` (UTF-8 plain text, no extension).
-- Operator-subject file: `C:\Users\sonof\AppData\Local\FleetIQ\d06-auth0\operator-subject` (UTF-8 plain text, no extension).
+- Public configuration: `/path/to/fleet-iq/fleetiq-deploy/target/d06-preparation/auth0-20261023/runtime-overrides.json` (prepare as an ignored JSON rehearsal input).
+- Private directory: `/var/lib/fleetiq/d06-auth0` (outside Git).
+- Client-secret file: `/var/lib/fleetiq/d06-auth0/client-secret` (UTF-8 plain text, no extension).
+- Operator-subject file: `/var/lib/fleetiq/d06-auth0/operator-subject` (UTF-8 plain text, no extension).
 
 ## Step-by-Step Execution Guide
 
@@ -16,7 +16,7 @@
 
 1. Action:
    - In File Explorer, create or open the private directory listed above.
-   - Open Properties → Security → Advanced. Disable inheritance; remove inherited access for other users and broad groups. Retain access for your Windows account and SYSTEM. Check existing explicit permissions and both files' effective access.
+   - Create the private directory with mode 0700 and private files with mode 0600. Verify ownership and permissions with `stat`; do not print file contents.
 2. Expected Result:
    - The directory exists; other ordinary user accounts cannot read its files. Existing files are preserved.
 
@@ -43,7 +43,7 @@
 ### Step 4: Set the public runtime inputs
 
 1. Action:
-   - Target File: `C:\Source\fleet-iq\fleetiq-deploy\target\d06-preparation\auth0-20261023\runtime-overrides.json`.
+   - Target File: `/path/to/fleet-iq/fleetiq-deploy/target/d06-preparation/auth0-20261023/runtime-overrides.json`.
    - Edit the existing JSON; preserve image, database and network selections. Set these dotted JSON keys:
      - `public.host`: `fleet.local.test`; `public.port`: `18443`; `gateway.listenerPort`: `8443`.
      - `backend.oidc.issuer`: `https://<Domain from Auth0 Application Settings>/` (selected domain: `dev-iqzkuoz81x7gifev.us.auth0.com`).
@@ -58,7 +58,7 @@
 
 1. Action:
    - Source: Auth0 Dashboard → Applications → Applications → FleetIQ → Settings / Credentials → **Client Secret**.
-   - Target File: `C:\Users\sonof\AppData\Local\FleetIQ\d06-auth0\client-secret`.
+   - Target File: `/var/lib/fleetiq/d06-auth0/client-secret`.
    - Using a local editor, save only the exact secret as UTF-8 without BOM, quotes, key names, spaces or a trailing newline. Preserve an existing correct file. Do not add `.txt`.
 2. Expected Result:
    - The private file contains one raw value. Its eventual Kubernetes target is namespace `fleetiq-apps`, Secret `fleetiq-oidc`, key `client-secret`; creating that Secret is a separate authorized installation step.
@@ -67,7 +67,7 @@
 
 1. Action:
    - Source: Auth0 Dashboard → User Management → Users → intended operator → Details / Raw JSON → **user_id**.
-   - Target File: `C:\Users\sonof\AppData\Local\FleetIQ\d06-auth0\operator-subject`.
+   - Target File: `/var/lib/fleetiq/d06-auth0/operator-subject`.
    - Save only the exact `user_id` as UTF-8 without BOM, quotes, key names or a trailing newline. Do not substitute an email or client ID; do not add `.txt`.
 2. Expected Result:
    - The private file contains the exact subject for bootstrap input `FLEETIQ_BOOTSTRAP_EXTERNAL_SUBJECT`. The separately authorized bootstrap uses `FLEETIQ_BOOTSTRAP_ACTOR_ID=initial-operator` and `FLEETIQ_BOOTSTRAP_AUTHORITY_ID=auth0-fleetiq-local`.

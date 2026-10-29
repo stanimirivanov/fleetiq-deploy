@@ -549,9 +549,9 @@ test('tool/schema bytes must exist, match their pin and remain a plain file', (c
   assert.equal(verifiedBytes(file, sha256(Buffer.from('{}'))).toString(), '{}');
   assert.throws(() => verifiedBytes(file, '0'.repeat(64)));
   assert.throws(() => verifiedBytes(join(directory, 'missing.json'), '0'.repeat(64)));
-  // Directory junctions are supported without administrator privileges on Windows.
+  // Exercise a real directory symlink.
   const link = join(directory, 'linked');
-  symlinkSync(directory, link, process.platform === 'win32' ? 'junction' : 'dir');
+  symlinkSync(directory, link, 'dir');
   assert.throws(() => verifiedBytes(link, sha256(Buffer.from('{}'))));
   assert.throws(() => plainDirectory(link));
   assert.throws(() =>
