@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import https from 'node:https';
 import net from 'node:net';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { analyticsInstallation } from './analytics.mjs';
 import {
   appliedInstallation,
   assertOwnership,
@@ -290,6 +291,43 @@ export async function qualify(onProgress = () => {}) {
       assert.equal((await get('/api/v1/nonexistent')).status, 404),
     );
     record('synthetic-proxy-origin-host-cookie-no-store-and-restored-real-backend');
+    // Infrastructure fixture only: no customer recipient or new lifecycle fact.
+    assert.equal(sql('SELECT max(version) FROM _sqlx_migrations WHERE success'), '49');
+    const privateRouter = resolve(site.path, 'alertmanager.yml');
+    writeFileSync(
+      privateRouter,
+      'route: {receiver: synthetic-sink}\nreceivers: [{name: synthetic-sink}]\n',
+      { mode: 0o644 },
+    );
+    const analyticsSite = analyticsInstallation(site, true);
+    up(analyticsSite); // Persist complete recipe before starting, so cleanup owns all resources.
+    await delay(10000);
+    const runningWorkers = () => {
+      assertOwnership(analyticsSite);
+      const ids = analyticsSite
+        .compose(['ps', '--quiet', 'analytics-worker', 'notification-worker'])
+        .split(/\s+/u)
+        .filter(Boolean);
+      assert.equal(ids.length, 2);
+      const workers = JSON.parse(
+        run('docker', ['--context', docker, 'inspect', ...ids]),
+      );
+      for (const worker of workers) {
+        assert.equal(worker.State.Status, 'running');
+        assert.equal(worker.RestartCount, 0, 'Worker startup must not crash-loop');
+        assert.equal(worker.Config.User, '10001:10001');
+        assert.equal(worker.HostConfig.ReadonlyRootfs, true);
+        assert.equal(Object.keys(worker.HostConfig.PortBindings ?? {}).length, 0);
+      }
+    };
+    runningWorkers();
+    analyticsSite.compose(['stop', 'alertmanager']);
+    runningWorkers(); // Process observation only, never infer delivery/semantic health.
+    analyticsSite.compose(['start', 'alertmanager']);
+    analyticsSite.compose(['restart', 'notification-worker']);
+    await delay(10000);
+    runningWorkers();
+    record('checked-schema-packaged-workers-start-restart-with-private-router');
   } catch (error) {
     primaryFailure = error;
   } finally {

@@ -18,3 +18,6 @@ trust, credentials and qualification limits; values.schema.json owns input types
 The offline local-preview values are fixtures, not a release selection. No
 migration, operator bootstrap, CRD/controller installation or Helm hook occurs.
 The chart assumes its selected namespace is dedicated to FleetIQ.
+
+Optional analytics workers and private notification routing are disabled by default.
+See [configuration and qualification](../../docs/operations/analytics-notifications.md).

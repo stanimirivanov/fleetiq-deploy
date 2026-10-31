@@ -47,3 +47,25 @@ spec:
     - to:
         - ipBlock: { cidr: {{ .Values.network.apiServerCidr | quote }} }
       ports: [{ protocol: TCP, port: {{ .Values.network.apiServerPort }} }]
+{{- if .Values.network.analyticsEnabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Values.clusterName }}-analytics
+spec:
+  podSelector:
+    matchLabels: { cnpg.io/cluster: {{ .Values.clusterName | quote }} }
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        {{- range $component := list "analytics-worker" "notification-worker" }}
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ $.Values.network.runtimeNamespace | quote }} }
+          podSelector:
+            matchLabels: { app.kubernetes.io/name: {{ $.Release.Name }}-{{ $component }} }
+        {{- end }}
+      ports: [{ protocol: TCP, port: 5432 }]
+  egress: []
+{{- end }}

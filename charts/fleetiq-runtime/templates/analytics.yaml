@@ -1,0 +1,116 @@
+{{- if .Values.analytics.enabled }}
+{{- range $component := list "analytics-worker" "notification-worker" "alertmanager" }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: {{ $.Release.Name }}-{{ $component }}
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: {{ $.Release.Name }}-{{ $component }}
+spec:
+  replicas: {{ ternary 0 1 $.Values.maintenance }}
+  revisionHistoryLimit: 2
+  progressDeadlineSeconds: 300
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app.kubernetes.io/name: {{ $.Release.Name }}-{{ $component }} }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: {{ $.Release.Name }}-{{ $component }}, app.kubernetes.io/part-of: fleetiq }
+    spec:
+      serviceAccountName: {{ $.Release.Name }}-{{ $component }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 60
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: {{ $component }}
+          image: {{ if eq $component "alertmanager" }}{{ $.Values.analytics.alertmanager.image | quote }}{{ else }}{{ $.Values.backend.image | quote }}{{ end }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { cpu: 250m, memory: 128Mi }
+          {{- if eq $component "alertmanager" }}
+          args: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager, '--cluster.listen-address=', --web.listen-address=0.0.0.0:9093]
+          ports: [{ name: router, containerPort: 9093, protocol: TCP }]
+          startupProbe:
+            httpGet: { path: /-/ready, port: router }
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 24
+          readinessProbe:
+            httpGet: { path: /-/ready, port: router }
+            periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: { path: /-/healthy, port: router }
+            periodSeconds: 10
+            timeoutSeconds: 3
+          volumeMounts:
+            - { name: configuration, mountPath: /etc/alertmanager, readOnly: true }
+            - { name: router-data, mountPath: /alertmanager }
+          {{- else }}
+          # Producer workers have no HTTP health API. Running is not semantic health.
+          args: [{{ $component }}]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: {{ toJson $.Values.backend.databaseSecret }}
+            {{- if eq $component "notification-worker" }}
+            - { name: FLEETIQ_ALERTMANAGER_URL, value: {{ printf "http://%s-alertmanager:9093/api/v2/alerts" $.Release.Name | quote }} }
+            {{- end }}
+          volumeMounts:
+            - { name: database-trust, mountPath: /etc/fleetiq/database, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+          {{- end }}
+      volumes:
+        {{- if eq $component "alertmanager" }}
+        - name: configuration
+          secret:
+            secretName: {{ $.Values.analytics.alertmanager.configurationSecret | quote }}
+            defaultMode: 288
+        # Non-HA router cache; FleetIQ's durable outbox stays in PostgreSQL.
+        - name: router-data
+          emptyDir: { sizeLimit: 128Mi }
+        {{- else }}
+        - name: database-trust
+          configMap:
+            name: {{ $.Values.backend.databaseTrust.name | quote }}
+            items: [{ key: {{ $.Values.backend.databaseTrust.key | quote }}, path: ca.crt }]
+        - name: tmp
+          emptyDir: { medium: Memory, sizeLimit: 64Mi }
+        {{- end }}
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ .Release.Name }}-alertmanager
+spec:
+  type: ClusterIP
+  selector: { app.kubernetes.io/name: {{ .Release.Name }}-alertmanager }
+  ports: [{ name: router, port: 9093, targetPort: router, protocol: TCP }]
+{{- end }}

@@ -69,7 +69,14 @@ export function validateLock(value = lock) {
     );
     assert.match(source.commit, /^[a-f0-9]{40}$/u);
   }
-  exactKeys(value.images, ['rust', 'runtime', 'node', 'edge', 'postgres']);
+  exactKeys(value.images, [
+    'rust',
+    'runtime',
+    'node',
+    'edge',
+    'postgres',
+    'alertmanager',
+  ]);
   for (const image of Object.values(value.images))
     assert.match(image, /^[a-z0-9/.-]+:[a-zA-Z0-9.-]+@sha256:[a-f0-9]{64}$/u);
   exactKeys(value.tools, ['node', 'pnpm', 'compose']);

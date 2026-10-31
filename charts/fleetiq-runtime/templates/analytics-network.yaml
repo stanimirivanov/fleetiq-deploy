@@ -1,0 +1,50 @@
+{{- if .Values.analytics.enabled }}
+{{- range $component := list "analytics-worker" "notification-worker" "alertmanager" }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: {{ $.Release.Name }}-{{ $component }}
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: {{ $.Release.Name }}-{{ $component }} }
+  policyTypes: [Ingress, Egress]
+  {{- if eq $component "alertmanager" }}
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: {{ $.Release.Name }}-notification-worker }
+      ports: [{ protocol: TCP, port: 9093 }]
+  {{- else }}
+  ingress: []
+  {{- end }}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ $.Values.network.dnsNamespace | quote }} }
+          podSelector:
+            matchLabels: {{ toJson $.Values.network.dnsPodLabels }}
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+    {{- if eq $component "alertmanager" }}
+    - to:
+        {{- range $.Values.analytics.alertmanager.receiverCidrs }}
+        - ipBlock: { cidr: {{ . | quote }} }
+        {{- end }}
+      ports: [{ protocol: TCP, port: 443 }]
+    {{- else }}
+    - to:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: {{ $.Values.network.databaseNamespace | quote }} }
+          podSelector:
+            matchLabels: { cnpg.io/cluster: {{ $.Values.network.databaseCluster | quote }} }
+      ports: [{ protocol: TCP, port: 5432 }]
+    {{- if eq $component "notification-worker" }}
+    - to:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: {{ $.Release.Name }}-alertmanager }
+      ports: [{ protocol: TCP, port: 9093 }]
+    {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

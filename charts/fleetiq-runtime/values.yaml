@@ -51,3 +51,11 @@ network:
   dnsPodLabels: { k8s-app: kube-dns }
   # Explicit HTTPS discovery/JWKS/token destinations, not unrestricted egress.
   oidcCidrs: []
+# Explicit opt-in; no process health API exists for these producer workers.
+analytics:
+  enabled: false
+  alertmanager:
+    image: prom/alertmanager:v0.34.2@sha256:39d8bb3966c694a124428a3a88fbcffd40bd069129ecd47c059f8a3f17c55f3b
+    configurationSecret: ''
+    # Exact receiver IPv4 ranges on HTTPS/443; no arbitrary destination ports.
+    receiverCidrs: []

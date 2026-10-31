@@ -1,0 +1,63 @@
+# Opt-in overlay; tools/analytics.mjs supplies private configuration and reviewed pins.
+x-worker: &worker
+  image: ${FLEETIQ_BACKEND_IMAGE:?Missing reviewed backend}
+  pull_policy: never
+  user: '10001:10001'
+  entrypoint: [/bin/bash, /opt/fleetiq/backend-entrypoint.sh]
+  labels: { com.fleetiq.deploy.owner: '${FLEETIQ_OWNER:?Missing owner}' }
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+  stop_grace_period: 30s
+  tmpfs: ['/tmp:size=16m,mode=1777,noexec,nosuid']
+  secrets: [database_password]
+  volumes: [./backend-entrypoint.sh:/opt/fleetiq/backend-entrypoint.sh:ro]
+  mem_limit: 256m
+  pids_limit: 128
+  depends_on:
+    postgres: { condition: service_healthy }
+services:
+  analytics-worker:
+    <<: *worker
+    command: [analytics-worker]
+    networks: [database]
+  notification-worker:
+    <<: *worker
+    command: [notification-worker]
+    environment:
+      FLEETIQ_ALERTMANAGER_URL: http://alertmanager:9093/api/v2/alerts
+    networks: [database, notifications]
+  alertmanager:
+    image: ${FLEETIQ_ALERTMANAGER_IMAGE:?Missing pinned router}
+    user: '10001:10001'
+    labels: { com.fleetiq.deploy.owner: '${FLEETIQ_OWNER:?Missing owner}' }
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    stop_grace_period: 30s
+    command: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager, '--cluster.listen-address=', --web.listen-address=0.0.0.0:9093]
+    secrets:
+      - source: alertmanager_configuration
+        target: /etc/alertmanager/alertmanager.yml
+    tmpfs: ["/alertmanager:size=128m,uid=10001,gid=10001,mode=0700,noexec,nosuid"]
+    networks: [notifications, receiver-egress]
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:9093/-/ready']
+      interval: 5s
+      timeout: 3s
+      retries: 24
+    mem_limit: 128m
+    pids_limit: 128
+secrets:
+  alertmanager_configuration:
+    file: ${FLEETIQ_ALERTMANAGER_CONFIG_FILE:?Missing private router configuration}
+networks:
+  notifications:
+    internal: true
+    labels: { com.fleetiq.deploy.owner: '${FLEETIQ_OWNER:?Missing owner}' }
+  # Local Docker bridge is NOT per-destination egress enforcement; Kubernetes is scoped.
+  receiver-egress:
+    labels: { com.fleetiq.deploy.owner: '${FLEETIQ_OWNER:?Missing owner}' }
