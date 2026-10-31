@@ -1,3 +1,4 @@
+# Optional analytics/router overlay: pnpm local analytics-up (see operations guide).
 # Only edge publishes a host port. Secrets are mounted files, never Compose values.
 x-labels: &labels
   com.fleetiq.deploy.owner: ${FLEETIQ_OWNER:?Run pnpm local init first}

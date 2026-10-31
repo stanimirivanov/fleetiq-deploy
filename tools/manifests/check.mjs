@@ -10,7 +10,12 @@ export function checkManifests() {
   const tools = manifestTools();
   const bootstrap = checkBootstrap(tools);
   const measurements = [];
-  for (const state of fixtureStates) {
+  for (const state of [
+    ...fixtureStates,
+    { analytics: true, maintenance: false, nonlocal: false },
+    { analytics: true, maintenance: true, nonlocal: false },
+    { analytics: true, maintenance: false, nonlocal: true },
+  ]) {
     const rendered = renderFixture(tools, { ...state, lint: true });
     const schemas = validateSchemas(tools, rendered);
     manifestPolicy(rendered, state);

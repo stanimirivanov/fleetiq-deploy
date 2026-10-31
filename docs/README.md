@@ -24,3 +24,5 @@
   scope, remaining browser qualification and acceptance.
 - [Completed work](exec-plans/completed/README.md): completed-plan convention.
 - [Security reporting](../SECURITY.md): private reporting and credential handling.
+
+- [Analytics and notification packaging](operations/analytics-notifications.md): opt-in workers, private router, source pins and qualification limits.

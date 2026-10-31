@@ -35,6 +35,7 @@ export const fixtureStates = [
 export function renderFixture(
   tools,
   {
+    analytics = false,
     maintenance = false,
     nonlocal = false,
     providerLocal = false,
@@ -107,13 +108,35 @@ export function renderFixture(
         item.metadata.name = applicationNamespace;
     }
     for (const [chart, namespace, override] of [
-      ['runtime', applicationNamespace, { maintenance, ...runtime }],
+      [
+        'runtime',
+        applicationNamespace,
+        {
+          maintenance,
+          ...runtime,
+          ...(analytics
+            ? {
+                analytics: {
+                  enabled: true,
+                  alertmanager: {
+                    configurationSecret: 'fleet-alertmanager',
+                    receiverCidrs: ['192.0.2.10/32'],
+                  },
+                },
+              }
+            : {}),
+        },
+      ],
       [
         'data',
         'fleetiq-data',
         {
           ...data,
-          network: { runtimeNamespace: applicationNamespace, ...data.network },
+          network: {
+            runtimeNamespace: applicationNamespace,
+            analyticsEnabled: analytics,
+            ...data.network,
+          },
         },
       ],
     ]) {

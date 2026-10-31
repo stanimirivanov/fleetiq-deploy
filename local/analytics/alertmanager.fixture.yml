@@ -1,0 +1,14 @@
+route:
+  receiver: synthetic
+  group_by: [fleetiq_tenant, fleetiq_rule, fleetiq_revision, fleetiq_episode]
+  group_wait: 0s
+  group_interval: 1s
+  repeat_interval: 1m
+receivers:
+  - name: synthetic
+    webhook_configs:
+      - url: http://receiver:9094/alerts
+        send_resolved: true
+        max_alerts: 16
+        http_config:
+          follow_redirects: false

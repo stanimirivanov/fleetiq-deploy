@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
 import { composePolicy, config, identityKeys, lock, ownedPath } from './policy.mjs';
 import { root, run } from './process.mjs';
@@ -258,7 +265,19 @@ export function appliedInstallation(name, docker) {
   const model = privateJson(path, 'applied-compose.json');
   const project = `fleetiq-dev-${name}`;
   assert.equal(model.name, project);
-  assert.deepEqual(Object.keys(model.services).sort(), ['backend', 'edge', 'postgres']);
+  assert.deepEqual(
+    Object.keys(model.services).sort(),
+    model.services.alertmanager
+      ? [
+          'alertmanager',
+          'analytics-worker',
+          'backend',
+          'edge',
+          'notification-worker',
+          'postgres',
+        ]
+      : ['backend', 'edge', 'postgres'],
+  );
   for (const service of Object.values(model.services)) assert(!service.container_name);
   const recipe = ownedPath(path, resolve(path, 'applied-compose.json'));
   const compose = (args, options = {}) =>
@@ -282,6 +301,15 @@ export function up(site) {
   assertOwnership(site);
   const recipe = resolve(site.path, 'applied-compose.json');
   if (existsSync(recipe)) ownedPath(site.path, recipe);
+  if (
+    existsSync(recipe) &&
+    privateJson(site.path, 'applied-compose.json').services.alertmanager &&
+    !site.model.services.alertmanager
+  ) {
+    throw new Error(
+      'Analytics installation already selected; use analytics-up or local down before returning to defaults',
+    );
+  }
   // Recovery reads this validated rendered recipe, not mutable current config.
   // Secret values are absent; only mounted file paths and public identity settings remain.
   writeFileSync(recipe, `${JSON.stringify(site.model, null, 2)}\n`);
@@ -294,6 +322,8 @@ export function down(site, volumes = false) {
   site.compose(['down', '--remove-orphans', ...(volumes ? ['--volumes'] : [])], {
     timeout: 120_000,
   });
+  if (site.model.services.alertmanager)
+    unlinkSync(ownedPath(site.path, resolve(site.path, 'applied-compose.json')));
 }
 export function exportCertificate(site) {
   const id = site.compose(['ps', '--quiet', 'edge']);

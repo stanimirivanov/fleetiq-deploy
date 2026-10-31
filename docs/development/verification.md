@@ -87,3 +87,7 @@ GitHub Actions use reviewed major tags. Runtime tools, images and application
 source commits retain their exact version/digest pins. Change the authority in
 `tools/ci.mjs` and render it together with the workflow; mutation tests protect
 mandatory gates, major action versions and evidence collection.
+
+The Docker group also inventories analytics-routing: the pinned real Alertmanager
+and a synthetic-only receiver exercise firing/resolved, unreachable router and
+restart with owner-checked cleanup. No installed milestone outcome is implied.

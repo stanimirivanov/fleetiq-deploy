@@ -14,3 +14,6 @@ role and deletion boundaries; values.schema.json owns input types.
 
 The offline local-preview image is synthetic. Never install it as a real selection.
 The chart assumes its selected namespace is dedicated to FleetIQ data.
+
+Enable network.analyticsEnabled only alongside the runtime analytics package; it
+adds worker-specific database ingress. See [worker packaging](../../docs/operations/analytics-notifications.md).

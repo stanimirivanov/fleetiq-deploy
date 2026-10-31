@@ -6,6 +6,7 @@ import { digest, lock } from './policy.mjs';
 import { pnpm, root, run } from './process.mjs';
 import { qualifyProduct } from './product/qualify.mjs';
 import { qualify } from './qualify.mjs';
+import { qualifyAnalytics } from './qualify-analytics.mjs';
 import { checkContracts } from './releases/contracts.mjs';
 import { checkReleaseBoundaries } from './releases/git-policy.mjs';
 import { qualifyPackages } from './releases/qualify.mjs';
@@ -71,6 +72,8 @@ try {
         item.measurements = await qualifyProduct((progress) => {
           item.measurements = progress;
         });
+      else if (check === 'analytics-routing')
+        item.measurements = await qualifyAnalytics();
       else if (check === 'installation')
         item.measurements = await qualify((progress) => {
           item.measurements = progress;

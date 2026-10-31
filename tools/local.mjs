@@ -1,3 +1,4 @@
+import { analyticsInstallation, analyticsServices } from './analytics.mjs';
 import {
   appliedInstallation,
   assertOwnership,
@@ -22,10 +23,17 @@ try {
       console.log(
         `Created private configuration: .local/instances/${name}/config.json`,
       );
-    } else if (command === 'down' || command === 'trust') {
+    } else if (
+      command === 'down' ||
+      command === 'trust' ||
+      command === 'analytics-stop'
+    ) {
       const site = appliedInstallation(name, docker);
       if (command === 'down') down(site);
-      else {
+      else if (command === 'analytics-stop') {
+        assertOwnership(site);
+        site.compose(['stop', ...analyticsServices]);
+      } else {
         console.log(`Public CA certificate: ${exportCertificate(site)}`);
         console.log(
           'Trust this public certificate manually. Never export the private key.',
@@ -36,9 +44,14 @@ try {
         name,
         docker,
         false,
-        ['up', 'restart', 'bootstrap'].includes(command),
+        ['up', 'analytics-up', 'restart', 'bootstrap'].includes(command),
       );
-      if (command === 'up') {
+      if (command === 'analytics-up') {
+        up(analyticsInstallation(site));
+        console.log(
+          'Analytics processes started; qualify queue progress and receiver delivery separately.',
+        );
+      } else if (command === 'up') {
         up(site);
         console.log(`Ready: https://localhost:${site.settings.httpsPort}`);
       } else if (command === 'restart') {
@@ -80,7 +93,7 @@ try {
         );
       } else
         throw new Error(
-          'Use: pnpm local init|sources|build|up|down|restart|trust|bootstrap [instance]',
+          'Use: pnpm local init|sources|build|up|analytics-up|analytics-stop|down|restart|trust|bootstrap [instance]',
         );
     }
   }
