@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { lstatSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pipelineServices } from './pipeline.mjs';
 import { composePolicy, lock, ownedPath } from './policy.mjs';
 import { root } from './process.mjs';
 
@@ -29,20 +30,21 @@ export function analyticsInstallation(site, qualification = false) {
       },
     });
   const model = JSON.parse(compose(['config', '--format', 'json']));
-  analyticsComposePolicy(model, qualification);
+  analyticsComposePolicy(model, qualification, site.model);
   return { ...site, compose, model };
 }
 
 /** Reject changes that expose the router, inject secrets or widen worker authority. */
-export function analyticsComposePolicy(model, qualification = false) {
-  assert.deepEqual(Object.keys(model.services).sort(), [
-    'alertmanager',
-    'analytics-worker',
-    'backend',
-    'edge',
-    'notification-worker',
-    'postgres',
-  ]);
+export function analyticsComposePolicy(model, qualification = false, base) {
+  const pipeline = base?.services['tcp-ingestion'] ? pipelineServices : [];
+  for (const name of pipeline)
+    assert.deepEqual(model.services[name], base.services[name]);
+  if (pipeline.length)
+    assert.deepEqual(model.networks['device-ingress'], base.networks['device-ingress']);
+  assert.deepEqual(
+    Object.keys(model.services).sort(),
+    ['backend', 'edge', 'postgres', ...analyticsServices, ...pipeline].sort(),
+  );
   composePolicy(
     {
       ...model,

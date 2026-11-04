@@ -166,7 +166,7 @@ to broaden token permissions. The regression fixture serves a real authenticated
 partial clone over loopback HTTP and proves both the missing-helper rejection
 and successful checkout with the helper. It uses synthetic credentials only.
 
-### Opt-in TCP ingestion and replay
+### Opt-in device pipeline
 
 Create `pipeline.json` in the private instance directory with exactly these
 fields (use your existing admitted package and active device/channel routes):
@@ -185,11 +185,18 @@ fields (use your existing admitted package and active device/channel routes):
 Run `pnpm local pipeline-up development`. The listener binds only to IPv4
 loopback on the host through a dedicated device bridge. Replay and PostgreSQL
 stay on the internal database network. Registered identifiers route traffic but do not
-authenticate devices. Both processes use the locked backend and wait for
-backend readiness. Provision the artifact, admission and routes through the
+authenticate devices. Ingestion, replay, semantic processing and projection use the locked backend
+and wait for backend readiness. Provision the artifact, admission and routes through the
 backend before sending traffic. The command reports process startup.
 
-Use `pnpm local pipeline-stop development` to stop both workers and
+Use `pnpm local pipeline-stop development` to stop the pipeline processes and
 `pnpm local pipeline-up development` to resume. Use
 `pnpm local down development` before switching installation overlays. The
 database volume retains accepted messages and replay checkpoints.
+
+
+To run the device pipeline with analytics and notification delivery, also
+provision the private Alertmanager configuration described in
+[analytics notifications](analytics-notifications.md), then run
+`pnpm local pipeline-analytics-up development`. Use the existing
+`analytics-stop` or `pipeline-stop` command to stop the corresponding group.

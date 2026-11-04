@@ -11,7 +11,12 @@ test('normal ingestion and replay are packaged as an explicit overlay', () => {
   assert.equal(base.services['tcp-ingestion'], undefined);
   assert.equal(base.services['replay-worker'], undefined);
   const { services } = read('../../local/pipeline/compose.yaml');
-  assert.deepEqual(Object.keys(services).sort(), ['replay-worker', 'tcp-ingestion']);
+  assert.deepEqual(Object.keys(services).sort(), [
+    'projection-worker',
+    'replay-worker',
+    'semantic-worker',
+    'tcp-ingestion',
+  ]);
   assert.deepEqual(services['tcp-ingestion'].ports, [
     `127.0.0.1:\${FLEETIQ_TCP_PORT:?Missing loopback port}:55027`,
   ]);
