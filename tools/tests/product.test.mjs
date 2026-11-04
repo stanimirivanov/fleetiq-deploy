@@ -469,3 +469,10 @@ test('a device-only result cannot qualify the installed milestone', () => {
   assert.throws(() => completeProduct({ phase: 'complete', checks }));
   for (const check of analytics) assert(requiredChecks.includes(check));
 });
+
+test('qualification rejects substitution of a normal pipeline worker', () => {
+  const spec = fixture();
+  productPolicy(spec);
+  spec.services.semantic.mem_limit = '512m';
+  assert.throws(() => productPolicy(spec), /Normal worker definition drift/u);
+});

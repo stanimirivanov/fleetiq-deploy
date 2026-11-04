@@ -1,7 +1,72 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { parse } from 'yaml';
 import { lock } from '../policy.mjs';
 import { root } from '../process.mjs';
+/** Use the local worker recipes with narrowly scoped fixture substitutions. */
+export function normalProductWorkers(owner, image) {
+  const variables = {
+    FLEETIQ_OWNER: owner,
+    FLEETIQ_BACKEND_IMAGE: image,
+    FLEETIQ_TCP_IDENTITY_POLICY: 'registered-identifiers',
+    FLEETIQ_TCP_TENANT_ID: 'tenant-a',
+    FLEETIQ_TCP_CHANNEL_ID: 'teltonika-tcp',
+    FLEETIQ_TCP_PACKAGE_ID: 'vendor.teltonika',
+    FLEETIQ_TCP_PACKAGE_VERSION: 'qualification-1',
+    FLEETIQ_TCP_PORT: '55027',
+  };
+  const read = (path) =>
+    parse(readFileSync(resolve(root, path), 'utf8'), { merge: true }).services;
+  const pipeline = read('local/pipeline/compose.yaml');
+  const analytics = read('local/analytics/compose.yaml');
+  return Object.fromEntries(
+    Object.entries({
+      ingest: pipeline['tcp-ingestion'],
+      replay: pipeline['replay-worker'],
+      semantic: pipeline['semantic-worker'],
+      projection: pipeline['projection-worker'],
+      analytics: analytics['analytics-worker'],
+      notification: analytics['notification-worker'],
+    }).map(([role, source]) => {
+      const service = JSON.parse(
+        JSON.stringify(source).replace(/\$\{([A-Z_]+):\?[^}]+\}/gu, (_, key) => {
+          assert(Object.hasOwn(variables, key), 'Unknown normal worker input');
+          return variables[key];
+        }),
+      );
+      assert.deepEqual(service.secrets, ['database_password']);
+      assert.deepEqual(service.volumes, [
+        './backend-entrypoint.sh:/opt/fleetiq/backend-entrypoint.sh:ro',
+      ]);
+      delete service.secrets;
+      // The browser fixture reaches the TCP listener on an internal network.
+      if (role === 'ingest') {
+        delete service.ports;
+        service.networks = service.networks.map((network) =>
+          network === 'device-ingress' ? 'application' : network,
+        );
+      }
+      service.volumes = [
+        {
+          type: 'bind',
+          source: resolve(root, 'local/backend-entrypoint.sh'),
+          target: '/opt/fleetiq/backend-entrypoint.sh',
+          read_only: true,
+        },
+        {
+          type: 'volume',
+          source: 'state',
+          target: '/run/secrets',
+          read_only: true,
+          volume: { subpath: 'database' },
+        },
+      ];
+      return [role, service];
+    }),
+  );
+}
+
 /** Separate CI composition. Never an override of normal fail-closed startup. */
 export function productCompose({ name, owner, images, helper, control }) {
   assert.match(name, /^product-[a-f0-9]{16}$/u);
@@ -183,29 +248,7 @@ export function productCompose({ name, owner, images, helper, control }) {
         retries: 60,
       },
     },
-    ingest: backend(['ingest-tcp'], {
-      memory: '768m',
-      environment: {
-        FLEETIQ_TCP_BIND_ADDRESS: '0.0.0.0:55027',
-        FLEETIQ_TCP_IDENTITY_POLICY: 'registered-identifiers',
-        FLEETIQ_TCP_TENANT_ID: 'tenant-a',
-        FLEETIQ_TCP_CHANNEL_ID: 'teltonika-tcp',
-        FLEETIQ_TCP_PACKAGE_ID: 'vendor.teltonika',
-        FLEETIQ_TCP_PACKAGE_VERSION: 'qualification-1',
-      },
-    }),
-    replay: backend(['replay-worker'], { memory: '768m' }),
-    semantic: backend(['semantic-worker']),
-    projection: backend(['project-current']),
-    analytics: backend(['analytics-worker']),
-    notification: {
-      ...backend(['notification-worker'], {
-        environment: {
-          FLEETIQ_ALERTMANAGER_URL: 'http://alertmanager:9093/api/v2/alerts',
-        },
-      }),
-      networks: ['database', 'notifications'],
-    },
+    ...normalProductWorkers(owner, images.backend),
     alertmanager: {
       ...restricted,
       image: lock.images.alertmanager,
@@ -259,7 +302,6 @@ export function productCompose({ name, owner, images, helper, control }) {
       ],
     },
   };
-  services.ingest.networks = ['database', 'application'];
   return {
     name,
     services,

@@ -23,6 +23,16 @@ services:
     <<: *worker
     command: [replay-worker]
     networks: [database]
+  semantic-worker:
+    <<: *worker
+    command: [semantic-worker]
+    networks: [database]
+    mem_limit: 384m
+  projection-worker:
+    <<: *worker
+    command: [project-current]
+    networks: [database]
+    mem_limit: 384m
   tcp-ingestion:
     <<: *worker
     command: [ingest-tcp]

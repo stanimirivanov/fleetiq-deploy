@@ -183,6 +183,7 @@ export async function qualifyProduct(onProgress = () => {}) {
     ui: lock.sources.ux.commit,
     images: { backend: images.backend, edge: images.edge, helper },
     checks: [],
+    workerDefinitions: ['local/pipeline/compose.yaml', 'local/analytics/compose.yaml'],
     cleanup: 'pending',
     databaseReadiness: 'pending',
     stage: 'initialize',
@@ -272,7 +273,7 @@ export async function qualifyProduct(onProgress = () => {}) {
       'register-calculator',
     ]);
     owned();
-    compose(['up', '-d', '--no-deps', 'ingest', 'replay', 'semantic', 'projection']);
+    compose(['up', '-d', 'ingest', 'replay', 'semantic', 'projection']);
     tcpReady();
     writePhase(control, 'workers-started');
     stage('device-to-browser');
@@ -307,7 +308,7 @@ export async function qualifyProduct(onProgress = () => {}) {
       timeout: 240000,
     });
     owned();
-    compose(['up', '-d', '--no-deps', 'ingest', 'replay', 'semantic', 'projection']);
+    compose(['up', '-d', 'ingest', 'replay', 'semantic', 'projection']);
     tcpReady();
     owned();
     stage('isolate-router-and-receiver-outages');

@@ -9,6 +9,7 @@ import {
 } from '../../local/qualification/product/oidc-contract.mjs';
 import { lock } from '../policy.mjs';
 import { root } from '../process.mjs';
+import { normalProductWorkers } from './compose.mjs';
 export const inputs = JSON.parse(
   readFileSync(resolve(root, 'local/qualification/product/inputs.lock.json')),
 );
@@ -98,13 +99,13 @@ export function productPolicy(spec) {
   assert.deepEqual(notification.environment, {
     FLEETIQ_ALERTMANAGER_URL: 'http://alertmanager:9093/api/v2/alerts',
   });
-  for (const [role, command] of [
-    ['analytics', 'analytics-worker'],
-    ['notification', 'notification-worker'],
-  ]) {
-    assert.equal(spec.services[role].image, spec.services.backend.image);
-    assert.deepEqual(spec.services[role].command, [command]);
-  }
+  for (const [role, worker] of Object.entries(
+    normalProductWorkers(
+      spec.services.backend.labels['com.fleetiq.deploy.owner'],
+      spec.services.backend.image,
+    ),
+  ))
+    assert.deepEqual(spec.services[role], worker, 'Normal worker definition drift');
   for (const [name, service] of Object.entries(spec.services)) {
     assert(
       !service.ports &&
@@ -161,13 +162,13 @@ export function productPolicy(spec) {
     backend: ['backend', 'public'],
     issuer: ['issuer', 'public'],
     edge: ['edge'],
-    ingest: ['database', 'public'],
-    replay: ['database', 'public'],
-    semantic: ['database', 'public'],
-    projection: ['database', 'public'],
+    ingest: ['database'],
+    replay: ['database'],
+    semantic: ['database'],
+    projection: ['database'],
     browser: ['public'],
-    analytics: ['database', 'public'],
-    notification: ['database', 'public'],
+    analytics: ['database'],
+    notification: ['database'],
     alertmanager: [],
     receiver: [],
   };

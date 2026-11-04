@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
+import { analyticsServices } from './analytics.mjs';
 import { pipelineServices } from './pipeline.mjs';
 import { composePolicy, config, identityKeys, lock, ownedPath } from './policy.mjs';
 import { root, run } from './process.mjs';
@@ -268,21 +269,13 @@ export function appliedInstallation(name, docker) {
   assert.equal(model.name, project);
   assert.deepEqual(
     Object.keys(model.services).sort(),
-    model.services.alertmanager
-      ? [
-          'alertmanager',
-          'analytics-worker',
-          'backend',
-          'edge',
-          'notification-worker',
-          'postgres',
-        ]
-      : [
-          'backend',
-          'edge',
-          'postgres',
-          ...(model.services['tcp-ingestion'] ? pipelineServices : []),
-        ],
+    [
+      'backend',
+      'edge',
+      'postgres',
+      ...(model.services.alertmanager ? analyticsServices : []),
+      ...(model.services['tcp-ingestion'] ? pipelineServices : []),
+    ].sort(),
   );
   for (const service of Object.values(model.services)) assert(!service.container_name);
   const recipe = ownedPath(path, resolve(path, 'applied-compose.json'));

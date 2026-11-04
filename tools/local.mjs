@@ -49,12 +49,27 @@ try {
         name,
         docker,
         false,
-        ['up', 'analytics-up', 'pipeline-up', 'restart', 'bootstrap'].includes(command),
+        [
+          'up',
+          'analytics-up',
+          'pipeline-up',
+          'pipeline-analytics-up',
+          'restart',
+          'bootstrap',
+        ].includes(command),
       );
-      if (command === 'pipeline-up') {
-        up(pipelineInstallation(site, privateJson(site.path, 'pipeline.json')));
+      if (command === 'pipeline-up' || command === 'pipeline-analytics-up') {
+        const pipeline = pipelineInstallation(
+          site,
+          privateJson(site.path, 'pipeline.json'),
+        );
+        up(
+          command === 'pipeline-analytics-up'
+            ? analyticsInstallation(pipeline)
+            : pipeline,
+        );
         console.log(
-          'TCP ingestion and replay started for the configured loopback listener.',
+          'The local device pipeline started for the configured loopback listener.',
         );
       } else if (command === 'analytics-up') {
         up(analyticsInstallation(site));
@@ -103,7 +118,7 @@ try {
         );
       } else
         throw new Error(
-          'Use: pnpm local init|sources|build|up|analytics-up|analytics-stop|pipeline-up|pipeline-stop|down|restart|trust|bootstrap [instance]',
+          'Use: pnpm local init|sources|build|up|analytics-up|analytics-stop|pipeline-up|pipeline-analytics-up|pipeline-stop|down|restart|trust|bootstrap [instance]',
         );
     }
   }

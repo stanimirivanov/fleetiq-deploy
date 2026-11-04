@@ -372,7 +372,6 @@ export async function qualify(onProgress = () => {}) {
     pipeline.compose(['start', 'replay-worker']);
     await eventually(() => assert.equal(count('completed'), '1'));
     record('normal-loopback-tcp-acceptance-and-durable-replay-after-restart');
-    down(appliedInstallation(name, docker));
 
     const privateRouter = resolve(site.path, 'alertmanager.yml');
     writeFileSync(
@@ -380,7 +379,7 @@ export async function qualify(onProgress = () => {}) {
       'route: {receiver: synthetic-sink}\nreceivers: [{name: synthetic-sink}]\n',
       { mode: 0o644 },
     );
-    const analyticsSite = analyticsInstallation(site, true);
+    const analyticsSite = analyticsInstallation(pipeline, true);
     up(analyticsSite); // Persist complete recipe before starting, so cleanup owns all resources.
     await delay(10000);
     const runningWorkers = () => {

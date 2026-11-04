@@ -3,7 +3,12 @@ import { resolve } from 'node:path';
 import { composePolicy } from './policy.mjs';
 import { root } from './process.mjs';
 
-export const pipelineServices = ['replay-worker', 'tcp-ingestion'];
+export const pipelineServices = [
+  'projection-worker',
+  'replay-worker',
+  'semantic-worker',
+  'tcp-ingestion',
+];
 
 export function pipelineEnvironment(settings) {
   const keys = ['tenantId', 'channelId', 'packageId', 'packageVersion'];
@@ -47,12 +52,18 @@ export function pipelineInstallation(site, settings, qualification = false) {
     'postgres',
     ...pipelineServices,
   ]);
-  const { 'replay-worker': replay, 'tcp-ingestion': tcp, ...base } = model.services;
+  const tcp = model.services['tcp-ingestion'];
+  const base = Object.fromEntries(
+    Object.entries(model.services).filter(([name]) => !pipelineServices.includes(name)),
+  );
   composePolicy({ ...model, services: base }, qualification);
-  for (const [service, command] of [
-    [replay, 'replay-worker'],
-    [tcp, 'ingest-tcp'],
+  for (const [name, command, memory] of [
+    ['replay-worker', 'replay-worker', 805306368],
+    ['tcp-ingestion', 'ingest-tcp', 805306368],
+    ['semantic-worker', 'semantic-worker', 402653184],
+    ['projection-worker', 'project-current', 402653184],
   ]) {
+    const service = model.services[name];
     assert.equal(service.image, base.backend.image);
     assert.equal(service.pull_policy, 'never');
     assert.equal(service.user, '10001:10001');
@@ -91,7 +102,9 @@ export function pipelineInstallation(site, settings, qualification = false) {
     ]);
     assert.equal(service.depends_on.backend.condition, 'service_healthy');
     assert.equal(service.pids_limit, 128);
-    assert.equal(String(service.mem_limit), '805306368');
+    assert.equal(String(service.mem_limit), String(memory));
+    if (name !== 'tcp-ingestion')
+      assert(!service.ports?.length && !Object.keys(service.environment ?? {}).length);
   }
   assert.deepEqual(Object.keys(model.networks).sort(), [
     'application',
@@ -107,7 +120,6 @@ export function pipelineInstallation(site, settings, qualification = false) {
       !ingress.driver_opts &&
       !ingress.enable_ipv6,
   );
-  assert(!replay.ports?.length && !Object.keys(replay.environment ?? {}).length);
   assert.deepEqual(tcp.environment, {
     ...channel,
     FLEETIQ_TCP_BIND_ADDRESS: '0.0.0.0:55027',
