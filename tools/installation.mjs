@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
+import { pipelineServices } from './pipeline.mjs';
 import { composePolicy, config, identityKeys, lock, ownedPath } from './policy.mjs';
 import { root, run } from './process.mjs';
 import { imageInventory } from './sources.mjs';
@@ -276,7 +277,12 @@ export function appliedInstallation(name, docker) {
           'notification-worker',
           'postgres',
         ]
-      : ['backend', 'edge', 'postgres'],
+      : [
+          'backend',
+          'edge',
+          'postgres',
+          ...(model.services['tcp-ingestion'] ? pipelineServices : []),
+        ],
   );
   for (const service of Object.values(model.services)) assert(!service.container_name);
   const recipe = ownedPath(path, resolve(path, 'applied-compose.json'));
@@ -303,11 +309,14 @@ export function up(site) {
   if (existsSync(recipe)) ownedPath(site.path, recipe);
   if (
     existsSync(recipe) &&
-    privateJson(site.path, 'applied-compose.json').services.alertmanager &&
-    !site.model.services.alertmanager
+    ['alertmanager', ...pipelineServices].some(
+      (service) =>
+        privateJson(site.path, 'applied-compose.json').services[service] &&
+        !site.model.services[service],
+    )
   ) {
     throw new Error(
-      'Analytics installation already selected; use analytics-up or local down before returning to defaults',
+      'An optional installation overlay is already selected; use local down before switching profiles',
     );
   }
   // Recovery reads this validated rendered recipe, not mutable current config.
@@ -322,7 +331,7 @@ export function down(site, volumes = false) {
   site.compose(['down', '--remove-orphans', ...(volumes ? ['--volumes'] : [])], {
     timeout: 120_000,
   });
-  if (site.model.services.alertmanager)
+  if (site.model.services.alertmanager || site.model.services['tcp-ingestion'])
     unlinkSync(ownedPath(site.path, resolve(site.path, 'applied-compose.json')));
 }
 export function exportCertificate(site) {

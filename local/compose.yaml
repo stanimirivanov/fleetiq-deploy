@@ -1,3 +1,4 @@
+# Optional TCP ingestion and replay overlay: pnpm local pipeline-up.
 # Optional analytics/router overlay: pnpm local analytics-up (see operations guide).
 # Only edge publishes a host port. Secrets are mounted files, never Compose values.
 x-labels: &labels

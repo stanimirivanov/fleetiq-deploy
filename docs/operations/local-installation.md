@@ -165,3 +165,31 @@ A checkout authentication failure after successful clone/fetch is not a reason
 to broaden token permissions. The regression fixture serves a real authenticated
 partial clone over loopback HTTP and proves both the missing-helper rejection
 and successful checkout with the helper. It uses synthetic credentials only.
+
+### Opt-in TCP ingestion and replay
+
+Create `pipeline.json` in the private instance directory with exactly these
+fields (use your existing admitted package and active device/channel routes):
+
+```json
+{
+  "identityPolicy": "registered-identifiers",
+  "port": 55027,
+  "tenantId": "tenant-a",
+  "channelId": "teltonika-tcp",
+  "packageId": "vendor.teltonika",
+  "packageVersion": "1"
+}
+```
+
+Run `pnpm local pipeline-up development`. The listener binds only to IPv4
+loopback on the host through a dedicated device bridge. Replay and PostgreSQL
+stay on the internal database network. Registered identifiers route traffic but do not
+authenticate devices. Both processes use the locked backend and wait for
+backend readiness. Provision the artifact, admission and routes through the
+backend before sending traffic. The command reports process startup.
+
+Use `pnpm local pipeline-stop development` to stop both workers and
+`pnpm local pipeline-up development` to resume. Use
+`pnpm local down development` before switching installation overlays. The
+database volume retains accepted messages and replay checkpoints.

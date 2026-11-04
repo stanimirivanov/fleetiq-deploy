@@ -4,6 +4,7 @@ import https from 'node:https';
 import net from 'node:net';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { transmit } from '../local/qualification/product/device.mjs';
 import { analyticsInstallation } from './analytics.mjs';
 import {
   appliedInstallation,
@@ -15,7 +16,8 @@ import {
   installation,
   up,
 } from './installation.mjs';
-import { run } from './process.mjs';
+import { pipelineInstallation } from './pipeline.mjs';
+import { root, run } from './process.mjs';
 
 async function availablePort() {
   const server = net.createServer();
@@ -293,6 +295,85 @@ export async function qualify(onProgress = () => {}) {
     record('synthetic-proxy-origin-host-cookie-no-store-and-restored-real-backend');
     // Infrastructure fixture only. The locked M05 producer requires audited recovery schema 0051.
     assert.equal(sql('SELECT max(version) FROM _sqlx_migrations WHERE success'), '51');
+    const pipelineSettings = {
+      identityPolicy: 'registered-identifiers',
+      port: await availablePort(),
+      tenantId: 'pipeline-qualification',
+      channelId: 'qualification-tcp',
+      packageId: 'vendor.teltonika',
+      packageVersion: 'qualification-1',
+    };
+    assert.throws(
+      () => pipelineInstallation(site, { ...pipelineSettings, port: 0 }, true),
+      /Invalid pipeline configuration/u,
+    );
+    const artifact = site.compose([
+      'exec',
+      '--no-TTY',
+      'backend',
+      'base64',
+      '-w0',
+      '/usr/share/fleetiq/qualification/teltonika.wasm',
+    ]);
+    assert.match(artifact, /^[A-Za-z0-9+/]+={0,2}$/u);
+    site.compose(
+      [
+        'exec',
+        '--no-TTY',
+        'postgres',
+        'psql',
+        '-U',
+        'fleetiq',
+        '-d',
+        'fleetiq',
+        '-v',
+        'ON_ERROR_STOP=1',
+        '-q',
+      ],
+      {
+        input: `\\set artifact '${artifact}'\n${readFileSync(resolve(root, 'local/pipeline/qualification.sql'), 'utf8')}`,
+      },
+    );
+    const pipeline = pipelineInstallation(site, pipelineSettings, true);
+    up(pipeline);
+    assertOwnership(pipeline);
+    pipeline.compose(['stop', 'replay-worker']);
+    await eventually(
+      () =>
+        new Promise((ready, fail) => {
+          const socket = net.connect({
+            host: '127.0.0.1',
+            port: pipelineSettings.port,
+          });
+          socket.setTimeout(1000, () =>
+            socket.destroy(new Error('TCP listener unavailable')),
+          );
+          socket.once('error', fail);
+          socket.once('connect', () => {
+            socket.destroy();
+            ready();
+          });
+        }),
+    );
+    await transmit(1700000000000, 420000000, 230000000, {
+      host: '127.0.0.1',
+      port: pipelineSettings.port,
+    });
+    const count = (status) =>
+      sql(`SELECT count(*) FROM ingestion.replay_work w
+      JOIN ingestion.accepted_messages m USING (tenant_id,message_id)
+      WHERE w.tenant_id='pipeline-qualification' AND octet_length(m.payload)=45
+        AND w.status='${status}'`);
+    assert.equal(count('pending'), '1');
+    pipeline.compose(['stop', 'tcp-ingestion']);
+    sql(
+      'DROP TRIGGER qualification_completion_outage ON ingestion.decoded_message_results',
+    );
+    pipeline.compose(['start', 'replay-worker']);
+    await eventually(() => assert.equal(count('completed'), '1'));
+    record('normal-loopback-tcp-acceptance-and-durable-replay-after-restart');
+    down(appliedInstallation(name, docker));
+
     const privateRouter = resolve(site.path, 'alertmanager.yml');
     writeFileSync(
       privateRouter,
