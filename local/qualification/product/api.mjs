@@ -110,17 +110,18 @@ export async function seed(page) {
     },
     status: 403,
   });
-  const properties = ['latitude', 'longitude'].map((axis) => ({
-    id: `position.${axis}`,
-    version: 1,
-  }));
+  const properties = [
+    'position.latitude',
+    'position.longitude',
+    'anomaly.latitude',
+  ].map((id) => ({ id, version: 1 }));
   for (const property of properties)
     await api(page, `${tenant}/properties`, {
       method: 'POST',
       body: {
         ...property,
         name: property.id,
-        value_kind: 'integer',
+        value_kind: property.id === 'anomaly.latitude' ? 'decimal' : 'integer',
         canonical_unit: null,
       },
     });

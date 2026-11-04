@@ -19,7 +19,7 @@ commands, changed source bytes or failed cleanup produce a nonzero exit.
 | HTTPS and routing | Trusted/untrusted/wrong-host TLS probes, SPA/API/static assertions |
 | No silent identity downgrade | Complete config checks, entrypoint validation and explicit reset override |
 | Cookie/Origin/Host/no-store | Synthetic upstream through the real HTTPS edge, then restored real backend |
-| Device-to-browser acceptance | Separate product inventory, real OIDC/TCP/worker/browser flow, map disposal and mandatory owned cleanup |
+| Device-to-browser acceptance | Separate product inventory, real OIDC/TCP/worker/browser flow, map disposal, analytics-to-receiver recovery and mandatory owned cleanup |
 | Owned cleanup | Context, owner labels, project names and post-cleanup resource inventory |
 | Durable restart | Database marker and public CA comparison after service restart |
 | No secret exemptions | Pinned Gitleaks across candidate files, index and incoming history; allow comments ignored |

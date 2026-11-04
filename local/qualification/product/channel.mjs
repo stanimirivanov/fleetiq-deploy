@@ -13,6 +13,12 @@ export const phases = [
   'workers-started',
   'initial-visible',
   'restart-complete',
+  'delivery-exhausted',
+  'retry-ready',
+  'recovery-submitted',
+  'firing-delivered',
+  'analytics-resolved',
+  'resolution-delivered',
   'complete',
   'failed',
 ];

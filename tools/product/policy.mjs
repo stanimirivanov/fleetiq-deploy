@@ -45,6 +45,8 @@ export function productPolicy(spec) {
   issuerBrowserPolicy();
   browserBuildPolicy();
   assert.deepEqual(Object.keys(spec.services).sort(), [
+    'alertmanager',
+    'analytics',
     'artifacts',
     'backend',
     'browser',
@@ -52,8 +54,10 @@ export function productPolicy(spec) {
     'ingest',
     'init',
     'issuer',
+    'notification',
     'postgres',
     'projection',
+    'receiver',
     'replay',
     'semantic',
   ]);
@@ -62,7 +66,45 @@ export function productPolicy(spec) {
     'database',
     'state',
   ]);
-  assert(spec.networks.application.internal && spec.networks.database.internal);
+  assert.deepEqual(Object.keys(spec.networks).sort(), [
+    'application',
+    'database',
+    'notifications',
+  ]);
+  for (const network of Object.values(spec.networks))
+    assert(network.internal === true && !network.external);
+  for (const [role, networks] of Object.entries({
+    analytics: ['database'],
+    notification: ['database', 'notifications'],
+    alertmanager: ['notifications'],
+    receiver: ['notifications'],
+  }))
+    assert.deepEqual(spec.services[role].networks, networks);
+  const { alertmanager, receiver, notification } = spec.services;
+  assert.equal(alertmanager.image, lock.images.alertmanager);
+  assert.deepEqual(alertmanager.volumes, [
+    {
+      type: 'bind',
+      source: resolve(root, 'local/analytics/alertmanager.fixture.yml'),
+      target: '/etc/alertmanager/alertmanager.yml',
+      read_only: true,
+    },
+  ]);
+  assert.deepEqual(receiver.command, [
+    'local/qualification/product/analytics-receiver.mjs',
+  ]);
+  assert.equal(receiver.image, spec.services.browser.image);
+  assert.equal(receiver.volumes, undefined);
+  assert.deepEqual(notification.environment, {
+    FLEETIQ_ALERTMANAGER_URL: 'http://alertmanager:9093/api/v2/alerts',
+  });
+  for (const [role, command] of [
+    ['analytics', 'analytics-worker'],
+    ['notification', 'notification-worker'],
+  ]) {
+    assert.equal(spec.services[role].image, spec.services.backend.image);
+    assert.deepEqual(spec.services[role].command, [command]);
+  }
   for (const [name, service] of Object.entries(spec.services)) {
     assert(
       !service.ports &&
@@ -92,7 +134,7 @@ export function productPolicy(spec) {
     );
     const expectedUser = ['init', 'artifacts'].includes(name)
       ? '0:0'
-      : ['browser', 'issuer'].includes(name)
+      : ['browser', 'issuer', 'receiver'].includes(name)
         ? '1000:1000'
         : '10001:10001';
     if (name !== 'postgres')
@@ -124,6 +166,10 @@ export function productPolicy(spec) {
     semantic: ['database', 'public'],
     projection: ['database', 'public'],
     browser: ['public'],
+    analytics: ['database', 'public'],
+    notification: ['database', 'public'],
+    alertmanager: [],
+    receiver: [],
   };
   for (const [role, service] of Object.entries(spec.services)) {
     const scopes = (service.volumes ?? []).flatMap((mount) =>

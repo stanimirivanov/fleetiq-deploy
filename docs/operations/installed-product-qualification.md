@@ -1,9 +1,10 @@
-# Installed device-to-web qualification
+# Installed telemetry, analytics and browser qualification
 
 ## TL;DR
 
 `pnpm qualify:product` runs a real disposable Compose installation, HTTPS issuer,
-Chromium and synthetic Teltonika tracker. It requires the reviewed images built by
+Chromium, synthetic Teltonika tracker, checked-schema analytics and notification
+workers, pinned Alertmanager and a private synthetic receiver. It requires the images built by
 `pnpm local build`. CI runs it after the existing infrastructure smoke test.
 Neither test activates an environment or completes persistent D06 qualification.
 
@@ -29,8 +30,9 @@ proxy/header rules, asset-route handling, MIME types and SSE controls remain int
 Template anchor changes fail closed and require adapter review.
 
 The root and `/run/tls` certificate mount remain read-only. Only `/tmp` is writable:
-32 MiB, UID/GID 10001, mode 0700, noexec/nosuid/nodev. No Caddy data/config caches,
-additional service or host trust change are needed for this product composition.
+32 MiB, UID/GID 10001, mode 0700, noexec/nosuid/nodev. The edge uses an isolated
+certificate mount. The notification network is internal.
+The browser and backend HTTP service cannot reach the synthetic receiver.
 The separate three-service infrastructure diagnostic still uses its existing
 legacy adapter; its receipt cannot qualify the product image or publication.
 
@@ -80,12 +82,27 @@ It is supplied only to source retrieval. Build and runtime steps do not receive 
 8. Render the real MapLibre map using the deployed raster/style endpoints and
    projected device positions. Across three route cycles, require one map canvas
    and one local map worker when active, and none after disposal.
-9. Append temporal binding corrections through the protected API. Existing
+9. Install the reviewed MAD release using the checked-schema registration CLI.
+   Under the real browser session, activate its configuration and an alert rule.
+   Send four Codec 8 observations in a finalized window. Read the exact retained
+   inputs and flag output, inspect the firing alert in the browser and acknowledge
+   its displayed version.
+10. Stop the owned router and receiver before notification attempts. Observe durable
+    exhaustion and denied recovery without the independent grant. Restart the
+    analytics and notification workers, then require the same failed position and
+    fence. Restore the router while keeping the receiver stopped. Review and retry
+    the exact position in Operations and verify the original receipt on an exact
+    repeat. Confirm that the router accepted the alert during the receiver outage.
+11. Restore the synthetic receiver and require firing delivery. Retransmit the
+    original TCP frame and process another anomalous window. Require the original
+    evaluation and one logical firing transition. Send a normal window and require
+    one resolution, delivered to the same receiver episode with the original start.
+12. Append temporal binding corrections through the protected API. Existing
    interpretations must remain unchanged; only the newly emitted record is
    attributed to the new asset with revision 2. Recheck original history.
-10. Revoke telemetry permission during live delivery, require evidence removal
+13. Revoke telemetry permission during live delivery, require evidence removal
     and HTTP denial, then log out and require an unauthorized session response.
-11. Require every inventoried assertion and a successful browser exit. Verify
+14. Require every inventoried assertion and a successful browser exit. Verify
     ownership before removing only this project's containers, networks and volumes.
     A failed assertion, prerequisite, process or cleanup fails the product group.
 
@@ -170,7 +187,7 @@ the selected UI is PR #101 merge `e09ccec246ad024ef587701223e76aadadcc604a`.
 The reviewed local build, infrastructure qualification and structural group passed
 (207 tests, formatting, native manifests, release contracts, secrets and audit).
 
-Two independent full product runs passed every one of the 14 checks above and
+Two independent full product runs passed the 14 checks then required and
 ownership-checked cleanup. Ignored local receipts are:
 
 - `.verification/product-cd10c355-44b4-4bbb-be5e-0b9f7a09556f.json`

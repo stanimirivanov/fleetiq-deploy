@@ -5,15 +5,16 @@
 M05-PR16 packages opt-in analytics-worker and notification-worker plus a private,
 single-instance Alertmanager. Defaults start none of them. Migrate and qualify
 producer artifacts before enabling. An HTTP-ready backend is not worker health,
-and HTTP acceptance is not receiver delivery. Installed product qualification is
-PR20; this slice supplies a separate synthetic router fixture.
+and HTTP acceptance is not receiver delivery. The [installed product gate](installed-product-qualification.md) exercises the
+complete path with a separate synthetic receiver.
 
 ## Artifact and configuration review
 
-The local platform source pin is the exact PR15 producer commit
-`e53c1fd8d6c5711acb7e918bdbad790c0d3a752f` (platform PR 378, still open when selected).
-Do not promote this consumer before that dependency is reviewed and published.
-Rebuild after a source-pin change; existing image provenance is invalidated.
+The local source lock selects merged platform baseline.28 and the merged Operations
+UI. Rebuild both artifacts after a pin change. Stop old server and worker processes
+before migration 0051, then start compatible checked-schema binaries. Recovery
+separates the attempt budget from the monotonic generation fence.
+
 The official `prom/alertmanager:v0.34.2` image index is pinned in the artifact lock
 and chart schema. Its digest was resolved from the official Docker Hub manifest
 API and independently matched to the manifest bytes. Alertmanager is Apache-2.0;
@@ -24,7 +25,7 @@ no npm dependency, controller or CRD is introduced. References:
 ## Local opt-in
 
 Complete the [normal installation](local-installation.md), build the selected
-sources, and migrate through 0049 before starting these checked-schema workers.
+sources, and migrate through 0051 before starting these checked-schema workers.
 Provision `.local/instances/development/alertmanager.yml` privately as an owned
 regular file, at most 64 KiB. Keep its parent mode 0700; the mounted file must be
 readable by container UID 10001. This command checks file metadata and never reads
@@ -88,5 +89,5 @@ fixture separately starts/restarts the packaged workers against the migrated
 database, checks crash-loop/private-port restrictions and retains no customer route. That fixture tests
 firing/resolved notification, an unreachable router, restart, and owner-checked
 cleanup. It creates no customer route and retains only bounded boolean evidence.
-It does not replace the installed telemetry-to-alert path planned for PR20.
+The separate product gate qualifies the installed telemetry-to-alert path.
 A missing Docker daemon/socket permission is incomplete qualification, never a pass.
