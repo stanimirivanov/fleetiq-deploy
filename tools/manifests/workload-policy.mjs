@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { qualifiedEdge } from '../qualified-edge.mjs';
 import { digestImage, resources } from './resource-policy.mjs';
 
 const secretReference = (entry) => {
@@ -50,6 +51,12 @@ export function workloadPolicy(
   assert.equal(pod.containers.length, 1, 'Unreviewed sidecar/writer');
   const container = pod.containers[0];
   digestImage(container.image);
+  if (nonlocal && container.name === 'edge')
+    assert.equal(
+      container.image,
+      qualifiedEdge.image,
+      'Unqualified nonlocal edge image',
+    );
   assert(
     !container.command && !container.envFrom && !container.lifecycle,
     'No executable override, envFrom or hidden lifecycle commands',

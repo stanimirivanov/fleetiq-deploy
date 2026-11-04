@@ -1,5 +1,6 @@
 export const requiredChecks = [
   'trusted-https-oidc',
+  'edge-auth-admission',
   'session-cookie-boundary',
   'csrf-and-cross-tenant-denial',
   'real-wasm-admission',

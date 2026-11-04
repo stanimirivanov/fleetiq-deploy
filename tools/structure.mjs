@@ -7,6 +7,7 @@ import { lock, sourceCompose, validateLock } from './policy.mjs';
 import { root, run } from './process.mjs';
 import { productCompose } from './product/compose.mjs';
 import { productPolicy } from './product/policy.mjs';
+import { qualifiedEdge } from './qualified-edge.mjs';
 
 /** Keep the existing opening-summary boundary and identify the guide to repair. */
 export function guideSummary(file, contents) {
@@ -23,7 +24,7 @@ export function structure() {
     productCompose({
       name: 'product-0123456789abcdef',
       owner: '01234567-89ab-cdef-0123-456789abcdef',
-      images: { backend: `sha256:${'a'.repeat(64)}`, edge: `sha256:${'b'.repeat(64)}` },
+      images: { backend: `sha256:${'a'.repeat(64)}`, edge: qualifiedEdge.image },
       helper: `sha256:${'c'.repeat(64)}`,
       control: resolve(root, '.local/product-policy/control'),
     }),

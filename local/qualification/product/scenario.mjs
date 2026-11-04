@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { lookup } from 'node:dns/promises';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { get } from 'node:https';
 import { expect as baseExpect, chromium } from '@playwright/test';
 import { qualifyAnalyticsAlerts } from './analytics-alerts.mjs';
 import { api, binding, currentPath, seed, tenant } from './api.mjs';
@@ -100,6 +101,31 @@ try {
   step = 'session-check';
   assert.equal((await api(page, '/api/v1/auth/session')).actor_id, 'operator-a');
   checks.push('trusted-https-oidc');
+  step = 'edge-auth-admission';
+  const ca = readFileSync('/run/public/ca.crt');
+  const login = () =>
+    new Promise((resolve, reject) => {
+      const request = get(
+        'https://fleet.test:8443/api/v1/auth/login',
+        {
+          ca,
+          signal: AbortSignal.timeout(10000),
+        },
+        (response) => {
+          response.resume();
+          resolve(response.statusCode);
+        },
+      );
+      request.on('error', reject);
+    });
+  const statuses = await Promise.all(Array.from({ length: 40 }, login));
+  assert(statuses.includes(303), 'A normal sign-in request must reach the backend');
+  assert(
+    statuses.includes(429),
+    'The published edge must reject excess sign-in requests',
+  );
+  assert(statuses.every((status) => status === 303 || status === 429));
+  checks.push('edge-auth-admission');
   const cookies = await context.cookies('https://fleet.test:8443');
   assert(
     cookies.some(

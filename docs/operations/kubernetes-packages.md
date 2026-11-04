@@ -103,8 +103,15 @@ configured and has no healthy application backend. This is a reviewed maintenanc
 selection, not evidence that old Pods/connections have drained. D08/D10 must prove
 quiescence, authorize a pinned migration separately and never undo SQL on failure.
 
-profile=nonlocal requires at least two backend/edge replicas and three database
-instances. It is a sizing floor, **not production readiness**: select suitable
-quotas, placement/failure domains, durable storage, backup/evidence endpoints,
-authenticated operations and recovery goals in later slices. No non-local active
-environment or availability claim is created by D04.
+`profile=nonlocal` requires at least two backend replicas, exactly two steady
+edge replicas, and at least three database instances. The edge Deployment allows
+one surge replica during rolling updates. The nonlocal chart admits only the
+published UI digest recorded in `charts/fleetiq-runtime/qualified-edge.json`.
+Its two OIDC routes share a 5 requests/s budget with burst 10 per immediate
+transport peer, and 20 requests/s with burst 24 per edge instance. Two steady
+instances plus one surge give a nominal ceiling of 60 requests/s across
+instances while all three are serving. Verify the actual Gateway's handling of
+terminating endpoints and in-flight connections before relying on this setting
+as a serving limit. Production readiness also requires suitable quotas,
+placement, durable storage, backup and evidence endpoints, authenticated
+operations, and recovery goals.

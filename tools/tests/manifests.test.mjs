@@ -31,6 +31,44 @@ const resource = (resources, kind, name) =>
 const backend = (resources) =>
   resource(resources, 'Deployment', 'fleetiq-backend').spec.template.spec;
 
+function renderNonlocalEdge(image, replicas) {
+  return tools.helm([
+    'template',
+    'fleetiq',
+    resolve(root, 'charts/fleetiq-runtime'),
+    '--namespace',
+    'fleetiq-local',
+    '--kube-version',
+    toolsLock.kubernetes,
+    '--values',
+    resolve(root, 'environments/local-preview/runtime.yaml'),
+    '--set',
+    `profile=nonlocal,backend.replicas=2,edge.replicas=${replicas},edge.image=${image}`,
+  ]);
+}
+
+const publishedEdge =
+  'ghcr.io/stanimirivanov/fleetiq-ui@sha256:339e6ab9411a66c4a1f919e2108a15066653406bc70c526b9957e74a6cb27762';
+
+test('nonlocal Helm admission rejects more than two steady edge replicas', () => {
+  assert.doesNotThrow(() => renderNonlocalEdge(publishedEdge, 2));
+  assert.throws(() => renderNonlocalEdge(publishedEdge, 3), {
+    name: 'CommandFailure',
+    exitCode: 1,
+  });
+});
+
+test('nonlocal Helm admission rejects a digest without qualified edge limits', () => {
+  assert.throws(
+    () =>
+      renderNonlocalEdge(
+        `ghcr.io/stanimirivanov/fleetiq-ui@sha256:${'b'.repeat(64)}`,
+        2,
+      ),
+    { name: 'CommandFailure', exitCode: 1 },
+  );
+});
+
 test('real Helm, Kustomize and pinned schemas qualify the complete portable and provider-local compositions', () => {
   for (const state of fixtureStates) {
     const rendered =
@@ -511,6 +549,24 @@ for (const [label, mutate] of [
     assert.throws(() => manifestPolicy(mutated));
   });
 }
+
+test('rendered nonlocal policy rejects a substituted edge digest and excess rollout surge', () => {
+  const state = { nonlocal: true };
+  const rendered = renderFixture(tools, state);
+  const edge = (items) => resource(items, 'Deployment', 'fleetiq-edge').spec;
+
+  const substituted = structuredClone(rendered);
+  edge(substituted).template.spec.containers[0].image =
+    `ghcr.io/stanimirivanov/fleetiq-ui@sha256:${'b'.repeat(64)}`;
+  assert.throws(
+    () => manifestPolicy(substituted, state),
+    /Unqualified nonlocal edge image/u,
+  );
+
+  const oversized = structuredClone(rendered);
+  edge(oversized).strategy.rollingUpdate.maxSurge = 2;
+  assert.throws(() => manifestPolicy(oversized, state), /bounded quota headroom/u);
+});
 
 test('maintenance cannot leave a packaged writer running or remove its retained data', () => {
   const rendered = renderFixture(tools, { maintenance: true });
