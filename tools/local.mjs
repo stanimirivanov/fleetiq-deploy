@@ -10,6 +10,7 @@ import {
   privateJson,
   up,
 } from './installation.mjs';
+import { pipelineInstallation, pipelineServices } from './pipeline.mjs';
 import { buildImages, prepareSources } from './sources.mjs';
 
 try {
@@ -26,13 +27,17 @@ try {
     } else if (
       command === 'down' ||
       command === 'trust' ||
-      command === 'analytics-stop'
+      command === 'analytics-stop' ||
+      command === 'pipeline-stop'
     ) {
       const site = appliedInstallation(name, docker);
       if (command === 'down') down(site);
-      else if (command === 'analytics-stop') {
+      else if (command === 'analytics-stop' || command === 'pipeline-stop') {
         assertOwnership(site);
-        site.compose(['stop', ...analyticsServices]);
+        site.compose([
+          'stop',
+          ...(command === 'pipeline-stop' ? pipelineServices : analyticsServices),
+        ]);
       } else {
         console.log(`Public CA certificate: ${exportCertificate(site)}`);
         console.log(
@@ -44,9 +49,14 @@ try {
         name,
         docker,
         false,
-        ['up', 'analytics-up', 'restart', 'bootstrap'].includes(command),
+        ['up', 'analytics-up', 'pipeline-up', 'restart', 'bootstrap'].includes(command),
       );
-      if (command === 'analytics-up') {
+      if (command === 'pipeline-up') {
+        up(pipelineInstallation(site, privateJson(site.path, 'pipeline.json')));
+        console.log(
+          'TCP ingestion and replay started for the configured loopback listener.',
+        );
+      } else if (command === 'analytics-up') {
         up(analyticsInstallation(site));
         console.log(
           'Analytics processes started; qualify queue progress and receiver delivery separately.',
@@ -93,7 +103,7 @@ try {
         );
       } else
         throw new Error(
-          'Use: pnpm local init|sources|build|up|analytics-up|analytics-stop|down|restart|trust|bootstrap [instance]',
+          'Use: pnpm local init|sources|build|up|analytics-up|analytics-stop|pipeline-up|pipeline-stop|down|restart|trust|bootstrap [instance]',
         );
     }
   }

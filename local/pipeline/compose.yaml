@@ -1,0 +1,41 @@
+# Explicit local opt-in. The listener routes registered identifiers without authenticating devices.
+x-worker: &worker
+  image: ${FLEETIQ_BACKEND_IMAGE:?Missing reviewed backend}
+  pull_policy: never
+  user: '10001:10001'
+  entrypoint: [/bin/bash, /opt/fleetiq/backend-entrypoint.sh]
+  labels: { com.fleetiq.deploy.owner: '${FLEETIQ_OWNER:?Missing owner}' }
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+  stop_grace_period: 30s
+  tmpfs: ['/tmp:size=16m,mode=1777,noexec,nosuid']
+  secrets: [database_password]
+  volumes: [./backend-entrypoint.sh:/opt/fleetiq/backend-entrypoint.sh:ro]
+  mem_limit: 768m
+  pids_limit: 128
+  depends_on:
+    backend: { condition: service_healthy }
+services:
+  replay-worker:
+    <<: *worker
+    command: [replay-worker]
+    networks: [database]
+  tcp-ingestion:
+    <<: *worker
+    command: [ingest-tcp]
+    networks: [database, device-ingress]
+    ports: ['127.0.0.1:${FLEETIQ_TCP_PORT:?Missing loopback port}:55027']
+    environment:
+      FLEETIQ_TCP_BIND_ADDRESS: '0.0.0.0:55027'
+      FLEETIQ_TCP_IDENTITY_POLICY: ${FLEETIQ_TCP_IDENTITY_POLICY:?Missing identity policy}
+      FLEETIQ_TCP_TENANT_ID: ${FLEETIQ_TCP_TENANT_ID:?Missing tenant}
+      FLEETIQ_TCP_CHANNEL_ID: ${FLEETIQ_TCP_CHANNEL_ID:?Missing channel}
+      FLEETIQ_TCP_PACKAGE_ID: ${FLEETIQ_TCP_PACKAGE_ID:?Missing package}
+      FLEETIQ_TCP_PACKAGE_VERSION: ${FLEETIQ_TCP_PACKAGE_VERSION:?Missing package version}
+networks:
+  device-ingress:
+    driver: bridge
+    labels: { com.fleetiq.deploy.owner: '${FLEETIQ_OWNER:?Missing owner}' }
