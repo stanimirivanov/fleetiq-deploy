@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import {
   readPhase,
   waitPhase,
@@ -40,6 +41,15 @@ function packaging() {
       .join('\n'),
   );
 }
+async function waitForDelivery(observe) {
+  const deadline = Date.now() + 90000;
+  do {
+    if (observe()) return;
+    await delay(1000);
+  } while (Date.now() < deadline);
+  throw new Error('Synthetic notification observation timed out');
+}
+
 /** No local live operations are implied by structural validation. CI invokes this explicitly. */
 export async function qualifyProduct(onProgress = () => {}) {
   // The driver is portable Node/CLI orchestration; context() verifies the actual
@@ -76,6 +86,20 @@ export async function qualifyProduct(onProgress = () => {}) {
       { timeout: 90000 },
     );
   };
+  const receiverState = () =>
+    JSON.parse(
+      compose(
+        [
+          'exec',
+          '-T',
+          'receiver',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:9094/state',{signal:AbortSignal.timeout(3000)}).then(async r=>{if(!r.ok)process.exit(1);console.log(await r.text())}).catch(()=>process.exit(1))",
+        ],
+        { timeout: 10000 },
+      ),
+    );
   const filter = ['--filter', `label=com.docker.compose.project=${name}`];
   const resources = () => ({
     container: command(['ps', '-aq', ...filter])
@@ -115,6 +139,7 @@ export async function qualifyProduct(onProgress = () => {}) {
   images.edge = buildProductEdge(docker, directory, fingerprint);
   const helperName = `fleetiq-product-fixture:${fingerprint.slice(0, 24)}`;
   // Pull verifies remote availability independently of a warm local image cache.
+  command(['pull', lock.images.alertmanager], { timeout: 300000, stdio: 'inherit' });
   command(['pull', inputs.browser], { timeout: 300000, stdio: 'inherit' });
   command(
     [
@@ -188,6 +213,8 @@ export async function qualifyProduct(onProgress = () => {}) {
         'issuer',
         'backend',
         'edge',
+        'alertmanager',
+        'receiver',
       ],
       { timeout: 300000 },
     );
@@ -228,6 +255,23 @@ export async function qualifyProduct(onProgress = () => {}) {
     stage('browser-sign-in-and-commissioning');
     await waitPhase(control, 'setup-ready');
     owned();
+    stage('register-calculator-release');
+    const calculator = ownedPath(
+      root,
+      resolve(root, 'local/qualification/product/calculator.fixture.json'),
+    );
+    compose([
+      'run',
+      '--rm',
+      '--no-deps',
+      '--volume',
+      `${calculator}:/run/calculator.json:ro`,
+      '-e',
+      'FLEETIQ_CALCULATOR_DEFINITION_FILE=/run/calculator.json',
+      'analytics',
+      'register-calculator',
+    ]);
+    owned();
     compose(['up', '-d', '--no-deps', 'ingest', 'replay', 'semantic', 'projection']);
     tcpReady();
     writePhase(control, 'workers-started');
@@ -265,8 +309,81 @@ export async function qualifyProduct(onProgress = () => {}) {
     owned();
     compose(['up', '-d', '--no-deps', 'ingest', 'replay', 'semantic', 'projection']);
     tcpReady();
+    owned();
+    stage('isolate-router-and-receiver-outages');
+    assert.deepEqual(receiverState(), {
+      firing: false,
+      resolved: false,
+      rejected: false,
+    });
+    compose(['stop', 'alertmanager', 'receiver']);
+    owned();
+    compose(['up', '-d', '--no-deps', 'analytics', 'notification']);
     writePhase(control, 'restart-complete');
-    stage('browser-resnapshot-map-and-revocation');
+
+    stage('wait-for-durable-notification-exhaustion');
+    await waitPhase(control, 'delivery-exhausted');
+    owned();
+    stage('restart-analytics-and-notification-workers');
+    compose(['restart', '--timeout', '15', 'analytics', 'notification'], {
+      timeout: 90000,
+    });
+    owned();
+    compose(
+      ['up', '-d', '--no-deps', '--wait', '--wait-timeout', '60', 'alertmanager'],
+      { timeout: 90000 },
+    );
+    writePhase(control, 'retry-ready');
+
+    stage('prove-router-accepted-with-receiver-stopped');
+    await waitPhase(control, 'recovery-submitted');
+    owned();
+    const receiverId = compose(['ps', '-aq', 'receiver']);
+    assert.equal(
+      command(['inspect', '--format', '{{.State.Status}}', receiverId]),
+      'exited',
+    );
+    await waitForDelivery(() => {
+      const active = JSON.parse(
+        compose(
+          [
+            'exec',
+            '-T',
+            'alertmanager',
+            'wget',
+            '-q',
+            '-O',
+            '-',
+            'http://127.0.0.1:9093/api/v2/alerts',
+          ],
+          { timeout: 10000 },
+        ),
+      );
+      return active.length === 1 && active[0].labels?.fleetiq_rule === 'latitude-spike';
+    });
+    owned();
+    stage('restore-synthetic-receiver');
+    compose(['start', 'receiver']);
+    const delivered = (status) =>
+      waitForDelivery(() => {
+        let state;
+        try {
+          state = receiverState();
+        } catch {
+          return false;
+        }
+        assert.equal(state.rejected, false, 'Receiver rejected a mismatched episode');
+        return state[status] === true;
+      });
+    await delivered('firing');
+    writePhase(control, 'firing-delivered');
+
+    stage('prove-resolution-at-synthetic-receiver');
+    await waitPhase(control, 'analytics-resolved');
+    owned();
+    await delivered('resolved');
+    writePhase(control, 'resolution-delivered');
+    stage('browser-correction-and-revocation');
     const completed = await waitPhase(control, 'complete', 360);
     result.checks = completeProduct(completed);
     progress();

@@ -197,6 +197,48 @@ export function productCompose({ name, owner, images, helper, control }) {
     replay: backend(['replay-worker'], { memory: '768m' }),
     semantic: backend(['semantic-worker']),
     projection: backend(['project-current']),
+    analytics: backend(['analytics-worker']),
+    notification: {
+      ...backend(['notification-worker'], {
+        environment: {
+          FLEETIQ_ALERTMANAGER_URL: 'http://alertmanager:9093/api/v2/alerts',
+        },
+      }),
+      networks: ['database', 'notifications'],
+    },
+    alertmanager: {
+      ...restricted,
+      image: lock.images.alertmanager,
+      user: '10001:10001',
+      mem_limit: '128m',
+      networks: ['notifications'],
+      command: [
+        '--config.file=/etc/alertmanager/alertmanager.yml',
+        '--storage.path=/alertmanager',
+        '--cluster.listen-address=',
+      ],
+      volumes: [
+        bind(
+          'local/analytics/alertmanager.fixture.yml',
+          '/etc/alertmanager/alertmanager.yml',
+        ),
+      ],
+      tmpfs: ['/alertmanager:size=128m,uid=10001,gid=10001,mode=0700,noexec,nosuid'],
+      healthcheck: {
+        test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:9093/-/ready'],
+        interval: '2s',
+        timeout: '3s',
+        retries: 30,
+      },
+    },
+    receiver: {
+      ...restricted,
+      image: helper,
+      user: '1000:1000',
+      mem_limit: '128m',
+      networks: ['notifications'],
+      command: ['local/qualification/product/analytics-receiver.mjs'],
+    },
     browser: {
       ...restricted,
       image: helper,
@@ -224,6 +266,7 @@ export function productCompose({ name, owner, images, helper, control }) {
     networks: {
       application: { internal: true, labels },
       database: { internal: true, labels },
+      notifications: { internal: true, labels },
     },
     volumes: Object.fromEntries(
       ['state', 'database', 'artifacts'].map((key) => [key, { labels }]),

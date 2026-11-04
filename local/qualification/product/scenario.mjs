@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { lookup } from 'node:dns/promises';
 import { mkdirSync } from 'node:fs';
 import { expect as baseExpect, chromium } from '@playwright/test';
+import { qualifyAnalyticsAlerts } from './analytics-alerts.mjs';
 import { api, binding, currentPath, seed, tenant } from './api.mjs';
 import {
   browserFailure,
@@ -250,6 +251,15 @@ try {
   }
   assert(styleRead && dataRead, 'Expected real self-hosted map requests');
   checks.push('self-hosted-geographic-renderer', 'map-resource-disposal');
+  await qualifyAnalyticsAlerts({
+    page,
+    expect,
+    directory,
+    checks,
+    setStep: (value) => {
+      step = value;
+    },
+  });
   // Temporal correction is additive. Already committed interpretations never rebind.
   const beforeCorrection = (await api(page, currentPath())).items[0].change;
   const correctionStart = Date.now();

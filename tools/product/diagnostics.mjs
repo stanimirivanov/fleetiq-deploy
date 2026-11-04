@@ -14,6 +14,10 @@ const services = new Set([
   'semantic',
   'projection',
   'browser',
+  'analytics',
+  'notification',
+  'alertmanager',
+  'receiver',
 ]);
 const states = new Set([
   'created',

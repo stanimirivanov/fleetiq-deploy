@@ -427,3 +427,45 @@ test('NGINX TLS edge preserves a read-only root and private bounded scratch', ()
     assert.throws(() => productPolicy(altered));
   }
 });
+
+test('installed analytics needs private worker, router and receiver networks', () => {
+  const value = fixture();
+  productPolicy(value);
+  assert.deepEqual(value.services.analytics.networks, ['database']);
+  assert.deepEqual(value.services.notification.networks, ['database', 'notifications']);
+  assert.deepEqual(value.services.alertmanager.networks, ['notifications']);
+  assert.deepEqual(value.services.receiver.networks, ['notifications']);
+  assert.equal(value.networks.notifications.internal, true);
+  for (const mutate of [
+    (spec) => {
+      spec.services.receiver.ports = ['9094:9094'];
+    },
+    (spec) => {
+      spec.services.notification.networks.push('application');
+    },
+    (spec) => {
+      spec.services.alertmanager.networks.push('application');
+    },
+    (spec) => {
+      spec.networks.notifications.internal = false;
+    },
+  ]) {
+    const changed = fixture();
+    mutate(changed);
+    assert.throws(() => productPolicy(changed));
+  }
+});
+
+test('a device-only result cannot qualify the installed milestone', () => {
+  const analytics = [
+    'tcp-anomaly-evidence',
+    'installed-alert-browser',
+    'receiver-outage-and-worker-restart',
+    'audited-notification-recovery',
+    'duplicate-keeps-logical-alert',
+    'resolved-receiver-delivery',
+  ];
+  const checks = requiredChecks.filter((check) => !analytics.includes(check));
+  assert.throws(() => completeProduct({ phase: 'complete', checks }));
+  for (const check of analytics) assert(requiredChecks.includes(check));
+});

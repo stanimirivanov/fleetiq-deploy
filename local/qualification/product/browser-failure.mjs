@@ -24,6 +24,13 @@ const steps = new Set([
   'inspector-history',
   'live-start',
   'live-update',
+  'analytics-configure',
+  'analytics-anomaly',
+  'analytics-alert-browser',
+  'analytics-exhaustion',
+  'analytics-recovery',
+  'analytics-duplicate',
+  'analytics-resolution',
   'unknown',
 ]);
 const causes = new Set([

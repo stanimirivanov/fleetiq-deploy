@@ -291,8 +291,8 @@ export async function qualify(onProgress = () => {}) {
       assert.equal((await get('/api/v1/nonexistent')).status, 404),
     );
     record('synthetic-proxy-origin-host-cookie-no-store-and-restored-real-backend');
-    // Infrastructure fixture only: no customer recipient or new lifecycle fact.
-    assert.equal(sql('SELECT max(version) FROM _sqlx_migrations WHERE success'), '49');
+    // Infrastructure fixture only. The locked M05 producer requires audited recovery schema 0051.
+    assert.equal(sql('SELECT max(version) FROM _sqlx_migrations WHERE success'), '51');
     const privateRouter = resolve(site.path, 'alertmanager.yml');
     writeFileSync(
       privateRouter,

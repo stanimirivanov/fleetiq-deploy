@@ -1,0 +1,10 @@
+{
+  "tenant": "tenant-a",
+  "calculator": "latitude-mad",
+  "version": "1",
+  "implementation": "window-mad-v1",
+  "input": "position.latitude",
+  "input_version": 1,
+  "output": "anomaly.latitude",
+  "output_version": 1
+}
