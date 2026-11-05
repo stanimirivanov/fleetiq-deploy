@@ -9,6 +9,7 @@ import {
 } from '../../local/qualification/product/oidc-contract.mjs';
 import { lock } from '../policy.mjs';
 import { root } from '../process.mjs';
+import { qualifiedEdge } from '../qualified-edge.mjs';
 import { normalProductWorkers } from './compose.mjs';
 export const inputs = JSON.parse(
   readFileSync(resolve(root, 'local/qualification/product/inputs.lock.json')),
@@ -189,6 +190,11 @@ export function productPolicy(spec) {
     );
   }
   const edge = spec.services.edge;
+  assert.equal(
+    edge.image,
+    qualifiedEdge.image,
+    'Installed product requires the published edge',
+  );
   assert.deepEqual(edge.environment, {
     FLEETIQ_PUBLIC_AUTHORITY: 'fleet.test:8443',
     FLEETIQ_API_UPSTREAM: 'backend:8080',

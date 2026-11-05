@@ -481,7 +481,7 @@
           "edge": {
             "properties": {
               "replicas": {
-                "minimum": 2
+                "const": 2
               }
             }
           }

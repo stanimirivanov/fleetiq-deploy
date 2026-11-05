@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { parseAllDocuments, stringify } from 'yaml';
 import { root } from '../process.mjs';
+import { qualifiedEdge } from '../qualified-edge.mjs';
 import { toolsLock } from './toolchain.mjs';
 
 export function documents(bytes) {
@@ -113,6 +114,7 @@ export function renderFixture(
         applicationNamespace,
         {
           maintenance,
+          ...(nonlocal ? { edge: { image: qualifiedEdge.image } } : {}),
           ...runtime,
           ...(analytics
             ? {

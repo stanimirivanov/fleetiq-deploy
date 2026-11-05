@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { lock } from '../policy.mjs';
 import { productEdgeIdentity, productEdgeTemplate } from '../product/edge.mjs';
+import { qualifiedEdge } from '../qualified-edge.mjs';
 
 // Independent miniature upstream input: adapter changes transport/map root only.
 const upstream = `server {
@@ -29,29 +30,27 @@ test('TLS adapter preserves upstream routing/CSP and LF/CRLF semantics', () => {
   }
 });
 test('native product identity rejects legacy Caddy, stale source, substituted bytes and weaker process config', () => {
-  const id = `sha256:${'a'.repeat(64)}`,
-    revision = lock.sources.ux.commit,
-    fingerprint = 'fixture';
   const image = {
-    Id: id,
+    RepoDigests: [qualifiedEdge.image],
+    Os: 'linux',
+    Architecture: 'amd64',
     Config: {
       User: '10001:10001',
       StopSignal: 'SIGQUIT',
       Entrypoint: ['/usr/local/bin/fleetiq-edge'],
       Labels: {
-        'org.opencontainers.image.revision': revision,
+        'org.opencontainers.image.revision': qualifiedEdge.revision,
         'org.opencontainers.image.source': lock.sources.ux.repository.replace(
           /\.git$/u,
           '',
         ),
-        'com.fleetiq.deploy.product-source': fingerprint,
       },
     },
   };
-  productEdgeIdentity(image, id, revision, fingerprint);
+  productEdgeIdentity(image);
   for (const mutate of [
     (v) => {
-      v.Id = `sha256:${'b'.repeat(64)}`;
+      v.RepoDigests = [`sha256:${'b'.repeat(64)}`];
     },
     (v) => {
       v.Config.User = '0:0';
@@ -69,11 +68,11 @@ test('native product identity rejects legacy Caddy, stale source, substituted by
       v.Config.Labels['org.opencontainers.image.source'] = 'https://foreign.test';
     },
     (v) => {
-      v.Config.Labels['com.fleetiq.deploy.product-source'] = 'stale';
+      v.Architecture = 'arm64';
     },
   ]) {
     const altered = structuredClone(image);
     mutate(altered);
-    assert.throws(() => productEdgeIdentity(altered, id, revision, fingerprint));
+    assert.throws(() => productEdgeIdentity(altered));
   }
 });

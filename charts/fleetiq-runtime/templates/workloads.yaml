@@ -1,3 +1,9 @@
+{{- if eq .Values.profile "nonlocal" }}
+{{- $edge := .Files.Get "qualified-edge.json" | mustFromJson }}
+{{- if ne .Values.edge.image $edge.image }}
+{{- fail "nonlocal edge.image must match the qualified publication digest" }}
+{{- end }}
+{{- end }}
 {{- range $component := list "backend" "edge" }}
 {{- $settings := index $.Values $component }}
 ---

@@ -14,13 +14,14 @@ import { avlFrame, imei, transmit } from '../../local/qualification/product/devi
 import { root } from '../process.mjs';
 import { productCompose } from '../product/compose.mjs';
 import { assertResource, completeProduct, productPolicy } from '../product/policy.mjs';
+import { qualifiedEdge } from '../qualified-edge.mjs';
 import { catalogue } from '../verification-catalogue.mjs';
 
 function fixture() {
   return productCompose({
     name: 'product-0123456789abcdef',
     owner: '01234567-89ab-cdef-0123-456789abcdef',
-    images: { backend: `sha256:${'a'.repeat(64)}`, edge: `sha256:${'b'.repeat(64)}` },
+    images: { backend: `sha256:${'a'.repeat(64)}`, edge: qualifiedEdge.image },
     helper: `sha256:${'c'.repeat(64)}`,
     control: resolve(root, '.local/test-control'),
   });
@@ -39,6 +40,12 @@ for (const [name, mutate] of [
     'published backend',
     (v) => {
       v.services.backend.ports = ['8080:8080'];
+    },
+  ],
+  [
+    'unqualified edge image',
+    (v) => {
+      v.services.edge.image = `sha256:${'b'.repeat(64)}`;
     },
   ],
   [

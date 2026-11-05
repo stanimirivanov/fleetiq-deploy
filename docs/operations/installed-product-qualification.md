@@ -21,13 +21,13 @@ pnpm qualify
 pnpm qualify:product
 ```
 
-The product edge builds the merged UI's own NGINX Dockerfile at the exact lock
-revision, independently of the legacy diagnostic edge image. Its image ID, source
-labels, UID, entrypoint and graceful-stop signal are checked before startup. The
-TLS adapter changes only the upstream listener to HTTPS with the disposable leaf
-certificate and points `/maps/` at the controlled fixture root. Upstream CSP,
-proxy/header rules, asset-route handling, MIME types and SSE controls remain intact.
-Template anchor changes fail closed and require adapter review.
+The installed product pulls the published UI image admitted by the nonlocal
+chart. The harness verifies the pulled digest, platform, source labels, UID,
+entrypoint and graceful-stop signal before startup. It reads the template from
+that image and adapts the listener to HTTPS with the disposable leaf certificate
+and the map root to controlled fixtures. The browser completes a real OIDC
+sign-in, then a bounded burst through the same TLS edge checks that normal login
+redirects and rate-limit responses both occur.
 
 The root and `/run/tls` certificate mount remain read-only. Only `/tmp` is writable:
 32 MiB, UID/GID 10001, mode 0700, noexec/nosuid/nodev. The edge uses an isolated

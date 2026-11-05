@@ -1,10 +1,10 @@
-/** Build the upstream UI runtime; the legacy diagnostic edge is not product evidence. */
+/** Qualify the same immutable UI image admitted by the nonlocal chart. */
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { lock } from '../policy.mjs';
 import { run } from '../process.mjs';
-import { reviewedSource } from '../sources.mjs';
+import { qualifiedEdge } from '../qualified-edge.mjs';
 
 /** Preserve upstream routing/CSP/proxy policy; replace only transport and map root. */
 export function productEdgeTemplate(template) {
@@ -29,59 +29,52 @@ export function productEdgeTemplate(template) {
   return result;
 }
 
-/** Prove the built ID is the selected upstream NGINX runtime, not the legacy adapter. */
-export function productEdgeIdentity(image, id, revision, fingerprint) {
-  assert.match(id, /^sha256:[a-f0-9]{64}$/u);
-  assert.equal(image.Id, id);
-  assert.equal(image.Config.Labels['org.opencontainers.image.revision'], revision);
+/** Verify the platform and source recorded by the immutable publication. */
+export function productEdgeIdentity(image) {
+  assert(image.RepoDigests?.includes(qualifiedEdge.image));
+  assert.equal(`${image.Os}/${image.Architecture}`, qualifiedEdge.platform);
+  assert.equal(
+    image.Config.Labels['org.opencontainers.image.revision'],
+    qualifiedEdge.revision,
+  );
   assert.equal(
     image.Config.Labels['org.opencontainers.image.source'],
     lock.sources.ux.repository.replace(/\.git$/u, ''),
   );
-  assert.equal(image.Config.Labels['com.fleetiq.deploy.product-source'], fingerprint);
   assert.equal(image.Config.User, '10001:10001');
   assert.equal(image.Config.StopSignal, 'SIGQUIT');
   assert.deepEqual(image.Config.Entrypoint, ['/usr/local/bin/fleetiq-edge']);
 }
 
-export function buildProductEdge(docker, directory, fingerprint) {
-  const source = reviewedSource('ux');
-  const template = readFileSync(
-    resolve(source, 'packaging/nginx/nginx.conf.template'),
-    'utf8',
-  );
+export function prepareProductEdge(docker, directory) {
+  const { image, platform } = qualifiedEdge;
+  const command = (args, options) =>
+    run('docker', ['--context', docker, ...args], options);
+  command(['pull', '--platform', platform, image], {
+    timeout: 300000,
+    stdio: 'inherit',
+  });
+  const [metadata] = JSON.parse(command(['image', 'inspect', image]));
+  productEdgeIdentity(metadata);
+  const template = command([
+    'run',
+    '--rm',
+    '--pull=never',
+    '--platform',
+    platform,
+    '--network=none',
+    '--read-only',
+    '--cap-drop=ALL',
+    '--security-opt=no-new-privileges',
+    '--entrypoint',
+    '/bin/cat',
+    image,
+    '/etc/fleetiq/nginx.conf.template',
+  ]);
   writeFileSync(
     resolve(directory, 'edge.conf.template'),
     productEdgeTemplate(template),
     { flag: 'wx', mode: 0o644 },
   );
-  const iid = resolve(directory, 'edge.iid');
-  run(
-    'docker',
-    [
-      '--context',
-      docker,
-      'buildx',
-      'build',
-      '--load',
-      '--file',
-      resolve(source, 'Dockerfile'),
-      '--build-arg',
-      `SOURCE_REVISION=${lock.sources.ux.commit}`,
-      '--label',
-      `com.fleetiq.deploy.product-source=${fingerprint}`,
-      '--iidfile',
-      iid,
-      '--tag',
-      `fleetiq-product-edge:${lock.sources.ux.commit.slice(0, 12)}-${fingerprint.slice(0, 12)}`,
-      source,
-    ],
-    { timeout: 900000, stdio: 'inherit' },
-  );
-  const id = readFileSync(iid, 'utf8').trim();
-  const [image] = JSON.parse(
-    run('docker', ['--context', docker, 'image', 'inspect', id]),
-  );
-  productEdgeIdentity(image, id, lock.sources.ux.commit, fingerprint);
-  return id;
+  return image;
 }
