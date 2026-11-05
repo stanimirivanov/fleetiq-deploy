@@ -115,3 +115,36 @@ terminating endpoints and in-flight connections before relying on this setting
 as a serving limit. Production readiness also requires suitable quotas,
 placement, durable storage, backup and evidence endpoints, authenticated
 operations, and recovery goals.
+
+## M05 delivery and qualification boundary
+
+Optional analytics/notification workers and the private router are packaged in
+Helm and normal Compose. The normal Compose device pipeline additionally provides
+TCP ingestion, replay, semantic processing and current-state projection; enable it
+with the combined recipe in the [analytics runbook](analytics-notifications.md).
+These device pipeline roles are not supplied by the current Helm charts. Do not
+infer a complete Kubernetes device-to-alert installation from the optional analytics
+values or from a passed offline render. Helm parity needs separately scoped work
+and live target evidence.
+
+The qualification boundaries are:
+
+- `pnpm check` renders actual Helm/Kustomize inputs and validates schemas, network
+  policy intent, disabled/opt-in states and maintenance. It applies no resources
+  and cannot prove CNI, Gateway, TLS, credentials or receiver behavior.
+- `pnpm qualify` tests the real local installation and router fixture. Its
+  infrastructure-only identity and legacy edge adapter cannot qualify the published
+  product UX image or a real sign-in.
+- `pnpm qualify:product` runs disposable Compose with real synthetic OIDC, TCP,
+  browser and receiver integration. It consumes the shared Compose worker
+  definitions and the published edge in `charts/fleetiq-runtime/qualified-edge.json`;
+  it does not render a live Helm installation or activate the nonlocal profile.
+
+[F-PR4 #42](https://github.com/stanimirivanov/fleetiq-deploy/pull/42) delivered the
+normal Compose pipeline. [F-PR6 #44](https://github.com/stanimirivanov/fleetiq-deploy/pull/44)
+qualified the admitted edge digest and bounded OIDC burst in the disposable product
+fixture, with fixed two-steady/one-surge chart limits checked offline. Actual Gateway
+termination behavior and serving capacity remain environment-specific.
+The [PR16 completion record](../exec-plans/completed/m05-analytics-packaging.md)
+closes packaging delivery, not persistent D06, nonlocal activation, production HA
+or end-to-end Kubernetes acceptance.
