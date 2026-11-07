@@ -20,7 +20,9 @@ https://localhost:8443 {
     header >Cache-Control "no-store"
     reverse_proxy {$FLEETIQ_API_UPSTREAM:backend:8080}
   }
-  handle /assets/* {
+  # Only compiled resources bypass the SPA fallback for /assets/<id>.
+  @staticAssets path_regexp ^/assets/.*\.(js|mjs|css|woff|woff2|png|jpg|jpeg|gif|svg|ico)$
+  handle @staticAssets {
     root * /srv
     file_server
   }

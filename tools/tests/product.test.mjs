@@ -11,6 +11,7 @@ import {
 } from '../../local/qualification/product/channel.mjs';
 import { requiredChecks } from '../../local/qualification/product/contract.mjs';
 import { avlFrame, imei, transmit } from '../../local/qualification/product/device.mjs';
+import { lock } from '../policy.mjs';
 import { root } from '../process.mjs';
 import { productCompose } from '../product/compose.mjs';
 import { assertResource, completeProduct, productPolicy } from '../product/policy.mjs';
@@ -21,7 +22,11 @@ function fixture() {
   return productCompose({
     name: 'product-0123456789abcdef',
     owner: '01234567-89ab-cdef-0123-456789abcdef',
-    images: { backend: `sha256:${'a'.repeat(64)}`, edge: qualifiedEdge.image },
+    images: {
+      backend: `sha256:${'a'.repeat(64)}`,
+      edge: qualifiedEdge.image,
+      normalEdge: `sha256:${'b'.repeat(64)}`,
+    },
     helper: `sha256:${'c'.repeat(64)}`,
     control: resolve(root, '.local/test-control'),
   });
@@ -510,4 +515,14 @@ test('private archive stays on backend loopback and rejects host exposure', () =
     mutate(unsafe);
     assert.throws(() => productPolicy(unsafe));
   }
+});
+
+test('normal Compose builds the reviewed UX revision and qualifies that image separately', () => {
+  assert.equal(lock.sources.ux.commit, qualifiedEdge.revision);
+  const spec = fixture();
+  assert.equal(spec.services['normal-edge'].image, `sha256:${'b'.repeat(64)}`);
+  assert.equal(spec.services.edge.image, qualifiedEdge.image);
+  assert.deepEqual(spec.services['normal-edge'].networks, ['application']);
+  spec.services['normal-edge'].image = qualifiedEdge.image;
+  assert.throws(() => productPolicy(spec));
 });

@@ -19,6 +19,7 @@ export const requiredChecks = [
   'map-resource-disposal',
   'mapping-correction-preserves-history',
   'bounded-logical-storage-usage',
+  'normal-compose-history-controls',
   'bounded-browser-export',
   'private-archive-reclamation-and-restore',
   'permission-revocation',

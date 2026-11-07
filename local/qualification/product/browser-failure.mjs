@@ -33,6 +33,8 @@ const steps = new Set([
   'analytics-resolution',
   'logical-storage-usage',
   'logical-storage-bounds',
+  'normal-compose-history-controls',
+  'normal-compose-inspector',
   'bounded-browser-export',
   'browser-export-ready',
   'browser-export-download',

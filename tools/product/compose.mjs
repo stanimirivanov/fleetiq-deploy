@@ -300,6 +300,30 @@ export function productCompose({ name, owner, images, helper, control }) {
         retries: 60,
       },
     },
+    'normal-edge': {
+      ...restricted,
+      image: images.normalEdge,
+      user: '10001:10001',
+      mem_limit: '256m',
+      pids_limit: 128,
+      networks: ['application'],
+      tmpfs: [
+        '/tmp:size=16m,mode=1777,noexec,nosuid',
+        '/config:size=1m,uid=10001,gid=10001,mode=0700,noexec,nosuid',
+        '/data:size=16m,uid=10001,gid=10001,mode=0700,noexec,nosuid',
+      ],
+      volumes: [
+        state('edge', '/run/tls'),
+        bind(resolve(control, '..', 'normal-edge.Caddyfile'), '/etc/caddy/Caddyfile'),
+      ],
+      depends_on: { backend: { condition: 'service_healthy' } },
+      healthcheck: {
+        test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:8081/ready'],
+        interval: '2s',
+        timeout: '3s',
+        retries: 60,
+      },
+    },
     ...normalProductWorkers(owner, images.backend),
     alertmanager: {
       ...restricted,

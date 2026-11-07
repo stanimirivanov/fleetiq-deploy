@@ -22,7 +22,7 @@ import { qualifiedEdge } from '../qualified-edge.mjs';
 import { imageInventory } from '../sources.mjs';
 import { productCompose } from './compose.mjs';
 import { collectServiceDiagnostics, diagnosticSummary } from './diagnostics.mjs';
-import { prepareProductEdge } from './edge.mjs';
+import { prepareNormalEdge, prepareProductEdge } from './edge.mjs';
 import { qualifyLifecycle } from './lifecycle.mjs';
 import { assertResource, completeProduct, inputs, productPolicy } from './policy.mjs';
 
@@ -138,7 +138,9 @@ export async function qualifyProduct(onProgress = () => {}) {
   }
   assert(Object.values(resources()).every((values) => values.length === 0));
   const fingerprint = packaging();
+  images.normalEdge = images.edge;
   images.edge = prepareProductEdge(docker, directory);
+  prepareNormalEdge(directory);
   const helperName = `fleetiq-product-fixture:${fingerprint.slice(0, 24)}`;
   // Pull verifies remote availability independently of a warm local image cache.
   command(['pull', lock.images.alertmanager], { timeout: 300000, stdio: 'inherit' });
@@ -185,7 +187,12 @@ export async function qualifyProduct(onProgress = () => {}) {
     platform: lock.sources.platform.commit,
     ui: qualifiedEdge.revision,
     uiPublication: qualifiedEdge.publication,
-    images: { backend: images.backend, edge: images.edge, helper },
+    images: {
+      backend: images.backend,
+      edge: images.edge,
+      normalEdge: images.normalEdge,
+      helper,
+    },
     checks: [],
     workerDefinitions: ['local/pipeline/compose.yaml', 'local/analytics/compose.yaml'],
     cleanup: 'pending',
@@ -218,6 +225,7 @@ export async function qualifyProduct(onProgress = () => {}) {
         'issuer',
         'backend',
         'edge',
+        'normal-edge',
         'alertmanager',
         'receiver',
       ],

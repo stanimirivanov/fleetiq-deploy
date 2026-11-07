@@ -57,6 +57,7 @@ export function productPolicy(spec) {
     'ingest',
     'init',
     'issuer',
+    'normal-edge',
     'notification',
     'postgres',
     'projection',
@@ -214,6 +215,7 @@ export function productPolicy(spec) {
     backend: ['backend', 'public'],
     issuer: ['issuer', 'public'],
     edge: ['edge'],
+    'normal-edge': ['edge'],
     ingest: ['database'],
     replay: ['database'],
     semantic: ['database'],
@@ -282,6 +284,26 @@ export function productPolicy(spec) {
       maps.source === resolve(root, 'local/qualification/product/maps'),
     'Only the controlled read-only map fixture is permitted',
   );
+  const normalEdge = spec.services['normal-edge'];
+  assert.match(normalEdge.image, /^sha256:[a-f0-9]{64}$/u);
+  assert.deepEqual(normalEdge.networks, ['application']);
+  assert.equal(normalEdge.entrypoint, undefined, 'Use the normal image entrypoint');
+  assert.equal(normalEdge.command, undefined);
+  assert.deepEqual(normalEdge.volumes, [
+    {
+      type: 'volume',
+      source: 'state',
+      target: '/run/tls',
+      read_only: true,
+      volume: { subpath: 'edge' },
+    },
+    {
+      type: 'bind',
+      source: resolve(control, '..', 'normal-edge.Caddyfile'),
+      target: '/etc/caddy/Caddyfile',
+      read_only: true,
+    },
+  ]);
   assert.deepEqual(spec.services.artifacts.network_mode, 'none');
   assert.deepEqual(spec.services.browser.networks, ['application']);
   assert.deepEqual(spec.services.postgres.networks, ['database']);

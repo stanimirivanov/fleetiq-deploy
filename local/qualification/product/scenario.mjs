@@ -16,6 +16,7 @@ import { requiredChecks } from './contract.mjs';
 import { transmit } from './device.mjs';
 import { qualifyExport, qualifyRestoredHistory } from './lifecycle.mjs';
 import { verifyLogicalStorageUsage } from './lifecycle-cost.mjs';
+import { qualifyNormalEdge } from './normal-edge.mjs';
 import { InstalledFleetPage } from './page.mjs';
 
 const expect = baseExpect.configure({ timeout: 30000 });
@@ -324,6 +325,11 @@ try {
   step = 'logical-storage-bounds';
   verifyLogicalStorageUsage(storageUsage);
   checks.push('bounded-logical-storage-usage');
+  step = 'normal-compose-history-controls';
+  await qualifyNormalEdge(chromium, expect, (value) => {
+    step = value;
+  });
+  checks.push('normal-compose-history-controls');
   await ui.inspector('asset-secondary');
   step = 'bounded-browser-export';
   await expect(
