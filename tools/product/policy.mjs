@@ -10,10 +10,8 @@ import {
 import { lock } from '../policy.mjs';
 import { root } from '../process.mjs';
 import { qualifiedEdge } from '../qualified-edge.mjs';
-import { normalProductWorkers } from './compose.mjs';
-export const inputs = JSON.parse(
-  readFileSync(resolve(root, 'local/qualification/product/inputs.lock.json')),
-);
+import { archiveEndpoint, normalProductWorkers, productInputs } from './compose.mjs';
+export const inputs = productInputs;
 export function browserBuildPolicy(
   dockerfile = readFileSync(
     resolve(root, 'local/qualification/product/Dockerfile'),
@@ -49,6 +47,9 @@ export function productPolicy(spec) {
   assert.deepEqual(Object.keys(spec.services).sort(), [
     'alertmanager',
     'analytics',
+    'archive-client',
+    'archive-storage',
+    'archive-worker',
     'artifacts',
     'backend',
     'browser',
@@ -107,6 +108,50 @@ export function productPolicy(spec) {
     ),
   ))
     assert.deepEqual(spec.services[role], worker, 'Normal worker definition drift');
+  const archiveRoles = ['archive-client', 'archive-storage', 'archive-worker'];
+  assert.equal(spec.services['archive-storage'].image, inputs.objectStorage);
+  assert.match(inputs.objectStorage, /^rustfs\/rustfs:1\.0\.4@sha256:[a-f0-9]{64}$/u);
+  assert.deepEqual(spec.services['archive-storage'].command, [
+    '--address',
+    '127.0.0.1:9000',
+    '/data',
+  ]);
+  assert.equal(
+    spec.services['archive-storage'].environment.RUSTFS_CONSOLE_ENABLE,
+    'false',
+  );
+  assert.equal(
+    spec.services.backend.environment.FLEETIQ_ARCHIVE_ENDPOINT,
+    archiveEndpoint,
+  );
+  assert.equal(spec.services['archive-worker'].image, spec.services.backend.image);
+  assert.deepEqual(spec.services['archive-worker'].command, ['archive-worker']);
+  assert.equal(
+    spec.services['archive-worker'].environment.FLEETIQ_ARCHIVE_ENDPOINT,
+    archiveEndpoint,
+  );
+  const archiveClient = spec.services['archive-client'];
+  assert.equal(archiveClient.image, spec.services.browser.image);
+  assert.deepEqual(archiveClient.entrypoint, [
+    '/bin/bash',
+    '/fixture/local/qualification/product/archive-client.sh',
+  ]);
+  for (const role of ['archive-storage', 'archive-client']) {
+    assert.deepEqual(spec.services[role].volumes, [
+      {
+        type: 'volume',
+        source: 'state',
+        target: '/run/secrets',
+        read_only: true,
+        volume: { subpath: 'objects' },
+      },
+    ]);
+  }
+  assert.deepEqual(spec.services['archive-storage'].environment, {
+    RUSTFS_CONSOLE_ENABLE: 'false',
+    RUSTFS_ACCESS_KEY_FILE: '/run/secrets/archive_access_key',
+    RUSTFS_SECRET_KEY_FILE: '/run/secrets/archive_secret_key',
+  });
   for (const [name, service] of Object.entries(spec.services)) {
     assert(
       !service.ports &&
@@ -136,7 +181,7 @@ export function productPolicy(spec) {
     );
     const expectedUser = ['init', 'artifacts'].includes(name)
       ? '0:0'
-      : ['browser', 'issuer', 'receiver'].includes(name)
+      : ['archive-client', 'browser', 'issuer', 'receiver'].includes(name)
         ? '1000:1000'
         : '10001:10001';
     if (name !== 'postgres')
@@ -146,7 +191,10 @@ export function productPolicy(spec) {
       assert(service.read_only);
       assert.deepEqual(service.cap_drop, ['ALL']);
     }
-    if (!['init', 'artifacts'].includes(name))
+    if (archiveRoles.includes(name)) {
+      assert.equal(service.network_mode, 'service:backend');
+      assert.equal(service.networks, undefined);
+    } else if (!['init', 'artifacts'].includes(name))
       assert(!service.network_mode, 'No host network mode');
     for (const mount of service.volumes ?? [])
       assert(!JSON.stringify(mount).includes('docker.sock'));
@@ -157,6 +205,9 @@ export function productPolicy(spec) {
       );
   }
   const stateScopes = {
+    'archive-client': ['objects'],
+    'archive-storage': ['objects'],
+    'archive-worker': ['archive'],
     init: ['root'],
     artifacts: [],
     postgres: ['database'],
@@ -265,6 +316,7 @@ export function productPolicy(spec) {
   );
   assert.deepEqual(Object.keys(inputs).sort(), [
     'browser',
+    'objectStorage',
     'oidcProvider',
     'playwright',
     'schemaVersion',

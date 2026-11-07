@@ -23,6 +23,7 @@ import { imageInventory } from '../sources.mjs';
 import { productCompose } from './compose.mjs';
 import { collectServiceDiagnostics, diagnosticSummary } from './diagnostics.mjs';
 import { prepareProductEdge } from './edge.mjs';
+import { qualifyLifecycle } from './lifecycle.mjs';
 import { assertResource, completeProduct, inputs, productPolicy } from './policy.mjs';
 
 function packaging() {
@@ -141,6 +142,7 @@ export async function qualifyProduct(onProgress = () => {}) {
   const helperName = `fleetiq-product-fixture:${fingerprint.slice(0, 24)}`;
   // Pull verifies remote availability independently of a warm local image cache.
   command(['pull', lock.images.alertmanager], { timeout: 300000, stdio: 'inherit' });
+  command(['pull', inputs.objectStorage], { timeout: 300000, stdio: 'inherit' });
   command(['pull', inputs.browser], { timeout: 300000, stdio: 'inherit' });
   command(
     [
@@ -258,6 +260,22 @@ export async function qualifyProduct(onProgress = () => {}) {
     stage('browser-sign-in-and-commissioning');
     await waitPhase(control, 'setup-ready');
     owned();
+    stage('configure-disposable-history-budget');
+    // One 4 MiB staged export plus one 2 MiB streaming download reservation.
+    compose([
+      'exec',
+      '-T',
+      'postgres',
+      'psql',
+      '-U',
+      'fleetiq',
+      '-d',
+      'fleetiq',
+      '-v',
+      'ON_ERROR_STOP=1',
+      '-c',
+      "INSERT INTO history.lifecycle_policies (tenant_id, revision, actor_id, hot_days, archive_days, max_jobs, max_bytes) VALUES ('tenant-a',1,'operator-a',7,30,2,6291456)",
+    ]);
     stage('register-calculator-release');
     const calculator = ownedPath(
       root,
@@ -278,6 +296,7 @@ export async function qualifyProduct(onProgress = () => {}) {
     compose(['up', '-d', 'ingest', 'replay', 'semantic', 'projection']);
     tcpReady();
     writePhase(control, 'workers-started');
+    result.lifecycle = await qualifyLifecycle({ compose, control, owned, stage });
     stage('device-to-browser');
     await waitPhase(control, 'initial-visible');
     owned();

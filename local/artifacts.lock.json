@@ -3,7 +3,7 @@
   "sources": {
     "platform": {
       "repository": "https://github.com/stanimirivanov/fleetiq-platform.git",
-      "commit": "cab947309cade798639ec44f1c00b81234dcb4c3"
+      "commit": "d4509837f17aa06dc1e7b7c7db61df09853e3cba"
     },
     "ux": {
       "repository": "https://github.com/stanimirivanov/fleetiq-ui.git",

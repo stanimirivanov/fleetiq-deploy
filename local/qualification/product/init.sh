@@ -6,6 +6,13 @@ umask 077
 mkdir /state/database /state/backend /state/issuer /state/edge /state/public
 openssl rand -hex 32 > /state/database/database_password
 cp /state/database/database_password /state/backend/database_password
+mkdir /state/archive /state/objects
+cp /state/database/database_password /state/archive/database_password
+for field in access_key secret_key; do
+  openssl rand -hex 24 > "/state/objects/archive_$field"
+  cp "/state/objects/archive_$field" /state/archive/
+  cp "/state/objects/archive_$field" /state/backend/
+done
 openssl rand -hex 32 > /state/backend/oidc_client_secret
 cp /state/backend/oidc_client_secret /state/issuer/oidc_client_secret
 openssl rand -hex 32 > /state/issuer/cookie-key

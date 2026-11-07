@@ -19,6 +19,12 @@ export const phases = [
   'firing-delivered',
   'analytics-resolved',
   'resolution-delivered',
+  'lifecycle-seeded',
+  'lifecycle-baseline',
+  'lifecycle-reclaimed',
+  'lifecycle-restore-requested',
+  'lifecycle-provider-recovered',
+  'lifecycle-restored',
   'complete',
   'failed',
 ];

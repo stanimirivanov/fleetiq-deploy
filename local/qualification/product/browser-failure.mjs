@@ -31,6 +31,12 @@ const steps = new Set([
   'analytics-recovery',
   'analytics-duplicate',
   'analytics-resolution',
+  'logical-storage-usage',
+  'logical-storage-bounds',
+  'bounded-browser-export',
+  'browser-export-ready',
+  'browser-export-download',
+  'archive-lifecycle',
   'unknown',
 ]);
 const causes = new Set([

@@ -7,6 +7,6 @@ COPY package.json pnpm-lock.yaml ./
 RUN npm install --global pnpm@12.5.1 --allow-scripts=pnpm@12.5.1 --strict-allow-scripts && pnpm install --frozen-lockfile
 COPY local/qualification/product ./local/qualification/product
 COPY local/backend-entrypoint.sh ./local/backend-entrypoint.sh
-RUN bash -n local/backend-entrypoint.sh && bash -n local/qualification/product/init.sh && bash -n local/qualification/product/backend.sh && bash -n local/qualification/product/postgres-initialization.sh && node local/qualification/product/entrypoint-test.mjs
+RUN bash -n local/backend-entrypoint.sh && bash -n local/qualification/product/init.sh && bash -n local/qualification/product/archive-client.sh && bash -n local/qualification/product/backend.sh && bash -n local/qualification/product/postgres-initialization.sh && node local/qualification/product/entrypoint-test.mjs
 USER pwuser
 ENTRYPOINT ["node"]
