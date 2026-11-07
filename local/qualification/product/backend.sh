@@ -7,4 +7,15 @@ unset password
 if [[ "$1" == serve ]]; then
   exec /bin/bash /opt/fleetiq/backend-entrypoint.sh "$@"
 fi
+if [[ "$1" == archive-worker || "$1" == reclaim-once ]]; then
+  FLEETIQ_ARCHIVE_ACCESS_KEY="$(cat /run/secrets/archive_access_key)"
+  FLEETIQ_ARCHIVE_SECRET_KEY="$(cat /run/secrets/archive_secret_key)"
+  [[ "$FLEETIQ_ARCHIVE_ACCESS_KEY" =~ ^[a-f0-9]{48}$ &&
+     "$FLEETIQ_ARCHIVE_SECRET_KEY" =~ ^[a-f0-9]{48}$ ]] || exit 1
+  export FLEETIQ_ARCHIVE_ACCESS_KEY FLEETIQ_ARCHIVE_SECRET_KEY
+fi
+# Only the archive publisher sees the disposable database age clock.
+if [[ "$1" == archive-worker ]]; then
+  DATABASE_URL+="?options=-csearch_path%3Dqualification_clock%2Cpg_catalog%2Cpublic"
+fi
 exec /usr/local/bin/fleetiq-server "$@"

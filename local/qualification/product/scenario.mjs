@@ -14,6 +14,8 @@ import {
 import { waitPhase, writePhase } from './channel.mjs';
 import { requiredChecks } from './contract.mjs';
 import { transmit } from './device.mjs';
+import { qualifyExport, qualifyRestoredHistory } from './lifecycle.mjs';
+import { verifyLogicalStorageUsage } from './lifecycle-cost.mjs';
 import { InstalledFleetPage } from './page.mjs';
 
 const expect = baseExpect.configure({ timeout: 30000 });
@@ -144,6 +146,8 @@ try {
   checks.push('csrf-and-cross-tenant-denial', 'real-wasm-admission');
   writePhase(directory, 'setup-ready', checks);
   await waitPhase(directory, 'workers-started');
+  step = 'archive-lifecycle';
+  await qualifyRestoredHistory({ page, expect, directory, checks });
   step = 'device-to-web';
   const firstAt = Date.now() - 1000;
   await transmit(firstAt, 515000000, -1200000, {
@@ -314,7 +318,35 @@ try {
     history.changes.some((change) => change.interpretation === original.interpretation),
   );
   checks.push('mapping-correction-preserves-history');
+  step = 'logical-storage-usage';
+  await api(page, '/api/v1/tenants/tenant-b/storage-usage', { status: 403 });
+  const storageUsage = await api(page, `${tenant}/storage-usage`);
+  step = 'logical-storage-bounds';
+  verifyLogicalStorageUsage(storageUsage);
+  checks.push('bounded-logical-storage-usage');
   await ui.inspector('asset-secondary');
+  step = 'bounded-browser-export';
+  await expect(
+    page.getByRole('region', { name: 'Hot property history', exact: true }),
+  ).toContainText('515000300');
+  const exportPath = await qualifyExport({
+    page,
+    expect,
+    tenant,
+    coverage: { scope: 'hot_snapshot', manifest_id: null, restore_generation: null },
+    setStep: (value) => {
+      step = value;
+    },
+  });
+  await api(page, `${tenant}/actors/operator-a/access-changes`, {
+    method: 'POST',
+    body: {
+      change_id: 'revoke-storage-usage',
+      kind: 'revoke',
+      action: 'operations.read',
+    },
+  });
+  await api(page, `${tenant}/storage-usage`, { status: 403 });
   await ui.startLive();
   await expect(ui.delivery()).toContainText('515000300');
   await api(page, `${tenant}/actors/operator-a/access-changes`, {
@@ -324,7 +356,8 @@ try {
   await expect(ui.delivery()).toContainText('Access is denied', { timeout: 30000 });
   await expect(ui.delivery()).not.toContainText('515000300');
   await api(page, currentPath('asset-secondary'), { status: 403 });
-  checks.push('permission-revocation');
+  await api(page, exportPath, { status: 403 });
+  checks.push('bounded-browser-export', 'permission-revocation');
   await api(page, '/api/v1/auth/logout', { method: 'POST' });
   await api(page, '/api/v1/auth/session', { status: 401 });
   checks.push('logout-invalidates-session');

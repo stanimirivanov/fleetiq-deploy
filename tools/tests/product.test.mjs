@@ -483,3 +483,31 @@ test('qualification rejects substitution of a normal pipeline worker', () => {
   spec.services.semantic.mem_limit = '512m';
   assert.throws(() => productPolicy(spec), /Normal worker definition drift/u);
 });
+
+test('private archive stays on backend loopback and rejects host exposure', () => {
+  const spec = fixture();
+  assert.equal(spec.services['archive-storage'].network_mode, 'service:backend');
+  assert.equal(spec.services['archive-worker'].network_mode, 'service:backend');
+  assert.equal(
+    spec.services.backend.environment.FLEETIQ_ARCHIVE_ENDPOINT,
+    'http://127.0.0.1:9000',
+  );
+  for (const mutate of [
+    (v) => {
+      v.services['archive-storage'].network_mode = 'host';
+    },
+    (v) => {
+      v.services['archive-storage'].command[1] = '0.0.0.0:9000';
+    },
+    (v) => {
+      v.services['archive-client'].volumes[0].volume.subpath = 'archive';
+    },
+    (v) => {
+      v.services['archive-worker'].command = ['reclaim-once'];
+    },
+  ]) {
+    const unsafe = fixture();
+    mutate(unsafe);
+    assert.throws(() => productPolicy(unsafe));
+  }
+});

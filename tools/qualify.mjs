@@ -476,6 +476,27 @@ export async function qualify(onProgress = () => {}) {
     assert.notEqual(await observeArchive(), started);
     assert.equal(archiveState(), beforeArchive);
     record('checked-schema-archive-worker-start-stop-restart-with-private-storage');
+    // A real packaged turn with no approval must short-circuit before provider I/O.
+    assertOwnership(archiveSite);
+    assert.equal(
+      archiveSite.compose([
+        'run',
+        '--rm',
+        '--no-deps',
+        '-T',
+        '-e',
+        'FLEETIQ_RECLAIM_TENANT_ID=pipeline-qualification',
+        '-e',
+        'FLEETIQ_RECLAIM_MANIFEST_ID=1',
+        '-e',
+        'FLEETIQ_RECLAIM_POLICY_REVISION=1',
+        archiveService,
+        'reclaim-once',
+      ]),
+      'disabled',
+    );
+    assert.equal(archiveState(), beforeArchive);
+    record('packaged-reclamation-denies-missing-approval');
   } catch (error) {
     primaryFailure = error;
   } finally {

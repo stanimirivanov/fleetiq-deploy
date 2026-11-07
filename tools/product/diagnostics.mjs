@@ -5,6 +5,9 @@ import { assertResource } from './policy.mjs';
 const services = new Set([
   'init',
   'artifacts',
+  'archive-storage',
+  'archive-worker',
+  'archive-client',
   'postgres',
   'backend',
   'issuer',

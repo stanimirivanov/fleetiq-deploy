@@ -52,5 +52,4 @@ recoverable through its lease and retry rules.
 The deployment gate exercises the real worker's checked-schema startup,
 graceful stop and restart with synthetic private mounts and an inactive archive
 policy. The platform producer regression exercises interrupted durable
-publication against PostgreSQL and S3. Installed lifecycle and capacity
-qualification belongs to M06-PR18.
+publication against PostgreSQL and S3. The [installed lifecycle runbook](history-lifecycle-qualification.md) describes the private provider and bounded recovery checks.

@@ -4,6 +4,10 @@ import { resolve } from 'node:path';
 import { parse } from 'yaml';
 import { lock } from '../policy.mjs';
 import { root } from '../process.mjs';
+export const productInputs = JSON.parse(
+  readFileSync(resolve(root, 'local/qualification/product/inputs.lock.json')),
+);
+export const archiveEndpoint = 'http://127.0.0.1:9000';
 /** Use the local worker recipes with narrowly scoped fixture substitutions. */
 export function normalProductWorkers(owner, image) {
   const variables = {
@@ -118,6 +122,18 @@ export function productCompose({ name, owner, images, helper, control }) {
       state('public', '/run/public'),
     ],
   });
+  const archive = {
+    FLEETIQ_ARCHIVE_ENDPOINT: archiveEndpoint,
+    FLEETIQ_ARCHIVE_BUCKET: 'qualification-archive',
+    FLEETIQ_ARCHIVE_REGION: 'us-east-1',
+  };
+  const worker = backend(['archive-worker'], {
+    memory: '256m',
+    environment: { ...archive, FLEETIQ_ARCHIVE_TENANT_ID: 'tenant-lifecycle' },
+  });
+  delete worker.networks;
+  worker.network_mode = 'service:backend';
+  worker.volumes = [...scripts, state('archive', '/run/secrets')];
   const identity = {
     FLEETIQ_BIND_ADDRESS: '0.0.0.0:8080',
     FLEETIQ_BROWSER_ORIGIN: 'https://fleet.test:8443',
@@ -127,6 +143,38 @@ export function productCompose({ name, owner, images, helper, control }) {
     FLEETIQ_OIDC_ADDITIONAL_CA_BUNDLE: '/run/public/ca.crt',
   };
   const services = {
+    'archive-storage': {
+      ...restricted,
+      image: productInputs.objectStorage,
+      user: '10001:10001',
+      network_mode: 'service:backend',
+      command: ['--address', '127.0.0.1:9000', '/data'],
+      environment: {
+        RUSTFS_CONSOLE_ENABLE: 'false',
+        RUSTFS_ACCESS_KEY_FILE: '/run/secrets/archive_access_key',
+        RUSTFS_SECRET_KEY_FILE: '/run/secrets/archive_secret_key',
+      },
+      volumes: [state('objects', '/run/secrets')],
+      mem_limit: '1024m',
+      tmpfs: [
+        ...restricted.tmpfs,
+        '/data:size=128m,uid=10001,gid=10001',
+        '/logs:size=32m,uid=10001,gid=10001',
+      ],
+    },
+    'archive-worker': worker,
+    'archive-client': {
+      ...restricted,
+      image: helper,
+      user: '1000:1000',
+      network_mode: 'service:backend',
+      entrypoint: [
+        '/bin/bash',
+        '/fixture/local/qualification/product/archive-client.sh',
+      ],
+      volumes: [state('objects', '/run/secrets')],
+      mem_limit: '128m',
+    },
     init: {
       ...restricted,
       image: helper,
@@ -186,7 +234,11 @@ export function productCompose({ name, owner, images, helper, control }) {
       },
     },
     backend: {
-      ...backend(['serve'], { identity: true, memory: '512m', environment: identity }),
+      ...backend(['serve'], {
+        identity: true,
+        memory: '512m',
+        environment: { ...identity, ...archive },
+      }),
       depends_on: {
         postgres: { condition: 'service_healthy' },
         issuer: { condition: 'service_healthy' },
