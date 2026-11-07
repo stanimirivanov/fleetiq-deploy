@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { resolve } from 'node:path';
 import { analyticsServices } from './analytics.mjs';
+import { archiveService } from './archive.mjs';
 import { pipelineServices } from './pipeline.mjs';
 import { composePolicy, config, identityKeys, lock, ownedPath } from './policy.mjs';
 import { root, run } from './process.mjs';
@@ -274,6 +275,7 @@ export function appliedInstallation(name, docker) {
       'edge',
       'postgres',
       ...(model.services.alertmanager ? analyticsServices : []),
+      ...(model.services[archiveService] ? [archiveService] : []),
       ...(model.services['tcp-ingestion'] ? pipelineServices : []),
     ].sort(),
   );
@@ -302,7 +304,7 @@ export function up(site) {
   if (existsSync(recipe)) ownedPath(site.path, recipe);
   if (
     existsSync(recipe) &&
-    ['alertmanager', ...pipelineServices].some(
+    ['alertmanager', archiveService, ...pipelineServices].some(
       (service) =>
         privateJson(site.path, 'applied-compose.json').services[service] &&
         !site.model.services[service],
@@ -324,7 +326,11 @@ export function down(site, volumes = false) {
   site.compose(['down', '--remove-orphans', ...(volumes ? ['--volumes'] : [])], {
     timeout: 120_000,
   });
-  if (site.model.services.alertmanager || site.model.services['tcp-ingestion'])
+  if (
+    site.model.services.alertmanager ||
+    site.model.services['tcp-ingestion'] ||
+    site.model.services[archiveService]
+  )
     unlinkSync(ownedPath(site.path, resolve(site.path, 'applied-compose.json')));
 }
 export function exportCertificate(site) {

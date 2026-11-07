@@ -200,3 +200,9 @@ provision the private Alertmanager configuration described in
 [analytics notifications](analytics-notifications.md), then run
 `pnpm local pipeline-analytics-up development`. Use the existing
 `analytics-stop` or `pipeline-stop` command to stop the corresponding group.
+
+## Optional archive worker
+
+The archive overlay selects one tenant and mounts private object storage inputs.
+Start it only after upgrading to the compatible producer and migrating the
+database. See [the archive worker guide](history-archive.md).
