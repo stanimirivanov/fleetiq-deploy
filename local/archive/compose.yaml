@@ -1,0 +1,41 @@
+# Selected explicitly by pnpm local archive-up.
+x-storage: &storage
+  FLEETIQ_ARCHIVE_ENDPOINT: ${FLEETIQ_ARCHIVE_ENDPOINT:?Missing archive endpoint}
+  FLEETIQ_ARCHIVE_BUCKET: ${FLEETIQ_ARCHIVE_BUCKET:?Missing archive bucket}
+  FLEETIQ_ARCHIVE_REGION: ${FLEETIQ_ARCHIVE_REGION:?Missing archive region}
+services:
+  backend:
+    environment: *storage
+    secrets: [archive_access_key, archive_secret_key]
+  archive-worker:
+    image: ${FLEETIQ_BACKEND_IMAGE:?Missing reviewed backend}
+    pull_policy: never
+    user: '10001:10001'
+    entrypoint: [/bin/bash, /opt/fleetiq/backend-entrypoint.sh]
+    command: [archive-worker]
+    labels: { com.fleetiq.deploy.owner: '${FLEETIQ_OWNER:?Missing owner}' }
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    stop_grace_period: 30s
+    tmpfs: ['/tmp:size=16m,mode=1777,noexec,nosuid']
+    environment:
+      <<: *storage
+      FLEETIQ_ARCHIVE_TENANT_ID: ${FLEETIQ_ARCHIVE_TENANT_ID:?Missing archive tenant}
+    secrets: [database_password, archive_access_key, archive_secret_key]
+    volumes: [./backend-entrypoint.sh:/opt/fleetiq/backend-entrypoint.sh:ro]
+    mem_limit: 256m
+    pids_limit: 128
+    depends_on:
+      backend: { condition: service_healthy }
+    networks: [database, archive-egress]
+secrets:
+  archive_access_key:
+    file: ${FLEETIQ_ARCHIVE_ACCESS_KEY_FILE:?Missing private archive key file}
+  archive_secret_key:
+    file: ${FLEETIQ_ARCHIVE_SECRET_KEY_FILE:?Missing private archive secret file}
+networks:
+  archive-egress:
+    labels: { com.fleetiq.deploy.owner: '${FLEETIQ_OWNER:?Missing owner}' }

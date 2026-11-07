@@ -1,4 +1,5 @@
 import { analyticsInstallation, analyticsServices } from './analytics.mjs';
+import { archiveInstallation, archiveService } from './archive.mjs';
 import {
   appliedInstallation,
   assertOwnership,
@@ -28,11 +29,18 @@ try {
       command === 'down' ||
       command === 'trust' ||
       command === 'analytics-stop' ||
-      command === 'pipeline-stop'
+      command === 'pipeline-stop' ||
+      command === 'archive-stop' ||
+      command === 'archive-restart'
     ) {
       const site = appliedInstallation(name, docker);
       if (command === 'down') down(site);
-      else if (command === 'analytics-stop' || command === 'pipeline-stop') {
+      else if (command === 'archive-stop' || command === 'archive-restart') {
+        if (!site.model.services[archiveService])
+          throw new Error('Archive overlay is not selected');
+        assertOwnership(site);
+        site.compose([command === 'archive-stop' ? 'stop' : 'restart', archiveService]);
+      } else if (command === 'analytics-stop' || command === 'pipeline-stop') {
         assertOwnership(site);
         site.compose([
           'stop',
@@ -52,6 +60,7 @@ try {
         [
           'up',
           'analytics-up',
+          'archive-up',
           'pipeline-up',
           'pipeline-analytics-up',
           'restart',
@@ -71,6 +80,9 @@ try {
         console.log(
           'The local device pipeline started for the configured loopback listener.',
         );
+      } else if (command === 'archive-up') {
+        up(archiveInstallation(site, privateJson(site.path, 'archive.json')));
+        console.log('Archive worker started for the configured tenant.');
       } else if (command === 'analytics-up') {
         up(analyticsInstallation(site));
         console.log(
@@ -118,7 +130,7 @@ try {
         );
       } else
         throw new Error(
-          'Use: pnpm local init|sources|build|up|analytics-up|analytics-stop|pipeline-up|pipeline-analytics-up|pipeline-stop|down|restart|trust|bootstrap [instance]',
+          'Use: pnpm local init|sources|build|up|analytics-up|analytics-stop|archive-up|archive-stop|archive-restart|pipeline-up|pipeline-analytics-up|pipeline-stop|down|restart|trust|bootstrap [instance]',
         );
     }
   }

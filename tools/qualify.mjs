@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { transmit } from '../local/qualification/product/device.mjs';
 import { analyticsInstallation } from './analytics.mjs';
+import { archiveInstallation, archiveService } from './archive.mjs';
 import {
   appliedInstallation,
   assertOwnership,
@@ -293,8 +294,20 @@ export async function qualify(onProgress = () => {}) {
       assert.equal((await get('/api/v1/nonexistent')).status, 404),
     );
     record('synthetic-proxy-origin-host-cookie-no-store-and-restored-real-backend');
-    // Infrastructure fixture only. The locked M05 producer requires audited recovery schema 0051.
-    assert.equal(sql('SELECT max(version) FROM _sqlx_migrations WHERE success'), '51');
+    const inventory = JSON.parse(
+      site.compose([
+        'exec',
+        '-T',
+        'backend',
+        '/usr/local/bin/fleetiq-server',
+        'migration-inventory',
+      ]),
+    );
+    assert.equal(inventory.format, 'fleetiq-migrations.v1');
+    assert.equal(
+      sql('SELECT max(version) FROM _sqlx_migrations WHERE success'),
+      inventory.migrations.at(-1)?.version,
+    );
     const pipelineSettings = {
       identityPolicy: 'registered-identifiers',
       port: await availablePort(),
@@ -408,6 +421,61 @@ export async function qualify(onProgress = () => {}) {
     await delay(10000);
     runningWorkers();
     record('checked-schema-packaged-workers-start-restart-with-private-router');
+    // No eligible policy is enabled in this installation fixture. The platform
+    // producer's executable regression separately interrupts real S3 publication.
+    for (const [name, value] of [
+      ['archive-access-key', 'synthetic-access'],
+      ['archive-secret-key', 'synthetic-secret'],
+    ])
+      writeFileSync(resolve(site.path, name), value, { flag: 'wx', mode: 0o644 });
+    const archiveSite = archiveInstallation(analyticsSite, {
+      tenantId: 'pipeline-qualification',
+      endpoint: 'https://archive.example.invalid/',
+      bucket: 'archive-qualification',
+      region: 'us-east-1',
+    });
+    const archiveState = () =>
+      sql(
+        "SELECT (SELECT count(*) FROM history.archive_jobs) || ':' || (SELECT count(*) FROM history.asset_property_changes WHERE event_at_ms IS NULL)",
+      );
+    const beforeArchive = archiveState();
+    up(archiveSite);
+    const inspectArchive = () => {
+      assertOwnership(archiveSite);
+      const id = archiveSite.compose(['ps', '--all', '--quiet', archiveService]);
+      assert.match(id, /^[a-f0-9]{64}$/u);
+      const [container] = JSON.parse(
+        run('docker', ['--context', docker, 'inspect', id]),
+      );
+      return container;
+    };
+    const observeArchive = () =>
+      eventually(() => {
+        const worker = inspectArchive();
+        assert.equal(worker.State.Status, 'running');
+        assert.equal(worker.RestartCount, 0);
+        const ip =
+          worker.NetworkSettings.Networks[`${site.project}_database`]?.IPAddress;
+        assert.equal(net.isIP(ip), 4);
+        assert(
+          Number(
+            sql(
+              `SELECT count(*) FROM pg_stat_activity WHERE client_addr='${ip}'::inet AND state='idle'`,
+            ),
+          ) > 0,
+        );
+        return worker.State.StartedAt;
+      });
+    const started = await observeArchive();
+    archiveSite.compose(['stop', archiveService]);
+    const stopped = inspectArchive().State;
+    assert.equal(stopped.Status, 'exited');
+    assert.equal(stopped.ExitCode, 0);
+    assert.equal(archiveState(), beforeArchive);
+    archiveSite.compose(['start', archiveService]);
+    assert.notEqual(await observeArchive(), started);
+    assert.equal(archiveState(), beforeArchive);
+    record('checked-schema-archive-worker-start-stop-restart-with-private-storage');
   } catch (error) {
     primaryFailure = error;
   } finally {
