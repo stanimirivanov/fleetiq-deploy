@@ -70,13 +70,13 @@ async function activate(page) {
 }
 
 /** Four real Codec 8 frames in one window: three flat baseline values and one final value. */
-async function sendWindow(anchor, anomalous) {
+async function sendWindow(anchor, anomalous, deviceOptions) {
   const start =
     anchor + windowMs * Math.max(0, Math.ceil((Date.now() + 1000 - anchor) / windowMs));
   await delay(Math.max(0, start - Date.now()));
   const last = anomalous ? latitude + 10000 : latitude;
   for (const [index, value] of [latitude, latitude, latitude, last].entries())
-    await transmit(start + index, value, -1200000);
+    await transmit(start + index, value, -1200000, deviceOptions);
   return { end: String(start + windowMs), lastAt: start + 3, last };
 }
 
@@ -160,8 +160,9 @@ export async function qualifyAnalyticsAlerts({
 }) {
   setStep('analytics-configure');
   const anchor = await activate(page);
+  const deviceOptions = { onStep: setStep };
+  const spike = await sendWindow(anchor, true, deviceOptions);
   setStep('analytics-anomaly');
-  const spike = await sendWindow(anchor, true);
   const firing = await observe(page, expect, 'firing', spike.end);
   assert.equal(firing.latest_transition.event_at_ms, spike.end);
   const id = firing.latest_transition.evidence.evaluation_id;
@@ -217,9 +218,9 @@ export async function qualifyAnalyticsAlerts({
   await waitPhase(directory, 'firing-delivered');
   checks.push('receiver-outage-and-worker-restart');
 
+  await transmit(spike.lastAt, spike.last, -1200000, deviceOptions);
+  const repeated = await sendWindow(anchor, true, deviceOptions);
   setStep('analytics-duplicate');
-  await transmit(spike.lastAt, spike.last, -1200000);
-  const repeated = await sendWindow(anchor, true);
   assert.equal(
     (await observe(page, expect, 'firing', repeated.end)).version,
     firing.version,
@@ -228,8 +229,8 @@ export async function qualifyAnalyticsAlerts({
   assert.deepEqual(await api(page, path), evidence);
   checks.push('duplicate-keeps-logical-alert');
 
+  const normal = await sendWindow(anchor, false, deviceOptions);
   setStep('analytics-resolution');
-  const normal = await sendWindow(anchor, false);
   const resolved = await observe(page, expect, 'resolved', normal.end);
   assert.equal(resolved.latest_transition.event_at_ms, normal.end);
   const finalHistory = await api(page, `${detail}/transitions?limit=20`);

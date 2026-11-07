@@ -14,6 +14,7 @@ const steps = new Set([
   'device-connect',
   'device-identification',
   'device-record',
+  'device-close',
   'current-property',
   'original-provenance',
   'inspector-open',
