@@ -10,15 +10,19 @@ const history = `${property}/history?${window}`;
 const restore = `${tenant}/restores/manifests/1`;
 const generation = `${restore}/generations/1`;
 
-export async function qualifyRestoredHistory({ page, expect, directory, checks }) {
+export async function qualifyRestoredHistory({
+  page,
+  expect,
+  directory,
+  checks,
+  setStep,
+}) {
   await waitPhase(directory, 'lifecycle-seeded');
   const original = (await api(page, history)).changes;
   assert.equal(original.length, 1);
   assert.equal(original[0].value.value, '111');
-  const provenance = await api(
-    page,
-    `${property}/interpretations/${original[0].interpretation}`,
-  );
+  const interpretation = `${property}/interpretations/${original[0].interpretation}`;
+  const provenance = await api(page, interpretation);
   const now = Date.now();
   await page.goto(
     `https://fleet.test:8443/assets/asset?tenant=tenant-lifecycle&property=electrical.voltage&property_version=1&effective_at_ms=${now}&known_at_ms=${now}&history_start=0&history_end=2000`,
@@ -50,9 +54,7 @@ export async function qualifyRestoredHistory({ page, expect, directory, checks }
   writePhase(directory, 'lifecycle-baseline', checks);
   await waitPhase(directory, 'lifecycle-reclaimed');
   await api(page, history, { status: 409 });
-  await api(page, `${property}/interpretations/${original[0].interpretation}`, {
-    status: 409,
-  });
+  await api(page, interpretation, { status: 409 });
 
   await page.goto(
     `https://fleet.test:8443/assets/asset?tenant=tenant-lifecycle&property=electrical.voltage&property_version=1&effective_at_ms=${now}&known_at_ms=${now}&history_start=0&history_end=1500`,
@@ -88,7 +90,46 @@ export async function qualifyRestoredHistory({ page, expect, directory, checks }
   await expect(
     page.getByRole('region', { name: 'Property history review' }),
   ).toContainText('restored');
-  assert(provenance && JSON.stringify(provenance).includes('vendor.fixture'));
+  setStep('restored-inspect');
+  const selectedInterpretation = `${interpretation}?manifest_id=1&restore_generation=1`;
+  const selectedResponse = (response) => {
+    const url = new URL(response.url());
+    return (
+      response.request().method() === 'GET' &&
+      `${url.pathname}${url.search}` === selectedInterpretation
+    );
+  };
+  const historyReview = page.getByRole('region', { name: 'Property history review' });
+  const [inspected] = await Promise.all([
+    page.waitForResponse(selectedResponse),
+    historyReview
+      .getByRole('button', { name: 'Inspect history interpretation 1', exact: true })
+      .click(),
+  ]);
+  assert.equal(inspected.status(), 200);
+  assert.deepEqual(await inspected.json(), provenance);
+  const panel = page.getByRole('region', { name: 'Interpretation provenance' });
+  for (const [label, value] of [
+    [
+      'Original binding',
+      `${provenance.binding_id} · revision ${provenance.binding_revision}`,
+    ],
+    [
+      'Source',
+      `${provenance.source.device_asset_id} / ${provenance.source.endpoint_id} / ${provenance.source.signal_id}`,
+    ],
+    [
+      'Decoder',
+      `${provenance.source.protocol_package_id} / ${provenance.source.protocol_package_version}`,
+    ],
+    ['First effective cutoff', provenance.first_resolution_effective_at_ms],
+    ['First knowledge cutoff', provenance.first_resolution_known_at_ms],
+  ]) {
+    await expect(
+      panel.getByText(label, { exact: true }).locator('..').locator('dd'),
+    ).toHaveText(value);
+  }
+  setStep('restored-export');
   const exportPath = await qualifyExport({
     page,
     expect,
@@ -107,10 +148,19 @@ export async function qualifyRestoredHistory({ page, expect, directory, checks }
       action: 'telemetry.read',
     },
   });
+  setStep('restored-inspect-revoked');
+  const [denied] = await Promise.all([
+    page.waitForResponse(selectedResponse),
+    historyReview
+      .getByRole('button', { name: 'Refresh history page', exact: true })
+      .click(),
+  ]);
+  assert.equal(denied.status(), 403);
+  await expect(panel.getByText('Original binding', { exact: true })).toHaveCount(0);
   await api(page, generation, { status: 403 });
   await api(page, `${history}&${selection}`, { status: 403 });
   await api(page, exportPath, { status: 403 });
-  checks.push('private-archive-reclamation-and-restore');
+  checks.push('private-archive-reclamation-and-restore', 'installed-restored-inspect');
   writePhase(directory, 'lifecycle-restored', checks);
 }
 

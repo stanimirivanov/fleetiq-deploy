@@ -23,6 +23,7 @@ export const requiredChecks = [
   'bounded-browser-export',
   'installed-numeric-summary',
   'private-archive-reclamation-and-restore',
+  'installed-restored-inspect',
   'permission-revocation',
   'logout-invalidates-session',
 ];

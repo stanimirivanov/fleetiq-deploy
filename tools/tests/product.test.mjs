@@ -565,3 +565,10 @@ test('installed acceptance requires the produced numeric summary browser check',
   );
   assert.throws(() => completeProduct({ phase: 'complete', checks: oldReceipt }));
 });
+
+test('installed acceptance requires the restored Inspect browser check', () => {
+  const oldReceipt = requiredChecks.filter(
+    (check) => check !== 'installed-restored-inspect',
+  );
+  assert.throws(() => completeProduct({ phase: 'complete', checks: oldReceipt }));
+});

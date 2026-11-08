@@ -148,7 +148,15 @@ try {
   writePhase(directory, 'setup-ready', checks);
   await waitPhase(directory, 'workers-started');
   step = 'archive-lifecycle';
-  await qualifyRestoredHistory({ page, expect, directory, checks });
+  await qualifyRestoredHistory({
+    page,
+    expect,
+    directory,
+    checks,
+    setStep: (value) => {
+      step = value;
+    },
+  });
   step = 'device-to-web';
   const firstAt = Date.now() - 1000;
   await transmit(firstAt, 515000000, -1200000, {
