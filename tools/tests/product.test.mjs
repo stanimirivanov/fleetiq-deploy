@@ -558,3 +558,10 @@ test('sequential device sends wait for peer close before opening the next sessio
     await new Promise((done) => server.close(done));
   }
 });
+
+test('installed acceptance requires the produced numeric summary browser check', () => {
+  const oldReceipt = requiredChecks.filter(
+    (check) => check !== 'installed-numeric-summary',
+  );
+  assert.throws(() => completeProduct({ phase: 'complete', checks: oldReceipt }));
+});

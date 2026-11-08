@@ -19,6 +19,34 @@ export async function qualifyRestoredHistory({ page, expect, directory, checks }
     page,
     `${property}/interpretations/${original[0].interpretation}`,
   );
+  const now = Date.now();
+  await page.goto(
+    `https://fleet.test:8443/assets/asset?tenant=tenant-lifecycle&property=electrical.voltage&property_version=1&effective_at_ms=${now}&known_at_ms=${now}&history_start=0&history_end=2000`,
+  );
+  await page.getByLabel('History representation').selectOption('1000');
+  await page.getByRole('button', { name: 'Apply history window' }).click();
+  const buckets = page.getByRole('table', { name: 'Exact numeric summary buckets' });
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Numeric summary' }),
+  ).toContainText(/Summary publication [1-9][0-9]*, revision 1\..*Hot snapshot only/u);
+  await expect(buckets.getByRole('row').nth(1).getByRole('cell')).toHaveText([
+    '0–1000',
+    '0 / 0 / 0',
+    '—',
+    '—',
+    '0',
+    'Undefined (no good samples)',
+  ]);
+  await expect(buckets.getByRole('row').nth(2).getByRole('cell')).toHaveText([
+    '1000–2000',
+    '1 / 1 / 0',
+    '111',
+    '111',
+    '111',
+    '111 / 1',
+  ]);
+  await expect(buckets.getByRole('row')).toHaveCount(3);
+  checks.push('installed-numeric-summary');
   writePhase(directory, 'lifecycle-baseline', checks);
   await waitPhase(directory, 'lifecycle-reclaimed');
   await api(page, history, { status: 409 });
@@ -26,7 +54,6 @@ export async function qualifyRestoredHistory({ page, expect, directory, checks }
     status: 409,
   });
 
-  const now = Date.now();
   await page.goto(
     `https://fleet.test:8443/assets/asset?tenant=tenant-lifecycle&property=electrical.voltage&property_version=1&effective_at_ms=${now}&known_at_ms=${now}&history_start=0&history_end=1500`,
   );

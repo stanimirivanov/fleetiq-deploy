@@ -13,9 +13,10 @@ pnpm qualify:product
 
 The installed product uses a local backend build from the reviewed platform
 revision and pulls the published UX by digest. The platform revision
-`d4509837f17aa06dc1e7b7c7db61df09853e3cba` was qualified and published for
+`fb2808e1c0ef4dcfcac3e163bd9f4c603a253945` was qualified and published for
 Linux AMD64 at digest
-`sha256:742b2dd37f714935c39f3a03898ada451939cfb2f4b7b959bfd817aa889ff8db`.
+`sha256:47cf1f392ccbcc6bf3681ae6c9bfc46d92c5d068673d79dab77dabb7286a3c7c`.
+See [the backend publication run](https://github.com/stanimirivanov/fleetiq-platform/actions/runs/42493603844).
 The local backend build has its own image identity. The current UX digest and
 publication receipt are in the [reviewed edge record](../../charts/fleetiq-runtime/qualified-edge.json).
 
@@ -24,6 +25,16 @@ backend loopback. The provider and signed fault client receive only generated
 storage inputs. The worker starts with separate storage and database files.
 No S3 port is published. The gate removes the owned containers, networks and
 volumes after success or failure.
+
+Before reclamation, the fixture runs the packaged `summarize-once` command
+against the lifecycle tenant and repeats the exact request. The retry must
+return the same series and revision, with exactly one committed publication.
+A selection for a restore that has not been staged must fail with unavailable
+coverage and leave no publication. The browser selects the one-second summary
+through the existing history form and checks the empty bucket and the exact
+value, count, and mean of the bucket containing the synthetic reading.
+The product receipt records the source revision, exercised local image ID,
+and verified summary publication.
 
 The lifecycle tenant contains two synthetic interpretations. The publisher
 alone uses a disposable database clock eight days behind to exercise the
