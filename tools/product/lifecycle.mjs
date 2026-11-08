@@ -85,6 +85,35 @@ export async function qualifyLifecycle({ compose, control, owned, stage }) {
       ],
       { timeout: 40000 },
     );
+  const summarize = (command, selection = []) =>
+    compose(
+      [
+        'run',
+        '--rm',
+        '--no-deps',
+        '-T',
+        '-e',
+        `FLEETIQ_SUMMARY_TENANT_ID=${tenant}`,
+        '-e',
+        'FLEETIQ_SUMMARY_ASSET_ID=asset',
+        '-e',
+        'FLEETIQ_SUMMARY_PROPERTY_ID=electrical.voltage',
+        '-e',
+        'FLEETIQ_SUMMARY_PROPERTY_VERSION=1',
+        '-e',
+        'FLEETIQ_SUMMARY_START_MS=0',
+        '-e',
+        'FLEETIQ_SUMMARY_END_MS=2000',
+        '-e',
+        'FLEETIQ_SUMMARY_RESOLUTION_MS=1000',
+        ...selection,
+        'archive-worker',
+        command,
+      ],
+      { timeout: 40000 },
+    );
+  const summaryCount = () =>
+    sql(`SELECT count(*) FROM history.numeric_summaries ${where}`);
   const state = () =>
     sql(
       `SELECT count(*) FILTER (WHERE event_at_ms IS NULL) || ':' || (SELECT count(*) FROM history.retention_receipts ${where}) FROM history.asset_property_changes ${where}`,
@@ -118,6 +147,23 @@ export async function qualifyLifecycle({ compose, control, owned, stage }) {
         sql(`SELECT message_id FROM projection.current_properties ${where}`) === 'old',
       'original projection',
     );
+    stage('lifecycle-summarize');
+    assert.equal(summaryCount(), '0');
+    assert.equal(
+      summarize('qualify-summary-unavailable', [
+        '-e',
+        'FLEETIQ_SUMMARY_MANIFEST_ID=1',
+        '-e',
+        'FLEETIQ_SUMMARY_RESTORE_GENERATION=1',
+      ]),
+      'summary coverage unavailable',
+    );
+    assert.equal(summaryCount(), '0');
+    const summary = summarize('summarize-once');
+    assert.match(summary, /^summary series=[1-9][0-9]{0,18} revision=1$/u);
+    assert.equal(summarize('summarize-once'), summary);
+    assert.equal(summaryCount(), '1');
+    assert.equal(sql(`SELECT count(*) FROM history.work_reservations ${where}`), '0');
     writePhase(control, 'lifecycle-seeded');
     await waitPhase(control, 'lifecycle-baseline');
 
@@ -235,6 +281,7 @@ export async function qualifyLifecycle({ compose, control, owned, stage }) {
     return {
       topology: 'private-loopback-s3-and-postgresql',
       providerImage: productInputs.objectStorage,
+      numericSummary: { publication: summary, revisions: 1, unavailableRejected: true },
       records: 2,
       archived: 1,
       archiveBytes: bytes.length,

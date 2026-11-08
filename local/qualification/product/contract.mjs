@@ -21,6 +21,7 @@ export const requiredChecks = [
   'bounded-logical-storage-usage',
   'normal-compose-history-controls',
   'bounded-browser-export',
+  'installed-numeric-summary',
   'private-archive-reclamation-and-restore',
   'permission-revocation',
   'logout-invalidates-session',

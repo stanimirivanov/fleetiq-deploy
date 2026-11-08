@@ -18,4 +18,12 @@ fi
 if [[ "$1" == archive-worker ]]; then
   DATABASE_URL+="?options=-csearch_path%3Dqualification_clock%2Cpg_catalog%2Cpublic"
 fi
+# Only report the exact expected application failure, without child diagnostics.
+if [[ "$1" == qualify-summary-unavailable ]]; then
+  status=0
+  output="$(/usr/local/bin/fleetiq-server summarize-once 2>&1)" || status=$?
+  [[ "$status" == 1 && "$output" == 'numeric summary rejected: CoverageUnavailable' ]] || exit 1
+  printf '%s\n' 'summary coverage unavailable'
+  exit 0
+fi
 exec /usr/local/bin/fleetiq-server "$@"
