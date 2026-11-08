@@ -48,8 +48,12 @@ command clears the old payload and reconciles its exact retry during an outage.
 The browser requests restore while storage is paused. The first attempt stages
 no bytes. Retrying the same generation after recovery restores exact value,
 binding, source and first-resolution evidence with selected-manifest coverage.
-The browser downloads the restored Parquet export and checks authorization again
-after telemetry access is revoked.
+The browser opens Inspect on the restored row, checks that its request carries
+the exact manifest and generation, and compares the response and rendered
+binding, source, and first-resolution cutoffs with the pre-reclamation evidence.
+After telemetry access is revoked, refreshing history must return 403 for the
+same selected provenance read and clear the displayed evidence. The restored
+Parquet export is also verified before and after revocation.
 
 Read the product evidence under `.verification/` for the archive reservation,
 object and staging byte counts, restore attempts, remaining logical work and
