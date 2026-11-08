@@ -1,9 +1,9 @@
 /** Qualify the same immutable UI image admitted by the nonlocal chart. */
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { lock } from '../policy.mjs';
-import { run } from '../process.mjs';
+import { root, run } from '../process.mjs';
 import { qualifiedEdge } from '../qualified-edge.mjs';
 
 /** Preserve upstream routing/CSP/proxy policy; replace only transport and map root. */
@@ -77,4 +77,24 @@ export function prepareProductEdge(docker, directory) {
     { flag: 'wx', mode: 0o644 },
   );
   return image;
+}
+
+/** Use the normal Caddy routing with the disposable OIDC hostname and CA. */
+export function prepareNormalEdge(directory) {
+  let config = readFileSync(resolve(root, 'local/Caddyfile'), 'utf8');
+  for (const [original, replacement] of [
+    ['https://localhost:8443 {', 'https://fleet.test:8443 {'],
+    ['tls internal', 'tls /run/tls/tls.crt /run/tls/tls.key'],
+  ]) {
+    assert.equal(
+      config.split(original).length,
+      2,
+      'Normal edge TLS adapter anchor changed',
+    );
+    config = config.replace(original, replacement);
+  }
+  writeFileSync(resolve(directory, 'normal-edge.Caddyfile'), config, {
+    flag: 'wx',
+    mode: 0o644,
+  });
 }

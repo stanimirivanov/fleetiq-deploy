@@ -11,6 +11,7 @@ import {
 } from '../../local/qualification/product/channel.mjs';
 import { requiredChecks } from '../../local/qualification/product/contract.mjs';
 import { avlFrame, imei, transmit } from '../../local/qualification/product/device.mjs';
+import { lock } from '../policy.mjs';
 import { root } from '../process.mjs';
 import { productCompose } from '../product/compose.mjs';
 import { assertResource, completeProduct, productPolicy } from '../product/policy.mjs';
@@ -21,7 +22,11 @@ function fixture() {
   return productCompose({
     name: 'product-0123456789abcdef',
     owner: '01234567-89ab-cdef-0123-456789abcdef',
-    images: { backend: `sha256:${'a'.repeat(64)}`, edge: qualifiedEdge.image },
+    images: {
+      backend: `sha256:${'a'.repeat(64)}`,
+      edge: qualifiedEdge.image,
+      normalEdge: `sha256:${'b'.repeat(64)}`,
+    },
     helper: `sha256:${'c'.repeat(64)}`,
     control: resolve(root, '.local/test-control'),
   });
@@ -509,5 +514,47 @@ test('private archive stays on backend loopback and rejects host exposure', () =
     const unsafe = fixture();
     mutate(unsafe);
     assert.throws(() => productPolicy(unsafe));
+  }
+});
+
+test('normal Compose builds the reviewed UX revision and qualifies that image separately', () => {
+  assert.equal(lock.sources.ux.commit, qualifiedEdge.revision);
+  const spec = fixture();
+  assert.equal(spec.services['normal-edge'].image, `sha256:${'b'.repeat(64)}`);
+  assert.equal(spec.services.edge.image, qualifiedEdge.image);
+  assert.deepEqual(spec.services['normal-edge'].networks, ['application']);
+  spec.services['normal-edge'].image = qualifiedEdge.image;
+  assert.throws(() => productPolicy(spec));
+});
+
+test('sequential device sends wait for peer close before opening the next session', async () => {
+  let active = false;
+  const server = net.createServer({ allowHalfOpen: true }, (socket) => {
+    if (active) {
+      socket.destroy();
+      return;
+    }
+    active = true;
+    let bytes = 0;
+    socket.on('data', (chunk) => {
+      bytes += chunk.length;
+      if (bytes === 17) socket.write(Buffer.from([1]));
+      if (bytes === 62) socket.write(Buffer.from([0, 0, 0, 1]));
+    });
+    socket.on('end', () => {
+      // Model the ingest task finishing durable processing after its record ACK.
+      setTimeout(() => {
+        active = false;
+        socket.end();
+      }, 50);
+    });
+  });
+  await new Promise((ready) => server.listen(0, '127.0.0.1', ready));
+  try {
+    const options = { host: '127.0.0.1', port: server.address().port, timeout: 2000 };
+    await transmit(1790000000123, 515000000, -1200000, options);
+    await transmit(1790000000124, 515000100, -1200000, options);
+  } finally {
+    await new Promise((done) => server.close(done));
   }
 });

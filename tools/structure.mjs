@@ -24,7 +24,11 @@ export function structure() {
     productCompose({
       name: 'product-0123456789abcdef',
       owner: '01234567-89ab-cdef-0123-456789abcdef',
-      images: { backend: `sha256:${'a'.repeat(64)}`, edge: qualifiedEdge.image },
+      images: {
+        backend: `sha256:${'a'.repeat(64)}`,
+        edge: qualifiedEdge.image,
+        normalEdge: `sha256:${'b'.repeat(64)}`,
+      },
       helper: `sha256:${'c'.repeat(64)}`,
       control: resolve(root, '.local/product-policy/control'),
     }),
@@ -65,7 +69,8 @@ export function structure() {
     'tls internal',
     'header >Cache-Control "no-store"',
     '@backend path /api /api/* /health/*',
-    'handle /assets/*',
+    '@staticAssets path_regexp ^/assets/.*\\.(js|mjs|css|woff|woff2|png|jpg|jpeg|gif|svg|ico)$',
+    'handle @staticAssets',
     'try_files {path} /index.html',
   ])
     assert(caddy.includes(rule), 'Required edge policy changed');

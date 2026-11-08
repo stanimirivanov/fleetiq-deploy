@@ -175,7 +175,12 @@ export async function qualify(onProgress = () => {}) {
     assert.equal(bootstrap(), 'platform operator bootstrapped');
     assert.equal(bootstrap(), 'platform operator was already bootstrapped');
     record('explicit-real-bootstrap-and-idempotent-repeat');
-    for (const path of ['/', '/tenants/tenant-a/assets/asset-1']) {
+    for (const path of [
+      '/',
+      '/assets',
+      '/assets/asset-1',
+      '/tenants/tenant-a/assets/asset-1',
+    ]) {
       const response = await get(path);
       assert.equal(response.status, 200);
       assert.match(response.body, /<html/u);

@@ -12,6 +12,7 @@ const services = new Set([
   'backend',
   'issuer',
   'edge',
+  'normal-edge',
   'ingest',
   'replay',
   'semantic',

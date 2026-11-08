@@ -55,6 +55,7 @@ export async function transmit(
     }
     notify();
   });
+  socket.on('end', notify);
   socket.on('error', () => {
     failure = new Error('Device connection failed');
     notify();
@@ -103,6 +104,16 @@ export async function transmit(
       1,
       'Only durable acceptance releases the record ACK',
     );
+    // The ACK precedes completion of the ingest turn. Finish the TCP
+    // exchange before another fixture session can contend for the peer slot.
+    onStep('device-close');
+    socket.end();
+    while (!socket.readableEnded) {
+      if (failure) throw failure;
+      await new Promise((ready) => {
+        wake = ready;
+      });
+    }
   } finally {
     clearTimeout(timer);
     socket.destroy();
