@@ -97,7 +97,7 @@ export async function qualifyRestoredHistory({
       restore_generation: '1',
     },
   });
-  setStep('mixed-history-inspect');
+  setStep('mixed-history-window');
   const historyReview = page.getByRole('region', { name: 'Property history review' });
   await historyReview.getByLabel('History end (Unix ms, exclusive)').fill('2500');
   await historyReview.getByRole('button', { name: 'Apply history window' }).click();
@@ -108,6 +108,7 @@ export async function qualifyRestoredHistory({
   await expect(rows.getByRole('row').nth(1)).toContainText('111');
   await expect(rows.getByRole('row').nth(2)).toContainText('222');
 
+  setStep('mixed-history-membership');
   const mixed = await api(
     page,
     `${property}/history?start_at_ms=0&end_at_ms=2500&${selection}&include_restore_membership=true`,
@@ -128,6 +129,7 @@ export async function qualifyRestoredHistory({
     [2, hotInterpretation, '', hotProvenance],
     [1, interpretation, selectedQuery, provenance],
   ]) {
+    setStep(row === 2 ? 'mixed-history-hot-inspect' : 'mixed-history-restored-inspect');
     const [inspected] = await Promise.all([
       page.waitForResponse(responseFor(path)),
       historyReview
@@ -140,10 +142,13 @@ export async function qualifyRestoredHistory({
     assert.equal(new URL(inspected.url()).search, search);
     assert.equal(inspected.status(), 200);
     assert.deepEqual(await inspected.json(), expected);
-    const location = new URL(page.url()).searchParams;
-    assert.equal(location.get('history_manifest'), '1');
-    assert.equal(location.get('history_generation'), '1');
-    assert.equal(location.get('history_end'), '2500');
+    await expect(page).toHaveURL(
+      ({ searchParams }) =>
+        searchParams.get('history_manifest') === '1' &&
+        searchParams.get('history_generation') === '1' &&
+        searchParams.get('history_end') === '2500' &&
+        searchParams.get('interpretation') === expected.interpretation,
+    );
     for (const [label, value] of [
       [
         'Original binding',

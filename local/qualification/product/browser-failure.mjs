@@ -40,6 +40,12 @@ const steps = new Set([
   'browser-export-ready',
   'browser-export-download',
   'archive-lifecycle',
+  'restored-export',
+  'mixed-history-window',
+  'mixed-history-membership',
+  'mixed-history-hot-inspect',
+  'mixed-history-restored-inspect',
+  'restored-inspect-revoked',
   'unknown',
 ]);
 const causes = new Set([
@@ -88,14 +94,14 @@ export function browserFailure(step, error, cspBlocked = false, uiCause) {
       ? 'content-security-policy'
       : /ERR_CERT_[A-Z_]+/u.test(message)
         ? 'certificate-trust'
-        : uiCause && causes.has(uiCause)
-          ? uiCause
-          : error?.name === 'TimeoutError' || /[Tt]imeout|[Tt]imed out/u.test(message)
-            ? 'timeout'
-            : /Target.*closed|browser.*closed/iu.test(message)
-              ? 'browser-closed'
-              : error?.name === 'AssertionError' || /expect\(/u.test(message)
-                ? 'assertion'
+        : error?.name === 'AssertionError' || /expect\(/u.test(message)
+          ? 'assertion'
+          : uiCause && causes.has(uiCause)
+            ? uiCause
+            : error?.name === 'TimeoutError' || /[Tt]imeout|[Tt]imed out/u.test(message)
+              ? 'timeout'
+              : /Target.*closed|browser.*closed/iu.test(message)
+                ? 'browser-closed'
                 : 'unclassified');
   return { step: steps.has(step) ? step : 'unknown', cause };
 }
