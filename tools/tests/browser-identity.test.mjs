@@ -283,3 +283,19 @@ test('TCP failure phases cannot be obscured by an incidental metadata page fallb
     );
   }
 });
+
+test('mixed-history diagnostics retain the exact step and assertion without exposing details', () => {
+  const error = new assert.AssertionError({ message: 'private assertion detail' });
+  for (const step of [
+    'restored-export',
+    'mixed-history-window',
+    'mixed-history-membership',
+    'mixed-history-hot-inspect',
+    'mixed-history-restored-inspect',
+    'restored-inspect-revoked',
+  ]) {
+    const record = browserFailure(step, error, false, 'metadata-context');
+    assert.deepEqual(record, { step, cause: 'assertion' });
+    assert.deepEqual(parseBrowserFailure(formatBrowserFailure(record)), record);
+  }
+});

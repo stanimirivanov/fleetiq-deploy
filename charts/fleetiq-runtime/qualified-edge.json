@@ -1,6 +1,6 @@
 {
-  "image": "ghcr.io/stanimirivanov/fleetiq-ui@sha256:ec127bffa3d5f09bb86d4980edc99c07fd02cbbdf2d90074de2661acf0979b15",
-  "revision": "a1c128288995a73afe4af6a87d080cfed26fa3ad",
+  "image": "ghcr.io/stanimirivanov/fleetiq-ui@sha256:ed09cc478db583a0fc50ec2f19bbb07908e07f57fd44318d5766cdefab4fd8ee",
+  "revision": "d4c9b1af241ffeabb59b112ff318cf034066a70f",
   "platform": "linux/amd64",
-  "publication": "https://github.com/stanimirivanov/fleetiq-ui/actions/runs/42509803703"
+  "publication": "https://github.com/stanimirivanov/fleetiq-ui/actions/runs/42575530229"
 }

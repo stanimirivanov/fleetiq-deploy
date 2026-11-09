@@ -86,49 +86,6 @@ export async function qualifyRestoredHistory({
     manifest_id: '1',
     restore_generation: '1',
   });
-  // Exact change equality includes the original binding, source and first-resolution times.
-  await expect(
-    page.getByRole('region', { name: 'Property history review' }),
-  ).toContainText('restored');
-  setStep('restored-inspect');
-  const selectedInterpretation = `${interpretation}?manifest_id=1&restore_generation=1`;
-  const selectedResponse = (response) => {
-    const url = new URL(response.url());
-    return (
-      response.request().method() === 'GET' &&
-      `${url.pathname}${url.search}` === selectedInterpretation
-    );
-  };
-  const historyReview = page.getByRole('region', { name: 'Property history review' });
-  const [inspected] = await Promise.all([
-    page.waitForResponse(selectedResponse),
-    historyReview
-      .getByRole('button', { name: 'Inspect history interpretation 1', exact: true })
-      .click(),
-  ]);
-  assert.equal(inspected.status(), 200);
-  assert.deepEqual(await inspected.json(), provenance);
-  const panel = page.getByRole('region', { name: 'Interpretation provenance' });
-  for (const [label, value] of [
-    [
-      'Original binding',
-      `${provenance.binding_id} · revision ${provenance.binding_revision}`,
-    ],
-    [
-      'Source',
-      `${provenance.source.device_asset_id} / ${provenance.source.endpoint_id} / ${provenance.source.signal_id}`,
-    ],
-    [
-      'Decoder',
-      `${provenance.source.protocol_package_id} / ${provenance.source.protocol_package_version}`,
-    ],
-    ['First effective cutoff', provenance.first_resolution_effective_at_ms],
-    ['First knowledge cutoff', provenance.first_resolution_known_at_ms],
-  ]) {
-    await expect(
-      panel.getByText(label, { exact: true }).locator('..').locator('dd'),
-    ).toHaveText(value);
-  }
   setStep('restored-export');
   const exportPath = await qualifyExport({
     page,
@@ -140,6 +97,83 @@ export async function qualifyRestoredHistory({
       restore_generation: '1',
     },
   });
+  setStep('mixed-history-window');
+  const historyReview = page.getByRole('region', { name: 'Property history review' });
+  await historyReview.getByLabel('History end (Unix ms, exclusive)').fill('2500');
+  await historyReview.getByRole('button', { name: 'Apply history window' }).click();
+  const rows = historyReview.getByRole('table', {
+    name: 'Exact historical values, quality and provenance',
+  });
+  await expect(rows.getByRole('row')).toHaveCount(3);
+  await expect(rows.getByRole('row').nth(1)).toContainText('111');
+  await expect(rows.getByRole('row').nth(2)).toContainText('222');
+
+  setStep('mixed-history-membership');
+  const mixed = await api(
+    page,
+    `${property}/history?start_at_ms=0&end_at_ms=2500&${selection}&include_restore_membership=true`,
+  );
+  assert.deepEqual(mixed.restored_row_indices, [0]);
+  assert.equal(mixed.changes.length, 2);
+  assert.deepEqual(mixed.changes[0], original[0]);
+  const hotInterpretation = `${property}/interpretations/${mixed.changes[1].interpretation}`;
+  const hotProvenance = await api(page, hotInterpretation);
+  assert.deepEqual(hotProvenance, mixed.changes[1]);
+  assert.equal(hotProvenance.source.message_id, 'new');
+
+  const selectedQuery = '?manifest_id=1&restore_generation=1';
+  const responseFor = (path) => (response) =>
+    response.request().method() === 'GET' && new URL(response.url()).pathname === path;
+  const panel = page.getByRole('region', { name: 'Interpretation provenance' });
+  for (const [row, path, search, expected] of [
+    [2, hotInterpretation, '', hotProvenance],
+    [1, interpretation, selectedQuery, provenance],
+  ]) {
+    setStep(row === 2 ? 'mixed-history-hot-inspect' : 'mixed-history-restored-inspect');
+    const [inspected] = await Promise.all([
+      page.waitForResponse(responseFor(path)),
+      historyReview
+        .getByRole('button', {
+          name: `Inspect history interpretation ${row}`,
+          exact: true,
+        })
+        .click(),
+    ]);
+    assert.equal(new URL(inspected.url()).search, search);
+    assert.equal(inspected.status(), 200);
+    assert.deepEqual(await inspected.json(), expected);
+    await expect(page).toHaveURL(
+      ({ searchParams }) =>
+        searchParams.get('history_manifest') === '1' &&
+        searchParams.get('history_generation') === '1' &&
+        searchParams.get('history_end') === '2500' &&
+        searchParams.get('interpretation') === expected.interpretation,
+    );
+    for (const [label, value] of [
+      [
+        'Original binding',
+        `${expected.binding_id} · revision ${expected.binding_revision}`,
+      ],
+      [
+        'Source',
+        `${expected.source.device_asset_id} / ${expected.source.endpoint_id} / ${expected.source.signal_id}`,
+      ],
+      [
+        'Decoder',
+        `${expected.source.protocol_package_id} / ${expected.source.protocol_package_version}`,
+      ],
+      ['First effective cutoff', expected.first_resolution_effective_at_ms],
+      ['First knowledge cutoff', expected.first_resolution_known_at_ms],
+      [
+        'Message / output',
+        `${expected.source.message_id} / ${expected.source.output_index}`,
+      ],
+    ]) {
+      await expect(
+        panel.getByText(label, { exact: true }).locator('..').locator('dd'),
+      ).toHaveText(value);
+    }
+  }
   await api(page, `${tenant}/actors/operator-a/access-changes`, {
     method: 'POST',
     body: {
@@ -150,17 +184,22 @@ export async function qualifyRestoredHistory({
   });
   setStep('restored-inspect-revoked');
   const [denied] = await Promise.all([
-    page.waitForResponse(selectedResponse),
+    page.waitForResponse(responseFor(interpretation)),
     historyReview
       .getByRole('button', { name: 'Refresh history page', exact: true })
       .click(),
   ]);
+  assert.equal(new URL(denied.url()).search, selectedQuery);
   assert.equal(denied.status(), 403);
   await expect(panel.getByText('Original binding', { exact: true })).toHaveCount(0);
   await api(page, generation, { status: 403 });
   await api(page, `${history}&${selection}`, { status: 403 });
   await api(page, exportPath, { status: 403 });
-  checks.push('private-archive-reclamation-and-restore', 'installed-restored-inspect');
+  checks.push(
+    'private-archive-reclamation-and-restore',
+    'installed-restored-inspect',
+    'installed-mixed-history-inspect',
+  );
   writePhase(directory, 'lifecycle-restored', checks);
 }
 

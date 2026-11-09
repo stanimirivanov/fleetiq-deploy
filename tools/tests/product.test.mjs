@@ -572,3 +572,10 @@ test('installed acceptance requires the restored Inspect browser check', () => {
   );
   assert.throws(() => completeProduct({ phase: 'complete', checks: oldReceipt }));
 });
+
+test('installed acceptance requires mixed-history Inspect beyond restored-only evidence', () => {
+  const oldReceipt = requiredChecks.filter(
+    (check) => check !== 'installed-mixed-history-inspect',
+  );
+  assert.throws(() => completeProduct({ phase: 'complete', checks: oldReceipt }));
+});
