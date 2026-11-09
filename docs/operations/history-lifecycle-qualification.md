@@ -13,10 +13,10 @@ pnpm qualify:product
 
 The installed product uses a local backend build from the reviewed platform
 revision and pulls the published UX by digest. The platform revision
-`fb2808e1c0ef4dcfcac3e163bd9f4c603a253945` was qualified and published for
+`a40217ae14c467ec91de163e46ced68590731f6b` was qualified and published for
 Linux AMD64 at digest
-`sha256:47cf1f392ccbcc6bf3681ae6c9bfc46d92c5d068673d79dab77dabb7286a3c7c`.
-See [the backend publication run](https://github.com/stanimirivanov/fleetiq-platform/actions/runs/42493603844).
+`sha256:7dc02efb0eb61552b858661615d98db1e609f6008b845e1ca8e303bfac980357`.
+See [the backend publication run](https://github.com/stanimirivanov/fleetiq-platform/actions/runs/42580519133).
 The local backend build has its own image identity. The current UX digest and
 publication receipt are in the [reviewed edge record](../../charts/fleetiq-runtime/qualified-edge.json).
 
@@ -48,12 +48,13 @@ command clears the old payload and reconciles its exact retry during an outage.
 The browser requests restore while storage is paused. The first attempt stages
 no bytes. Retrying the same generation after recovery restores exact value,
 binding, source and first-resolution evidence with selected-manifest coverage.
-The browser opens Inspect on the restored row, checks that its request carries
-the exact manifest and generation, and compares the response and rendered
-binding, source, and first-resolution cutoffs with the pre-reclamation evidence.
+The browser keeps the one-row restored Parquet export check, then widens the
+history window to include the reclaimed and later hot-only readings. Inspect
+must use the exact selected manifest and generation for the reclaimed row and
+the hot lookup for the later row. Both reads preserve the history selection and
+show the expected binding, source, message, and first-resolution cutoffs.
 After telemetry access is revoked, refreshing history must return 403 for the
-same selected provenance read and clear the displayed evidence. The restored
-Parquet export is also verified before and after revocation.
+same selected provenance read and clear the displayed evidence.
 
 Read the product evidence under `.verification/` for the archive reservation,
 object and staging byte counts, restore attempts, remaining logical work and

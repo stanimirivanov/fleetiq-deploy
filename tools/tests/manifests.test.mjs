@@ -48,7 +48,7 @@ function renderNonlocalEdge(image, replicas) {
 }
 
 const publishedEdge =
-  'ghcr.io/stanimirivanov/fleetiq-ui@sha256:ec127bffa3d5f09bb86d4980edc99c07fd02cbbdf2d90074de2661acf0979b15';
+  'ghcr.io/stanimirivanov/fleetiq-ui@sha256:ed09cc478db583a0fc50ec2f19bbb07908e07f57fd44318d5766cdefab4fd8ee';
 
 test('nonlocal Helm admission rejects more than two steady edge replicas', () => {
   assert.doesNotThrow(() => renderNonlocalEdge(publishedEdge, 2));

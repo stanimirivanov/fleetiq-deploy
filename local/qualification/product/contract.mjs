@@ -24,6 +24,7 @@ export const requiredChecks = [
   'installed-numeric-summary',
   'private-archive-reclamation-and-restore',
   'installed-restored-inspect',
+  'installed-mixed-history-inspect',
   'permission-revocation',
   'logout-invalidates-session',
 ];
