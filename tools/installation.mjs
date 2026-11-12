@@ -277,6 +277,7 @@ export function appliedInstallation(name, docker) {
       ...(model.services.alertmanager ? analyticsServices : []),
       ...(model.services[archiveService] ? [archiveService] : []),
       ...(model.services['tcp-ingestion'] ? pipelineServices : []),
+      ...(model.services['demo-issuer'] ? ['demo-issuer', 'simulator'] : []),
     ].sort(),
   );
   for (const service of Object.values(model.services)) assert(!service.container_name);

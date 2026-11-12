@@ -1,8 +1,68 @@
 # Owned simulator demo metadata
 
-SIM-PR4 adds a foreground metadata seeder. It does not start Compose, bootstrap
-an operator, run a simulator or reset a database. SIM-PR6 owns that lifecycle;
-SIM-PR7 owns simulator-to-map/Inspect acceptance. Normal OIDC startup is unchanged.
+## TL;DR
+
+SIM-PR6 adds the explicit one-device lifecycle below. Startup provisions through
+real browser OIDC before starting the pipeline and the pinned simulator. Ordinary
+shutdown retains state; reset deletes only the positively identified demo. This
+is a synthetic local demo. SIM-PR7 owns map/Inspect acceptance; hardware issue #59
+remains separate and physical not-run.
+
+## One-device lifecycle
+
+Run `pnpm local build` first. Keep the reviewed componentized Teltonika artifact
+outside the checkout in a regular file owned by your nonroot user, mode 0600.
+Initialization records its exact content and the published simulator pin:
+
+```bash
+pnpm local demo-init simulator-demo /absolute/private/path/teltonika.wasm
+```
+
+Before startup, map `fleet.fleetiq.test` and `issuer.fleetiq.test` to 127.0.0.1.
+Review the generated **public** `.local/demo-identities/simulator-demo/ca.crt` and
+explicitly trust that CA in Node and Chromium, following the identity runbook.
+No demo command edits host DNS or installs trust. Then run:
+
+```bash
+NODE_EXTRA_CA_CERTS=.local/demo-identities/simulator-demo/ca.crt pnpm local demo-up simulator-demo
+pnpm local demo-down simulator-demo
+NODE_EXTRA_CA_CERTS=.local/demo-identities/simulator-demo/ca.crt pnpm local demo-up simulator-demo
+pnpm local demo-reset simulator-demo --confirm-owned-instance simulator-demo
+```
+
+Use these commands for the demo instance. The issuer and browser ports are fixed
+loopback 59443 and 58443; the ingestion listener has no host port. The simulator
+joins only the private ingress network, sends one retained Codec 8 record with a
+bounded retry budget, and exits only after the exact ACK. A CLI ACK is not a map
+or projection acceptance claim. Backend/database ports remain private.
+
+`demo-up` verifies owner/context/daemon, exact retained inputs and source/image
+provenance, waits for issuer/backend/edge health, idempotently bootstraps the
+retained synthetic operator and reconciles metadata through real browser auth.
+Only then does it start the pipeline, wait for TCP health and run the simulator.
+A provisioning/readiness failure cannot fall through to a send. DNS/CA/browser
+prerequisites remain explicit; failure retains owned state for review/retry.
+
+`demo-down` removes containers/networks and preserves database/certificate volumes,
+issuer keys, device identity, source timestamp, inputs and journal. Every startup
+reauthenticates. `demo-reset` is destructive: it checks the retained recipe,
+context/daemon, owner nonce and every resource label before removing this demo's
+volumes and private directories. Foreign ownership refuses before deletion;
+unrelated resources survive. Interrupted initialization is not silently adopted.
+
+Private inputs/journals are 0600 within 0700 directories. Delegated edge TLS files
+are readable only through explicit mounts from a private 0700 parent, as with
+normal Compose secrets. The CA signing key stays in the original host identity
+directory; the issuer gets only its runtime keys/certificates. Never share private
+state, generated identifiers, cookies or key material. Share only sanitized gate
+receipts and reviewed public CA material.
+
+The canonical Docker gate now requires `demo-lifecycle`: real producer ACK,
+foreign-owner/context rejection, authenticated repeat provisioning, nondestructive
+restart, owned reset and retention of unrelated canary resources. Its browser
+trust exists only in a disposable qualification container; it does not satisfy
+operator host/browser trust prerequisites. The standalone seeder below remains
+available for focused metadata maintenance.
 
 ## Prerequisites and commands
 
@@ -21,7 +81,7 @@ Before `reconcile`, the owner must provide a reachable installation at the exact
 canonical demo browser origin, backend trust/network access to the same canonical
 issuer, host DNS, reviewed public-CA trust for Node **and Chromium**, and the
 Playwright Chromium runtime. These commands never install trust or bypass TLS.
-The Compose/network wiring is a later slice, not supplied by the seeder.
+These standalone commands use the owned lifecycle above; they do not start Compose themselves.
 
 Run the existing explicit `pnpm local bootstrap <instance>` procedure with private
 `bootstrap.json`: use the journal's generated `actorId`, the identity's retained
@@ -56,8 +116,8 @@ publication exposes only an outcome; its immutable retry contract preserves the
 server's original audit evidence, which this API does not return to the seeder. Foreign
 resources without a pending owned intent, changed definitions or identifiers,
 revoked permissions, later binding/route revisions, changed signing identity,
-artifact or request plan fail closed. No reset, overwrite, automatic correction,
-journal migration or deletion command is provided. Resolve drift with the owner;
+artifact or request plan fail closed. The standalone seeder provides no reset, overwrite or automatic journal migration.
+The explicit `demo-reset` command above owns whole-installation reset. Resolve drift with the owner;
 never delete the database or journal to conceal a failed reconciliation.
 
 Only fixed completion/failure categories are printed. Never share the journal,

@@ -6,8 +6,8 @@ import Provider from 'oidc-provider';
 import { demoIdentity, loadDemoIdentity } from '../../tools/demo-identity.mjs';
 
 /** Local synthetic login only; persistent keys, deliberately ephemeral OIDC models. */
-export function createDemoIssuer(directory) {
-  const state = loadDemoIdentity(directory);
+export function createDemoIssuer(directory, { verifyCaKey = true } = {}) {
+  const state = loadDemoIdentity(directory, { verifyCaKey });
   const provider = new Provider(demoIdentity.issuer, {
     clients: [
       {

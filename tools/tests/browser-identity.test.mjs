@@ -387,3 +387,40 @@ test('browser diagnostics retain only an allowlisted source frame, never stack t
     undefined,
   );
 });
+
+test('post-analytics mapping correction diagnostics retain only reviewed steps and exception classes', () => {
+  for (const step of [
+    'mapping-correction-snapshot',
+    'mapping-correction-bindings',
+    'mapping-correction-send',
+    'mapping-correction-current',
+    'mapping-correction-provenance',
+  ]) {
+    const error = new TypeError('unreviewed private response');
+    const record = browserFailure(step, error);
+    assert.deepEqual(record, { step, cause: 'type-error' });
+    assert.deepEqual(parseBrowserFailure(formatBrowserFailure(record)), record);
+    assert(!formatBrowserFailure(record).includes('unreviewed'));
+  }
+});
+
+test('browser response-body failures have bounded categories without retaining request data', () => {
+  for (const [message, cause] of [
+    [
+      'response.body: Protocol error (Network.getResponseBody): No resource with given identifier found private-canary',
+      'response-body-unavailable',
+    ],
+    [
+      'response.body: Request content was evicted from inspector cache private-canary',
+      'response-body-unavailable',
+    ],
+    [
+      'response.json: Unexpected end of JSON input private-canary',
+      'response-json-invalid',
+    ],
+  ]) {
+    const record = browserFailure('mixed-history-restored-inspect', new Error(message));
+    assert.equal(record.cause, cause);
+    assert(!formatBrowserFailure(record).includes('private-canary'));
+  }
+});

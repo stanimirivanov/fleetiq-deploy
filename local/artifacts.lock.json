@@ -22,5 +22,11 @@
     "node": "24.18.0",
     "pnpm": "12.5.1",
     "compose": "5.5.1"
+  },
+  "simulator": {
+    "repository": "https://github.com/stanimirivanov/fleetiq-simulator",
+    "commit": "ba598f8342e9991897a12d40f6a95f577a4b4b56",
+    "sourceSha256": "9624a1c8c5edd378f81c0dc9d9ee18bd5af04e0e0f0ba53bd639fe784de5a9d3",
+    "image": "ghcr.io/stanimirivanov/fleetiq-simulator@sha256:cb10d3dffa97d91a650122cd3fc8999e1f3024e01175bbeb3247a4bbed6e1436"
   }
 }

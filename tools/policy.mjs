@@ -57,8 +57,26 @@ export function config(value) {
     );
   return value;
 }
+/** Optional producer pin: normal installs remain compatible; demo startup requires it. */
+export function validateSimulatorPin(value) {
+  exactKeys(value, ['repository', 'commit', 'sourceSha256', 'image']);
+  assert.equal(value.repository, 'https://github.com/stanimirivanov/fleetiq-simulator');
+  assert.match(value.commit, /^[a-f0-9]{40}$/u);
+  assert.match(value.sourceSha256, /^[a-f0-9]{64}$/u);
+  assert.match(
+    value.image,
+    /^ghcr\.io\/stanimirivanov\/fleetiq-simulator@sha256:[a-f0-9]{64}$/u,
+  );
+}
 export function validateLock(value = lock) {
-  exactKeys(value, ['schemaVersion', 'sources', 'images', 'tools']);
+  exactKeys(value, [
+    'schemaVersion',
+    'sources',
+    'images',
+    'tools',
+    ...(Object.hasOwn(value, 'simulator') ? ['simulator'] : []),
+  ]);
+  if (Object.hasOwn(value, 'simulator')) validateSimulatorPin(value.simulator);
   assert.equal(value.schemaVersion, 1);
   exactKeys(value.sources, ['platform', 'ux']);
   for (const [name, source] of Object.entries(value.sources)) {

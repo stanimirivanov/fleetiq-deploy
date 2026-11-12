@@ -1,5 +1,6 @@
 import { analyticsInstallation, analyticsServices } from './analytics.mjs';
 import { archiveInstallation, archiveService } from './archive.mjs';
+import { demoCommand, parseDemoArguments } from './demo.mjs';
 import {
   appliedInstallation,
   assertOwnership,
@@ -15,11 +16,22 @@ import { pipelineInstallation, pipelineServices } from './pipeline.mjs';
 import { buildImages, prepareSources } from './sources.mjs';
 
 try {
-  const [command, name = 'development'] = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const [command, name = 'development'] = args;
+  const demo = command?.startsWith('demo-') ? parseDemoArguments(args) : null;
   if (command === 'sources') prepareSources();
   else {
     const docker = context();
-    if (command === 'build') buildImages(docker);
+    if (command?.startsWith('demo-')) {
+      try {
+        await demoCommand(demo.command, demo.name, docker, demo.artifactPath);
+      } catch {
+        throw new Error(
+          'Demo lifecycle failed; check owned state, published image and explicit DNS/CA/browser prerequisites',
+        );
+      }
+      console.log('Demo lifecycle command: complete');
+    } else if (command === 'build') buildImages(docker);
     else if (command === 'init') {
       initialize(name, docker);
       console.log(

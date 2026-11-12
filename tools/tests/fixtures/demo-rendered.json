@@ -1,0 +1,819 @@
+{
+  "baseline": {
+    "name": "fixture",
+    "networks": {
+      "application": {
+        "name": "fixture_application",
+        "ipam": {},
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        }
+      },
+      "database": {
+        "name": "fixture_database",
+        "ipam": {},
+        "internal": true,
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        }
+      },
+      "device-ingress": {
+        "name": "fixture_device-ingress",
+        "driver": "bridge",
+        "ipam": {},
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        }
+      }
+    },
+    "secrets": {
+      "database_password": {
+        "name": "fixture_database_password",
+        "file": "/tmp/fixture-password"
+      },
+      "oidc_client_secret": {
+        "name": "fixture_oidc_client_secret",
+        "file": "/tmp/fixture-secret"
+      }
+    },
+    "services": {
+      "backend": {
+        "cap_drop": ["ALL"],
+        "command": null,
+        "depends_on": {
+          "postgres": {
+            "condition": "service_healthy",
+            "required": true
+          }
+        },
+        "entrypoint": null,
+        "environment": {
+          "FLEETIQ_BIND_ADDRESS": "0.0.0.0:8080",
+          "FLEETIQ_BROWSER_ORIGIN": "https://fleet.fleetiq.test:58443",
+          "FLEETIQ_OIDC_CLIENT_ID": "client",
+          "FLEETIQ_OIDC_IDENTITY_AUTHORITY": "demo",
+          "FLEETIQ_OIDC_ISSUER": "https://issuer.fleetiq.test:59443"
+        },
+        "healthcheck": {
+          "test": ["CMD", "/bin/bash", "/opt/fleetiq/healthcheck.sh"],
+          "timeout": "3s",
+          "interval": "3s",
+          "retries": 40,
+          "start_period": "10s"
+        },
+        "image": "backend:test",
+        "init": true,
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        },
+        "mem_limit": "536870912",
+        "networks": {
+          "application": null,
+          "database": null
+        },
+        "pids_limit": 128,
+        "pull_policy": "never",
+        "read_only": true,
+        "restart": "unless-stopped",
+        "secrets": [
+          {
+            "source": "database_password",
+            "target": "/run/secrets/database_password"
+          },
+          {
+            "source": "oidc_client_secret",
+            "target": "/run/secrets/oidc_client_secret"
+          }
+        ],
+        "security_opt": ["no-new-privileges:true"],
+        "stop_grace_period": "15s",
+        "tmpfs": ["/tmp:size=16m,mode=1777,noexec,nosuid"],
+        "user": "10001:10001",
+        "volumes": [
+          {
+            "type": "bind",
+            "source": "/fixture-repository/local/backend-entrypoint.sh",
+            "target": "/opt/fleetiq/backend-entrypoint.sh",
+            "read_only": true,
+            "bind": {}
+          },
+          {
+            "type": "bind",
+            "source": "/fixture-repository/local/healthcheck.sh",
+            "target": "/opt/fleetiq/healthcheck.sh",
+            "read_only": true,
+            "bind": {}
+          }
+        ]
+      },
+      "edge": {
+        "cap_drop": ["ALL"],
+        "command": null,
+        "depends_on": {
+          "backend": {
+            "condition": "service_healthy",
+            "required": true
+          }
+        },
+        "entrypoint": null,
+        "healthcheck": {
+          "test": [
+            "CMD",
+            "wget",
+            "-q",
+            "-O",
+            "/dev/null",
+            "http://127.0.0.1:8081/ready"
+          ],
+          "timeout": "3s",
+          "interval": "3s",
+          "retries": 40
+        },
+        "image": "edge:test",
+        "init": true,
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        },
+        "mem_limit": "268435456",
+        "networks": {
+          "application": null
+        },
+        "pids_limit": 128,
+        "ports": [
+          {
+            "mode": "ingress",
+            "host_ip": "127.0.0.1",
+            "target": 8443,
+            "published": "58443",
+            "protocol": "tcp"
+          }
+        ],
+        "pull_policy": "never",
+        "read_only": true,
+        "restart": "unless-stopped",
+        "security_opt": ["no-new-privileges:true"],
+        "stop_grace_period": "15s",
+        "tmpfs": [
+          "/tmp:size=16m,mode=1777,noexec,nosuid",
+          "/config:size=1m,uid=10001,gid=10001,mode=0700,noexec,nosuid"
+        ],
+        "user": "10001:10001",
+        "volumes": [
+          {
+            "type": "bind",
+            "source": "/fixture-repository/local/Caddyfile",
+            "target": "/etc/caddy/Caddyfile",
+            "read_only": true,
+            "bind": {}
+          },
+          {
+            "type": "volume",
+            "source": "certificates",
+            "target": "/data",
+            "volume": {}
+          }
+        ]
+      },
+      "postgres": {
+        "command": null,
+        "entrypoint": null,
+        "environment": {
+          "POSTGRES_DB": "fleetiq",
+          "POSTGRES_PASSWORD_FILE": "/run/secrets/database_password",
+          "POSTGRES_USER": "fleetiq"
+        },
+        "healthcheck": {
+          "test": [
+            "CMD",
+            "pg_isready",
+            "-h",
+            "127.0.0.1",
+            "-U",
+            "fleetiq",
+            "-d",
+            "fleetiq"
+          ],
+          "timeout": "3s",
+          "interval": "3s",
+          "retries": 40
+        },
+        "image": "postgres:test",
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        },
+        "mem_limit": "536870912",
+        "networks": {
+          "database": null
+        },
+        "restart": "unless-stopped",
+        "secrets": [
+          {
+            "source": "database_password",
+            "target": "/run/secrets/database_password"
+          }
+        ],
+        "security_opt": ["no-new-privileges:true"],
+        "volumes": [
+          {
+            "type": "volume",
+            "source": "database",
+            "target": "/var/lib/postgresql",
+            "volume": {}
+          }
+        ]
+      },
+      "projection-worker": {
+        "cap_drop": ["ALL"],
+        "command": ["project-current"],
+        "depends_on": {
+          "backend": {
+            "condition": "service_healthy",
+            "required": true
+          }
+        },
+        "entrypoint": ["/bin/bash", "/opt/fleetiq/backend-entrypoint.sh"],
+        "image": "backend:test",
+        "init": true,
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        },
+        "mem_limit": "402653184",
+        "networks": {
+          "database": null
+        },
+        "pids_limit": 128,
+        "pull_policy": "never",
+        "read_only": true,
+        "restart": "unless-stopped",
+        "secrets": [
+          {
+            "source": "database_password",
+            "target": "/run/secrets/database_password"
+          }
+        ],
+        "security_opt": ["no-new-privileges:true"],
+        "stop_grace_period": "30s",
+        "tmpfs": ["/tmp:size=16m,mode=1777,noexec,nosuid"],
+        "user": "10001:10001",
+        "volumes": [
+          {
+            "type": "bind",
+            "source": "/fixture-repository/local/backend-entrypoint.sh",
+            "target": "/opt/fleetiq/backend-entrypoint.sh",
+            "read_only": true,
+            "bind": {}
+          }
+        ]
+      },
+      "replay-worker": {
+        "cap_drop": ["ALL"],
+        "command": ["replay-worker"],
+        "depends_on": {
+          "backend": {
+            "condition": "service_healthy",
+            "required": true
+          }
+        },
+        "entrypoint": ["/bin/bash", "/opt/fleetiq/backend-entrypoint.sh"],
+        "image": "backend:test",
+        "init": true,
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        },
+        "mem_limit": "805306368",
+        "networks": {
+          "database": null
+        },
+        "pids_limit": 128,
+        "pull_policy": "never",
+        "read_only": true,
+        "restart": "unless-stopped",
+        "secrets": [
+          {
+            "source": "database_password",
+            "target": "/run/secrets/database_password"
+          }
+        ],
+        "security_opt": ["no-new-privileges:true"],
+        "stop_grace_period": "30s",
+        "tmpfs": ["/tmp:size=16m,mode=1777,noexec,nosuid"],
+        "user": "10001:10001",
+        "volumes": [
+          {
+            "type": "bind",
+            "source": "/fixture-repository/local/backend-entrypoint.sh",
+            "target": "/opt/fleetiq/backend-entrypoint.sh",
+            "read_only": true,
+            "bind": {}
+          }
+        ]
+      },
+      "semantic-worker": {
+        "cap_drop": ["ALL"],
+        "command": ["semantic-worker"],
+        "depends_on": {
+          "backend": {
+            "condition": "service_healthy",
+            "required": true
+          }
+        },
+        "entrypoint": ["/bin/bash", "/opt/fleetiq/backend-entrypoint.sh"],
+        "image": "backend:test",
+        "init": true,
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        },
+        "mem_limit": "402653184",
+        "networks": {
+          "database": null
+        },
+        "pids_limit": 128,
+        "pull_policy": "never",
+        "read_only": true,
+        "restart": "unless-stopped",
+        "secrets": [
+          {
+            "source": "database_password",
+            "target": "/run/secrets/database_password"
+          }
+        ],
+        "security_opt": ["no-new-privileges:true"],
+        "stop_grace_period": "30s",
+        "tmpfs": ["/tmp:size=16m,mode=1777,noexec,nosuid"],
+        "user": "10001:10001",
+        "volumes": [
+          {
+            "type": "bind",
+            "source": "/fixture-repository/local/backend-entrypoint.sh",
+            "target": "/opt/fleetiq/backend-entrypoint.sh",
+            "read_only": true,
+            "bind": {}
+          }
+        ]
+      },
+      "tcp-ingestion": {
+        "cap_drop": ["ALL"],
+        "command": ["ingest-tcp"],
+        "depends_on": {
+          "backend": {
+            "condition": "service_healthy",
+            "required": true
+          }
+        },
+        "entrypoint": ["/bin/bash", "/opt/fleetiq/backend-entrypoint.sh"],
+        "environment": {
+          "FLEETIQ_TCP_BIND_ADDRESS": "0.0.0.0:55027",
+          "FLEETIQ_TCP_CHANNEL_ID": "channel",
+          "FLEETIQ_TCP_IDENTITY_POLICY": "registered-identifiers",
+          "FLEETIQ_TCP_PACKAGE_ID": "package",
+          "FLEETIQ_TCP_PACKAGE_VERSION": "version",
+          "FLEETIQ_TCP_TENANT_ID": "tenant"
+        },
+        "image": "backend:test",
+        "init": true,
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        },
+        "mem_limit": "805306368",
+        "networks": {
+          "database": null,
+          "device-ingress": null
+        },
+        "pids_limit": 128,
+        "ports": [
+          {
+            "mode": "ingress",
+            "host_ip": "127.0.0.1",
+            "target": 55027,
+            "published": "55027",
+            "protocol": "tcp"
+          }
+        ],
+        "pull_policy": "never",
+        "read_only": true,
+        "restart": "unless-stopped",
+        "secrets": [
+          {
+            "source": "database_password",
+            "target": "/run/secrets/database_password"
+          }
+        ],
+        "security_opt": ["no-new-privileges:true"],
+        "stop_grace_period": "30s",
+        "tmpfs": ["/tmp:size=16m,mode=1777,noexec,nosuid"],
+        "user": "10001:10001",
+        "volumes": [
+          {
+            "type": "bind",
+            "source": "/fixture-repository/local/backend-entrypoint.sh",
+            "target": "/opt/fleetiq/backend-entrypoint.sh",
+            "read_only": true,
+            "bind": {}
+          }
+        ]
+      }
+    },
+    "volumes": {
+      "certificates": {
+        "name": "fixture_certificates",
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        }
+      },
+      "database": {
+        "name": "fixture_database",
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        }
+      }
+    },
+    "x-labels": {
+      "com.fleetiq.deploy.owner": "fixture"
+    },
+    "x-restrictions": {
+      "cap_drop": ["ALL"],
+      "init": true,
+      "labels": {
+        "com.fleetiq.deploy.owner": "fixture"
+      },
+      "read_only": true,
+      "restart": "unless-stopped",
+      "security_opt": ["no-new-privileges:true"],
+      "stop_grace_period": "15s"
+    },
+    "x-worker": {
+      "cap_drop": ["ALL"],
+      "depends_on": {
+        "backend": {
+          "condition": "service_healthy"
+        }
+      },
+      "entrypoint": ["/bin/bash", "/opt/fleetiq/backend-entrypoint.sh"],
+      "image": "backend:test",
+      "init": true,
+      "labels": {
+        "com.fleetiq.deploy.owner": "fixture"
+      },
+      "mem_limit": "768m",
+      "pids_limit": 128,
+      "pull_policy": "never",
+      "read_only": true,
+      "restart": "unless-stopped",
+      "secrets": ["database_password"],
+      "security_opt": ["no-new-privileges:true"],
+      "stop_grace_period": "30s",
+      "tmpfs": ["/tmp:size=16m,mode=1777,noexec,nosuid"],
+      "user": "10001:10001",
+      "volumes": ["./backend-entrypoint.sh:/opt/fleetiq/backend-entrypoint.sh:ro"]
+    }
+  },
+  "overlay": {
+    "services": {
+      "backend": {
+        "cap_drop": ["ALL"],
+        "command": null,
+        "depends_on": {
+          "demo-issuer": {
+            "condition": "service_healthy",
+            "required": true
+          },
+          "postgres": {
+            "condition": "service_healthy",
+            "required": true
+          }
+        },
+        "entrypoint": null,
+        "environment": {
+          "FLEETIQ_BIND_ADDRESS": "0.0.0.0:8080",
+          "FLEETIQ_BROWSER_ORIGIN": "https://fleet.fleetiq.test:58443",
+          "FLEETIQ_OIDC_ADDITIONAL_CA_BUNDLE": "/run/secrets/demo_ca",
+          "FLEETIQ_OIDC_CLIENT_ID": "client",
+          "FLEETIQ_OIDC_IDENTITY_AUTHORITY": "demo",
+          "FLEETIQ_OIDC_ISSUER": "https://issuer.fleetiq.test:59443"
+        },
+        "healthcheck": {
+          "test": ["CMD", "/bin/bash", "/opt/fleetiq/healthcheck.sh"],
+          "timeout": "3s",
+          "interval": "3s",
+          "retries": 40,
+          "start_period": "10s"
+        },
+        "image": "backend:test",
+        "init": true,
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        },
+        "mem_limit": "536870912",
+        "networks": {
+          "application": null,
+          "database": null
+        },
+        "pids_limit": 128,
+        "pull_policy": "never",
+        "read_only": true,
+        "restart": "unless-stopped",
+        "secrets": [
+          {
+            "source": "database_password",
+            "target": "/run/secrets/database_password"
+          },
+          {
+            "source": "oidc_client_secret",
+            "target": "/run/secrets/oidc_client_secret"
+          },
+          {
+            "source": "demo_ca",
+            "target": "/run/secrets/demo_ca"
+          }
+        ],
+        "security_opt": ["no-new-privileges:true"],
+        "stop_grace_period": "15s",
+        "tmpfs": ["/tmp:size=16m,mode=1777,noexec,nosuid"],
+        "user": "10001:10001",
+        "volumes": [
+          {
+            "type": "bind",
+            "source": "/fixture-repository/local/backend-entrypoint.sh",
+            "target": "/opt/fleetiq/backend-entrypoint.sh",
+            "read_only": true,
+            "bind": {}
+          },
+          {
+            "type": "bind",
+            "source": "/fixture-repository/local/healthcheck.sh",
+            "target": "/opt/fleetiq/healthcheck.sh",
+            "read_only": true,
+            "bind": {}
+          }
+        ]
+      },
+      "edge": {
+        "cap_drop": ["ALL"],
+        "command": null,
+        "depends_on": {
+          "backend": {
+            "condition": "service_healthy",
+            "required": true
+          }
+        },
+        "entrypoint": null,
+        "healthcheck": {
+          "test": [
+            "CMD",
+            "wget",
+            "-q",
+            "-O",
+            "/dev/null",
+            "http://127.0.0.1:8081/ready"
+          ],
+          "timeout": "3s",
+          "interval": "3s",
+          "retries": 40
+        },
+        "image": "edge:test",
+        "init": true,
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        },
+        "mem_limit": "268435456",
+        "networks": {
+          "application": null
+        },
+        "pids_limit": 128,
+        "ports": [
+          {
+            "mode": "ingress",
+            "host_ip": "127.0.0.1",
+            "target": 8443,
+            "published": "58443",
+            "protocol": "tcp"
+          }
+        ],
+        "pull_policy": "never",
+        "read_only": true,
+        "restart": "unless-stopped",
+        "secrets": [
+          {
+            "source": "demo_tls_cert",
+            "target": "/run/secrets/demo_tls_cert"
+          },
+          {
+            "source": "demo_tls_key",
+            "target": "/run/secrets/demo_tls_key"
+          }
+        ],
+        "security_opt": ["no-new-privileges:true"],
+        "stop_grace_period": "15s",
+        "tmpfs": [
+          "/tmp:size=16m,mode=1777,noexec,nosuid",
+          "/config:size=1m,uid=10001,gid=10001,mode=0700,noexec,nosuid"
+        ],
+        "user": "10001:10001",
+        "volumes": [
+          {
+            "type": "bind",
+            "source": "/tmp/demo-fixture/demo-public/Caddyfile",
+            "target": "/etc/caddy/Caddyfile",
+            "read_only": true,
+            "bind": {}
+          },
+          {
+            "type": "volume",
+            "source": "certificates",
+            "target": "/data",
+            "volume": {}
+          }
+        ]
+      },
+      "tcp-ingestion": {
+        "cap_drop": ["ALL"],
+        "command": ["ingest-tcp"],
+        "depends_on": {
+          "backend": {
+            "condition": "service_healthy",
+            "required": true
+          }
+        },
+        "entrypoint": ["/bin/bash", "/opt/fleetiq/backend-entrypoint.sh"],
+        "environment": {
+          "FLEETIQ_TCP_BIND_ADDRESS": "0.0.0.0:55027",
+          "FLEETIQ_TCP_CHANNEL_ID": "channel",
+          "FLEETIQ_TCP_IDENTITY_POLICY": "registered-identifiers",
+          "FLEETIQ_TCP_PACKAGE_ID": "package",
+          "FLEETIQ_TCP_PACKAGE_VERSION": "version",
+          "FLEETIQ_TCP_TENANT_ID": "tenant"
+        },
+        "healthcheck": {
+          "test": ["CMD", "/bin/bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/55027"],
+          "timeout": "3s",
+          "interval": "1s",
+          "retries": 60
+        },
+        "image": "backend:test",
+        "init": true,
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        },
+        "mem_limit": "805306368",
+        "networks": {
+          "database": null,
+          "device-ingress": null
+        },
+        "pids_limit": 128,
+        "pull_policy": "never",
+        "read_only": true,
+        "restart": "unless-stopped",
+        "secrets": [
+          {
+            "source": "database_password",
+            "target": "/run/secrets/database_password"
+          }
+        ],
+        "security_opt": ["no-new-privileges:true"],
+        "stop_grace_period": "30s",
+        "tmpfs": ["/tmp:size=16m,mode=1777,noexec,nosuid"],
+        "user": "10001:10001",
+        "volumes": [
+          {
+            "type": "bind",
+            "source": "/fixture-repository/local/backend-entrypoint.sh",
+            "target": "/opt/fleetiq/backend-entrypoint.sh",
+            "read_only": true,
+            "bind": {}
+          }
+        ]
+      },
+      "demo-issuer": {
+        "cap_drop": ["ALL"],
+        "command": [
+          "import {createDemoIssuer} from './local/demo/issuer.mjs';createDemoIssuer('/run/identity',{verifyCaKey:false}).listen(59443,'0.0.0.0');"
+        ],
+        "entrypoint": ["node", "--input-type=module", "-e"],
+        "healthcheck": {
+          "test": [
+            "CMD",
+            "node",
+            "--input-type=module",
+            "-e",
+            "import https from 'node:https';import fs from 'node:fs';const r=https.get('https://issuer.fleetiq.test:59443/.well-known/openid-configuration',{ca:fs.readFileSync('/run/identity/ca.crt'),timeout:2000},s=>{s.resume();process.exit(s.statusCode===200?0:1)});r.on('error',()=>process.exit(1));r.on('timeout',()=>process.exit(1));"
+          ],
+          "timeout": "3s",
+          "interval": "3s",
+          "retries": 40
+        },
+        "image": "node:test",
+        "init": true,
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        },
+        "mem_limit": "268435456",
+        "networks": {
+          "application": {
+            "aliases": ["issuer.fleetiq.test"]
+          }
+        },
+        "pids_limit": 64,
+        "ports": [
+          {
+            "mode": "ingress",
+            "host_ip": "127.0.0.1",
+            "target": 59443,
+            "published": "59443",
+            "protocol": "tcp"
+          }
+        ],
+        "pull_policy": "never",
+        "read_only": true,
+        "restart": "unless-stopped",
+        "security_opt": ["no-new-privileges:true"],
+        "tmpfs": ["/tmp:size=16m,mode=1777,noexec,nosuid"],
+        "user": "1000:1000",
+        "volumes": [
+          {
+            "type": "bind",
+            "source": "/fixture-repository/local/demo",
+            "target": "/app/local/demo",
+            "read_only": true,
+            "bind": {}
+          },
+          {
+            "type": "bind",
+            "source": "/fixture-repository/tools",
+            "target": "/app/tools",
+            "read_only": true,
+            "bind": {}
+          },
+          {
+            "type": "bind",
+            "source": "/fixture-repository/node_modules",
+            "target": "/app/node_modules",
+            "read_only": true,
+            "bind": {}
+          },
+          {
+            "type": "bind",
+            "source": "/tmp/demo-fixture/demo-issuer",
+            "target": "/run/identity",
+            "read_only": true,
+            "bind": {}
+          }
+        ],
+        "working_dir": "/app"
+      },
+      "simulator": {
+        "profiles": ["demo-send"],
+        "cap_drop": ["ALL"],
+        "cpus": 1,
+        "command": ["run", "--config", "/run/demo/config.json"],
+        "entrypoint": null,
+        "image": "ghcr.io/stanimirivanov/fleetiq-simulator@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "init": true,
+        "labels": {
+          "com.fleetiq.deploy.owner": "fixture"
+        },
+        "mem_limit": "268435456",
+        "networks": {
+          "device-ingress": null
+        },
+        "pids_limit": 64,
+        "pull_policy": "never",
+        "read_only": true,
+        "restart": "no",
+        "security_opt": ["no-new-privileges:true"],
+        "tmpfs": ["/tmp:size=16m,mode=1777,noexec,nosuid"],
+        "user": "1000:1000",
+        "volumes": [
+          {
+            "type": "bind",
+            "source": "/tmp/demo-fixture/demo-inputs",
+            "target": "/run/demo",
+            "read_only": true,
+            "bind": {}
+          }
+        ]
+      }
+    },
+    "secrets": {
+      "database_password": {
+        "name": "fixture_database_password",
+        "file": "/tmp/fixture-password"
+      },
+      "demo_ca": {
+        "name": "fixture_demo_ca",
+        "file": "/tmp/demo-fixture/demo-public/ca.crt"
+      },
+      "demo_tls_cert": {
+        "name": "fixture_demo_tls_cert",
+        "file": "/tmp/demo-fixture/demo-public/tls.crt"
+      },
+      "demo_tls_key": {
+        "name": "fixture_demo_tls_key",
+        "file": "/tmp/demo-fixture/demo-public/tls.key"
+      },
+      "oidc_client_secret": {
+        "name": "fixture_oidc_client_secret",
+        "file": "/tmp/fixture-secret"
+      }
+    }
+  }
+}
