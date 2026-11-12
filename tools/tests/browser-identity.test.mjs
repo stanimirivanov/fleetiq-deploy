@@ -368,3 +368,22 @@ test('known browser lifecycle and selector errors remain actionable without reta
       cause,
     );
 });
+
+test('browser diagnostics retain only an allowlisted source frame, never stack text', () => {
+  const marker = randomBytes(32).toString('hex');
+  const error = {
+    message: marker,
+    stack: `Error: ${marker}\n    at private (${marker}:1:1)\n    at qualifyExport (/fixture/local/qualification/product/lifecycle.mjs:224:61)\n    at private (/run/private/${marker}:22:2)`,
+  };
+  const record = browserFailure('restored-export', error);
+  assert.deepEqual(record.source, { module: 'lifecycle', line: 224 });
+  assert.deepEqual(parseBrowserFailure(formatBrowserFailure(record)), record);
+  assert(!JSON.stringify(record).includes(marker));
+  assert(!formatBrowserFailure(record).includes(marker));
+  assert.equal(
+    parseBrowserFailure(
+      'FleetIQ browser failure: step=restored-export; cause=unclassified; source=private:224',
+    ),
+    undefined,
+  );
+});

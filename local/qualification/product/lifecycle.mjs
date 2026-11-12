@@ -88,6 +88,7 @@ export async function qualifyRestoredHistory({
   });
   setStep('restored-export');
   const exportPath = await qualifyExport({
+    setStep,
     page,
     expect,
     tenant,
@@ -221,6 +222,7 @@ export async function qualifyExport({
     exportRegion.getByRole('button', { name: 'Request export' }).click(),
   ]);
   assert.equal(request.status(), 202);
+  setStep('browser-export-response');
   const { export_id: exportId, state } = await request.json();
   assert(typeof exportId === 'string' && /^[1-9][0-9]{0,18}$/u.test(exportId));
   const exportPath = `${tenant}/exports/jobs/${exportId}`;
@@ -238,7 +240,9 @@ export async function qualifyExport({
     downloadButton.click(),
   ]);
   assert.equal(download.suggestedFilename(), `fleetiq-export-${exportId}.parquet`);
+  setStep('browser-export-metadata');
   const info = await api(page, exportPath);
+  setStep('browser-export-file');
   const bytes = readFileSync(await download.path());
   assert.equal(info.row_count, 1);
   assert.deepEqual(info.coverage, coverage);

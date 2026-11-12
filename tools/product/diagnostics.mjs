@@ -145,7 +145,7 @@ export function diagnosticSummary(value) {
     value.services
       .map(
         (service) =>
-          `${service.service}: ${service.state}, health=${service.health}, exit=${service.exitCode ?? 'unknown'}, category=${service.category}${service.browserFailure ? `, browser-step=${service.browserFailure.step}, browser-cause=${service.browserFailure.cause}` : ''}${service.apiFailure ? `, operation=${service.apiFailure.operation}, status=${service.apiFailure.status}, expected=${service.apiFailure.expected}` : ''}`,
+          `${service.service}: ${service.state}, health=${service.health}, exit=${service.exitCode ?? 'unknown'}, category=${service.category}${service.browserFailure ? `, browser-step=${service.browserFailure.step}, browser-cause=${service.browserFailure.cause}${service.browserFailure.source ? `, browser-source=${service.browserFailure.source.module}:${service.browserFailure.source.line}` : ''}` : ''}${service.apiFailure ? `, operation=${service.apiFailure.operation}, status=${service.apiFailure.status}, expected=${service.apiFailure.expected}` : ''}`,
       )
       .join('; ') || 'service diagnostics unavailable'
   );

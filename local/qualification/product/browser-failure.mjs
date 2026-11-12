@@ -50,6 +50,9 @@ const steps = new Set([
   'bounded-browser-export',
   'browser-export-request',
   'browser-export-status',
+  'browser-export-response',
+  'browser-export-metadata',
+  'browser-export-file',
   'browser-export-ready',
   'browser-export-download',
   'archive-lifecycle',
@@ -148,19 +151,50 @@ export function browserFailure(step, error, cspBlocked = false, uiCause) {
                   : /Target.*closed|browser.*closed/iu.test(message)
                     ? 'browser-closed'
                     : 'unclassified');
-  return { step: steps.has(step) ? step : 'unknown', cause };
+  const frame =
+    typeof error?.stack === 'string'
+      ? error.stack
+          .split('\n')
+          .slice(1)
+          .map((line) =>
+            /^\s+at .*\/local\/qualification\/product\/(lifecycle|scenario|page|normal-edge|analytics-alerts)\.mjs:([1-9][0-9]{0,3}):[0-9]+\)?$/u.exec(
+              line,
+            ),
+          )
+          .find(Boolean)
+      : undefined;
+  return {
+    step: steps.has(step) ? step : 'unknown',
+    cause,
+    ...(frame ? { source: { module: frame[1], line: Number(frame[2]) } } : {}),
+  };
 }
 export function formatBrowserFailure(value) {
   if (!steps.has(value.step) || !causes.has(value.cause))
     throw new Error('Unreviewed browser diagnostic');
-  return `FleetIQ browser failure: step=${value.step}; cause=${value.cause}`;
+  if (
+    value.source &&
+    (!['lifecycle', 'scenario', 'page', 'normal-edge', 'analytics-alerts'].includes(
+      value.source.module,
+    ) ||
+      !Number.isInteger(value.source.line) ||
+      value.source.line < 1 ||
+      value.source.line > 9999)
+  )
+    throw new Error('Unreviewed browser source');
+  return `FleetIQ browser failure: step=${value.step}; cause=${value.cause}${value.source ? `; source=${value.source.module}:${value.source.line}` : ''}`;
 }
 export function parseBrowserFailure(text) {
-  const match = /^FleetIQ browser failure: step=([a-z-]+); cause=([a-z-]+)\r?$/mu.exec(
-    text,
-  );
+  const match =
+    /^FleetIQ browser failure: step=([a-z-]+); cause=([a-z-]+)(?:; source=(lifecycle|scenario|page|normal-edge|analytics-alerts):([1-9][0-9]{0,3}))?\r?$/mu.exec(
+      text,
+    );
   return match && steps.has(match[1]) && causes.has(match[2])
-    ? { step: match[1], cause: match[2] }
+    ? {
+        step: match[1],
+        cause: match[2],
+        ...(match[3] ? { source: { module: match[3], line: Number(match[4]) } } : {}),
+      }
     : undefined;
 }
 
