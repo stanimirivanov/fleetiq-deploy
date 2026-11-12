@@ -211,6 +211,7 @@ export async function qualifyExport({
   setStep = () => {},
 }) {
   const exportRegion = page.getByRole('region', { name: 'Historical export' });
+  setStep('browser-export-request');
   const [request] = await Promise.all([
     page.waitForResponse(
       (response) =>
@@ -224,6 +225,7 @@ export async function qualifyExport({
   assert(typeof exportId === 'string' && /^[1-9][0-9]{0,18}$/u.test(exportId));
   const exportPath = `${tenant}/exports/jobs/${exportId}`;
   if (state === 'pending') {
+    setStep('browser-export-status');
     await expect.poll(async () => (await api(page, exportPath)).state).toBe('ready');
     await exportRegion.getByRole('button', { name: 'Refresh export status' }).click();
   }
