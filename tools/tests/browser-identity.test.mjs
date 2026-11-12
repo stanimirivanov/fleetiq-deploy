@@ -333,3 +333,57 @@ test('idle metadata context is not a failure and cannot obscure actionable brows
     );
   }
 });
+
+test('demo seeding failures retain only their reviewed commissioning phase', () => {
+  const error = Object.assign(new Error('private commissioning detail'), {
+    phase: 'property',
+  });
+  assert.deepEqual(browserFailure('demo-metadata-reconciliation', error), {
+    step: 'demo-metadata-reconciliation',
+    cause: 'demo-seed-property',
+  });
+  error.phase = 'private-unreviewed-detail';
+  assert.equal(
+    browserFailure('demo-metadata-reconciliation', error).cause,
+    'unclassified',
+  );
+});
+
+test('known browser lifecycle and selector errors remain actionable without retaining messages', () => {
+  for (const [message, cause] of [
+    ['page.waitForResponse: Page crashed', 'browser-page-crashed'],
+    ['locator.click: strict mode violation: private details', 'locator-ambiguous'],
+    [
+      'page.goto: Navigation is interrupted by another navigation to private URL',
+      'navigation-interrupted',
+    ],
+  ])
+    assert.equal(
+      browserFailure(
+        'browser-export-request',
+        new Error(message),
+        false,
+        'metadata-context',
+      ).cause,
+      cause,
+    );
+});
+
+test('browser diagnostics retain only an allowlisted source frame, never stack text', () => {
+  const marker = randomBytes(32).toString('hex');
+  const error = {
+    message: marker,
+    stack: `Error: ${marker}\n    at private (${marker}:1:1)\n    at qualifyExport (/fixture/local/qualification/product/lifecycle.mjs:224:61)\n    at private (/run/private/${marker}:22:2)`,
+  };
+  const record = browserFailure('restored-export', error);
+  assert.deepEqual(record.source, { module: 'lifecycle', line: 224 });
+  assert.deepEqual(parseBrowserFailure(formatBrowserFailure(record)), record);
+  assert(!JSON.stringify(record).includes(marker));
+  assert(!formatBrowserFailure(record).includes(marker));
+  assert.equal(
+    parseBrowserFailure(
+      'FleetIQ browser failure: step=restored-export; cause=unclassified; source=private:224',
+    ),
+    undefined,
+  );
+});

@@ -579,3 +579,11 @@ test('installed acceptance requires mixed-history Inspect beyond restored-only e
   );
   assert.throws(() => completeProduct({ phase: 'complete', checks: oldReceipt }));
 });
+
+test('installed acceptance requires owned demo metadata reconciliation evidence', () => {
+  const withoutDemo = requiredChecks.filter(
+    (check) => check !== 'owned-demo-metadata-reconciliation',
+  );
+  assert.throws(() => completeProduct({ phase: 'complete', checks: withoutDemo }));
+  assert(requiredChecks.includes('owned-demo-metadata-reconciliation'));
+});

@@ -1,3 +1,5 @@
+import { demoSeedFailurePhases } from '../../../tools/demo-seed.mjs';
+
 /** Closed diagnostics: provider URLs, authorization codes and assertion bodies never escape. */
 const steps = new Set([
   'trust-store',
@@ -10,6 +12,7 @@ const steps = new Set([
   'hostname-check',
   'session-check',
   'commissioning',
+  'demo-metadata-reconciliation',
   'device-to-web',
   'device-connect',
   'device-identification',
@@ -47,6 +50,9 @@ const steps = new Set([
   'bounded-browser-export',
   'browser-export-request',
   'browser-export-status',
+  'browser-export-response',
+  'browser-export-metadata',
+  'browser-export-file',
   'browser-export-ready',
   'browser-export-download',
   'archive-lifecycle',
@@ -67,6 +73,9 @@ const causes = new Set([
   'locator-timeout',
   'action-timeout',
   'browser-closed',
+  'browser-page-crashed',
+  'locator-ambiguous',
+  'navigation-interrupted',
   'assertion',
   'metadata-invalid-response',
   'metadata-unavailable',
@@ -80,6 +89,7 @@ const causes = new Set([
   'tenant-discovery-loading',
   'application-error',
   'unclassified',
+  ...demoSeedFailurePhases.map((phase) => `demo-seed-${phase}`),
   'tcp-connection',
   'tcp-closed',
   'tcp-deadline',
@@ -111,37 +121,80 @@ export function browserFailure(step, error, cspBlocked = false, uiCause) {
         ['locator.click:', 'action-timeout'],
       ].find(([prefix]) => message.startsWith(prefix))?.[1]
     : undefined;
+  const seedCause =
+    step === 'demo-metadata-reconciliation' && causes.has(`demo-seed-${error?.phase}`)
+      ? `demo-seed-${error.phase}`
+      : undefined;
+  const browserCause = [
+    ['Page crashed', 'browser-page-crashed'],
+    ['strict mode violation:', 'locator-ambiguous'],
+    ['is interrupted by another navigation', 'navigation-interrupted'],
+  ].find(([fixed]) => message.includes(fixed))?.[1];
   const cause =
     deviceCause ??
+    seedCause ??
     (cspBlocked
       ? 'content-security-policy'
       : /ERR_CERT_[A-Z_]+/u.test(message)
         ? 'certificate-trust'
         : error?.name === 'AssertionError' || /expect\(/u.test(message)
           ? 'assertion'
-          : uiCause && uiCause !== 'metadata-context' && causes.has(uiCause)
-            ? uiCause
-            : timeoutCause
-              ? timeoutCause
-              : error?.name === 'TimeoutError' ||
-                  /[Tt]imeout|[Tt]imed out/u.test(message)
-                ? 'timeout'
-                : /Target.*closed|browser.*closed/iu.test(message)
-                  ? 'browser-closed'
-                  : 'unclassified');
-  return { step: steps.has(step) ? step : 'unknown', cause };
+          : browserCause
+            ? browserCause
+            : uiCause && uiCause !== 'metadata-context' && causes.has(uiCause)
+              ? uiCause
+              : timeoutCause
+                ? timeoutCause
+                : error?.name === 'TimeoutError' ||
+                    /[Tt]imeout|[Tt]imed out/u.test(message)
+                  ? 'timeout'
+                  : /Target.*closed|browser.*closed/iu.test(message)
+                    ? 'browser-closed'
+                    : 'unclassified');
+  const frame =
+    typeof error?.stack === 'string'
+      ? error.stack
+          .split('\n')
+          .slice(1)
+          .map((line) =>
+            /^\s+at .*\/local\/qualification\/product\/(lifecycle|scenario|page|normal-edge|analytics-alerts)\.mjs:([1-9][0-9]{0,3}):[0-9]+\)?$/u.exec(
+              line,
+            ),
+          )
+          .find(Boolean)
+      : undefined;
+  return {
+    step: steps.has(step) ? step : 'unknown',
+    cause,
+    ...(frame ? { source: { module: frame[1], line: Number(frame[2]) } } : {}),
+  };
 }
 export function formatBrowserFailure(value) {
   if (!steps.has(value.step) || !causes.has(value.cause))
     throw new Error('Unreviewed browser diagnostic');
-  return `FleetIQ browser failure: step=${value.step}; cause=${value.cause}`;
+  if (
+    value.source &&
+    (!['lifecycle', 'scenario', 'page', 'normal-edge', 'analytics-alerts'].includes(
+      value.source.module,
+    ) ||
+      !Number.isInteger(value.source.line) ||
+      value.source.line < 1 ||
+      value.source.line > 9999)
+  )
+    throw new Error('Unreviewed browser source');
+  return `FleetIQ browser failure: step=${value.step}; cause=${value.cause}${value.source ? `; source=${value.source.module}:${value.source.line}` : ''}`;
 }
 export function parseBrowserFailure(text) {
-  const match = /^FleetIQ browser failure: step=([a-z-]+); cause=([a-z-]+)\r?$/mu.exec(
-    text,
-  );
+  const match =
+    /^FleetIQ browser failure: step=([a-z-]+); cause=([a-z-]+)(?:; source=(lifecycle|scenario|page|normal-edge|analytics-alerts):([1-9][0-9]{0,3}))?\r?$/mu.exec(
+      text,
+    );
   return match && steps.has(match[1]) && causes.has(match[2])
-    ? { step: match[1], cause: match[2] }
+    ? {
+        step: match[1],
+        cause: match[2],
+        ...(match[3] ? { source: { module: match[3], line: Number(match[4]) } } : {}),
+      }
     : undefined;
 }
 

@@ -38,6 +38,9 @@ function packaging() {
       resolve(root, 'package.json'),
       resolve(root, 'pnpm-lock.yaml'),
       resolve(root, 'local/backend-entrypoint.sh'),
+      resolve(root, 'tools/demo-seed.mjs'),
+      resolve(root, 'local/demo/seed.mjs'),
+      resolve(root, 'local/demo/identity.yaml'),
     ]
       .map((path) => readFileSync(path))
       .join('\n'),
