@@ -1,0 +1,4 @@
+schemaVersion: 1
+issuer: https://issuer.fleetiq.test:59443
+browser: https://fleet.fleetiq.test:58443
+callback: https://fleet.fleetiq.test:58443/api/v1/auth/callback
