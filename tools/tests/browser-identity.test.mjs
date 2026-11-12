@@ -245,7 +245,6 @@ test('UI fallback diagnosis returns fixed categories without retaining arbitrary
     ['The service returned an invalid response.', 'metadata-invalid-response'],
     ['Your session has ended.', 'session-ended'],
     ['The metadata service is unavailable.', 'metadata-unavailable'],
-    ['Choose the required context to review asset identity.', 'metadata-context'],
   ]) {
     const actual = await browserUiCause(page(`${marker} ${copy}`));
     assert.equal(actual, cause);
@@ -297,5 +296,40 @@ test('mixed-history diagnostics retain the exact step and assertion without expo
     const record = browserFailure(step, error, false, 'metadata-context');
     assert.deepEqual(record, { step, cause: 'assertion' });
     assert.deepEqual(parseBrowserFailure(formatBrowserFailure(record)), record);
+  }
+});
+
+test('idle metadata context is not a failure and cannot obscure actionable browser timeouts', async () => {
+  const marker = randomBytes(32).toString('hex');
+  const idlePage = {
+    isClosed: () => false,
+    evaluate: (fn) =>
+      Promise.resolve(
+        runInNewContext(`(${fn.toString()})()`, {
+          document: {
+            body: {
+              textContent: `Choose the required context to review asset identity. ${marker}`,
+            },
+          },
+        }),
+      ),
+  };
+  assert.equal(await browserUiCause(idlePage), undefined);
+  for (const [step, prefix, cause] of [
+    ['map-navigation', 'page.goto', 'navigation-timeout'],
+    ['live-recovery-reading', 'locator.textContent', 'locator-timeout'],
+    ['browser-export-request', 'page.waitForResponse', 'response-timeout'],
+    ['browser-export-request', 'locator.click', 'action-timeout'],
+  ]) {
+    const error = new Error(`${prefix}: Timeout 30000ms exceeded. ${marker}`);
+    error.name = 'TimeoutError';
+    const record = browserFailure(step, error, false, 'metadata-context');
+    assert.deepEqual(record, { step, cause });
+    assert.deepEqual(parseBrowserFailure(formatBrowserFailure(record)), record);
+    assert(!JSON.stringify(record).includes(marker));
+    assert.equal(
+      browserFailure(step, error, false, 'application-error').cause,
+      'application-error',
+    );
   }
 });

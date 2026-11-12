@@ -25,6 +25,14 @@ const steps = new Set([
   'inspector-history',
   'live-start',
   'live-update',
+  'live-recovery-send',
+  'live-recovery-reading',
+  'live-recovery-provenance',
+  'live-recovery-generation',
+  'map-navigation',
+  'map-readiness',
+  'map-leave',
+  'map-disposal',
   'analytics-configure',
   'analytics-anomaly',
   'analytics-alert-browser',
@@ -37,6 +45,8 @@ const steps = new Set([
   'normal-compose-history-controls',
   'normal-compose-inspector',
   'bounded-browser-export',
+  'browser-export-request',
+  'browser-export-status',
   'browser-export-ready',
   'browser-export-download',
   'archive-lifecycle',
@@ -52,6 +62,10 @@ const causes = new Set([
   'content-security-policy',
   'certificate-trust',
   'timeout',
+  'navigation-timeout',
+  'response-timeout',
+  'locator-timeout',
+  'action-timeout',
   'browser-closed',
   'assertion',
   'metadata-invalid-response',
@@ -88,6 +102,15 @@ export function browserFailure(step, error, cspBlocked = false, uiCause) {
         ['Only durable acceptance releases the record ACK', 'tcp-record-rejected'],
       ].find(([fixed]) => message.includes(fixed))?.[1]
     : undefined;
+  // Project only known Playwright operation prefixes; never retain the error body.
+  const timeoutCause = /[Tt]imeout|[Tt]imed out/u.test(message)
+    ? [
+        ['page.goto:', 'navigation-timeout'],
+        ['page.waitForResponse:', 'response-timeout'],
+        ['locator.textContent:', 'locator-timeout'],
+        ['locator.click:', 'action-timeout'],
+      ].find(([prefix]) => message.startsWith(prefix))?.[1]
+    : undefined;
   const cause =
     deviceCause ??
     (cspBlocked
@@ -96,13 +119,16 @@ export function browserFailure(step, error, cspBlocked = false, uiCause) {
         ? 'certificate-trust'
         : error?.name === 'AssertionError' || /expect\(/u.test(message)
           ? 'assertion'
-          : uiCause && causes.has(uiCause)
+          : uiCause && uiCause !== 'metadata-context' && causes.has(uiCause)
             ? uiCause
-            : error?.name === 'TimeoutError' || /[Tt]imeout|[Tt]imed out/u.test(message)
-              ? 'timeout'
-              : /Target.*closed|browser.*closed/iu.test(message)
-                ? 'browser-closed'
-                : 'unclassified');
+            : timeoutCause
+              ? timeoutCause
+              : error?.name === 'TimeoutError' ||
+                  /[Tt]imeout|[Tt]imed out/u.test(message)
+                ? 'timeout'
+                : /Target.*closed|browser.*closed/iu.test(message)
+                  ? 'browser-closed'
+                  : 'unclassified');
   return { step: steps.has(step) ? step : 'unknown', cause };
 }
 export function formatBrowserFailure(value) {
@@ -142,8 +168,6 @@ export async function browserUiCause(page) {
       if (text.includes('Your session has ended.')) return 'session-ended';
       if (text.includes('The metadata service is unavailable.'))
         return 'metadata-unavailable';
-      if (text.includes('Choose the required context to review'))
-        return 'metadata-context';
       return undefined;
     })
     .catch(() => undefined);

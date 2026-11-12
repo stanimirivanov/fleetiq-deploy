@@ -233,7 +233,9 @@ try {
   await waitPhase(directory, 'restart-complete');
   // Keep the production finite retry budget. A longer outage uses its documented
   // operator retry; both paths must establish a fresh full SSE baseline.
+  step = 'live-recovery-send';
   await transmit(Date.now() - 1, 515000200, -1200200);
+  step = 'live-recovery-reading';
   let operatorRetryUsed = false;
   await expect
     .poll(
@@ -244,6 +246,7 @@ try {
       { timeout: 90000 },
     )
     .toBe(true);
+  step = 'live-recovery-provenance';
   assert.deepEqual(
     await api(page, `${evidencePath}/interpretations/${original.interpretation}`),
     provenance,
@@ -253,6 +256,7 @@ try {
     'Restart must establish a new stream',
   );
   assert.equal(liveRequests.at(-1), false, 'Resnapshot must discard the old cursor');
+  step = 'live-recovery-generation';
   assert.notEqual(
     (await api(page, currentPath())).generation,
     initialSnapshot.generation,
@@ -273,7 +277,9 @@ try {
     if (url.pathname === '/maps/tiles/0/0/0.png') dataRead = true;
   });
   for (let cycle = 0; cycle < 3; cycle++) {
+    step = 'map-navigation';
     await ui.map();
+    step = 'map-readiness';
     await expect(
       page
         .getByRole('status')
@@ -284,7 +290,9 @@ try {
     await expect(
       page.getByRole('region', { name: 'Loaded fleet page', exact: true }),
     ).toContainText('asset-main');
+    step = 'map-leave';
     await ui.leaveMap();
+    step = 'map-disposal';
     await expect(page.locator('.maplibregl-canvas')).toHaveCount(0);
     await expect.poll(workers).toBe(0);
   }
@@ -338,7 +346,9 @@ try {
     step = value;
   });
   checks.push('normal-compose-history-controls');
-  await ui.inspector('asset-secondary');
+  await ui.inspector('asset-secondary', (value) => {
+    step = value;
+  });
   step = 'bounded-browser-export';
   await expect(
     page.getByRole('region', { name: 'Hot property history', exact: true }),

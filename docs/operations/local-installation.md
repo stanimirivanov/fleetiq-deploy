@@ -206,3 +206,59 @@ provision the private Alertmanager configuration described in
 The archive overlay selects one tenant and mounts private object storage inputs.
 Start it only after upgrading to the compatible producer and migrating the
 database. See [the archive worker guide](history-archive.md).
+
+## Opt-in local synthetic demo identity
+
+SIM-PR3 provides a standalone demo issuer; provisioning and Compose integration
+follow in SIM-PR4–7. Normal `pnpm local up` still requires complete operator OIDC
+configuration and never selects this issuer implicitly. This is an isolated
+synthetic account, with all local users/processes trusted, not a production login.
+
+After installing the pinned Node/pnpm tools and OpenSSL, initialize once:
+
+```bash
+node tools/demo-identity.mjs init simulator-demo
+node local/demo/issuer.mjs .local/demo-identities/simulator-demo
+```
+
+Run the issuer in a separate terminal. It binds only `127.0.0.1:59443`; an occupied
+port fails startup. Configuration is fixed in `local/demo/identity.yaml`:
+
+- Issuer: `https://issuer.fleetiq.test:59443`.
+- Browser origin: `https://fleet.fleetiq.test:58443`.
+- Exact callback: `https://fleet.fleetiq.test:58443/api/v1/auth/callback`.
+
+The operator must map **both names to 127.0.0.1** in host DNS/hosts configuration
+and review the generated public `ca.crt` before explicitly trusting it in the
+host/browser. The issuer leaf certificate covers exactly both names. No command
+modifies a trust store. For the Node preflight, point `NODE_EXTRA_CA_CERTS` at that
+reviewed public certificate, then run:
+
+```bash
+node tools/demo-identity.mjs preflight simulator-demo
+```
+
+Without DNS, issuer availability or CA trust this command fails. An isolated
+browser trust profile used by qualification does not install host/browser trust.
+The UI origin and callback are reserved here; the UI/Compose demo is not yet
+started by these commands. Later Compose wiring must resolve the **same issuer
+URL and port** through a private network alias and mount only the public CA into
+the backend trust bundle. Never substitute a container-only issuer URL, publish a
+backend/database port, or disable certificate verification.
+
+The private directory is mode 0700; credentials, signing/cookie keys, CA/leaf
+private keys and certificate files are mode 0600. Export only the public CA for
+review/trust. Never share `identity.json`, keys, cookies, codes or tokens in Git,
+logs, issue evidence or command arguments. The stable synthetic subject and exact
+client registration are retained in private state for later seed/bootstrap work.
+Initialization reuses only complete validated state and refuses partial, linked,
+foreign, permissive or inconsistent state without overwriting it.
+
+Restarting the issuer retains client, cookie and signing keys. Its in-memory
+sessions, grants and authorization codes deliberately expire at restart; browser
+and seed must reauthenticate. Session lifetime is 15 minutes, interaction/access
+and ID-token lifetime five minutes, and authorization-code lifetime one minute.
+The provider's development-adapter warning is expected for this explicitly
+nonpersistent local issuer. Certificates expire after 30 days: stop and review
+replacement of the isolated identity before expiry; no automatic key rotation,
+trust changes, reset or adoption is provided. SIGINT/SIGTERM closes the listener.
