@@ -1,3 +1,5 @@
+import { demoSeedFailurePhases } from '../../../tools/demo-seed.mjs';
+
 /** Closed diagnostics: provider URLs, authorization codes and assertion bodies never escape. */
 const steps = new Set([
   'trust-store',
@@ -10,6 +12,7 @@ const steps = new Set([
   'hostname-check',
   'session-check',
   'commissioning',
+  'demo-metadata-reconciliation',
   'device-to-web',
   'device-connect',
   'device-identification',
@@ -67,6 +70,9 @@ const causes = new Set([
   'locator-timeout',
   'action-timeout',
   'browser-closed',
+  'browser-page-crashed',
+  'locator-ambiguous',
+  'navigation-interrupted',
   'assertion',
   'metadata-invalid-response',
   'metadata-unavailable',
@@ -80,6 +86,7 @@ const causes = new Set([
   'tenant-discovery-loading',
   'application-error',
   'unclassified',
+  ...demoSeedFailurePhases.map((phase) => `demo-seed-${phase}`),
   'tcp-connection',
   'tcp-closed',
   'tcp-deadline',
@@ -111,24 +118,36 @@ export function browserFailure(step, error, cspBlocked = false, uiCause) {
         ['locator.click:', 'action-timeout'],
       ].find(([prefix]) => message.startsWith(prefix))?.[1]
     : undefined;
+  const seedCause =
+    step === 'demo-metadata-reconciliation' && causes.has(`demo-seed-${error?.phase}`)
+      ? `demo-seed-${error.phase}`
+      : undefined;
+  const browserCause = [
+    ['Page crashed', 'browser-page-crashed'],
+    ['strict mode violation:', 'locator-ambiguous'],
+    ['is interrupted by another navigation', 'navigation-interrupted'],
+  ].find(([fixed]) => message.includes(fixed))?.[1];
   const cause =
     deviceCause ??
+    seedCause ??
     (cspBlocked
       ? 'content-security-policy'
       : /ERR_CERT_[A-Z_]+/u.test(message)
         ? 'certificate-trust'
         : error?.name === 'AssertionError' || /expect\(/u.test(message)
           ? 'assertion'
-          : uiCause && uiCause !== 'metadata-context' && causes.has(uiCause)
-            ? uiCause
-            : timeoutCause
-              ? timeoutCause
-              : error?.name === 'TimeoutError' ||
-                  /[Tt]imeout|[Tt]imed out/u.test(message)
-                ? 'timeout'
-                : /Target.*closed|browser.*closed/iu.test(message)
-                  ? 'browser-closed'
-                  : 'unclassified');
+          : browserCause
+            ? browserCause
+            : uiCause && uiCause !== 'metadata-context' && causes.has(uiCause)
+              ? uiCause
+              : timeoutCause
+                ? timeoutCause
+                : error?.name === 'TimeoutError' ||
+                    /[Tt]imeout|[Tt]imed out/u.test(message)
+                  ? 'timeout'
+                  : /Target.*closed|browser.*closed/iu.test(message)
+                    ? 'browser-closed'
+                    : 'unclassified');
   return { step: steps.has(step) ? step : 'unknown', cause };
 }
 export function formatBrowserFailure(value) {

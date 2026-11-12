@@ -333,3 +333,38 @@ test('idle metadata context is not a failure and cannot obscure actionable brows
     );
   }
 });
+
+test('demo seeding failures retain only their reviewed commissioning phase', () => {
+  const error = Object.assign(new Error('private commissioning detail'), {
+    phase: 'property',
+  });
+  assert.deepEqual(browserFailure('demo-metadata-reconciliation', error), {
+    step: 'demo-metadata-reconciliation',
+    cause: 'demo-seed-property',
+  });
+  error.phase = 'private-unreviewed-detail';
+  assert.equal(
+    browserFailure('demo-metadata-reconciliation', error).cause,
+    'unclassified',
+  );
+});
+
+test('known browser lifecycle and selector errors remain actionable without retaining messages', () => {
+  for (const [message, cause] of [
+    ['page.waitForResponse: Page crashed', 'browser-page-crashed'],
+    ['locator.click: strict mode violation: private details', 'locator-ambiguous'],
+    [
+      'page.goto: Navigation is interrupted by another navigation to private URL',
+      'navigation-interrupted',
+    ],
+  ])
+    assert.equal(
+      browserFailure(
+        'browser-export-request',
+        new Error(message),
+        false,
+        'metadata-context',
+      ).cause,
+      cause,
+    );
+});

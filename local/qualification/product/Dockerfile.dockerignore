@@ -6,3 +6,8 @@
 !local/qualification
 !local/qualification/product
 !local/qualification/product/**
+!local/demo
+!local/demo/seed.mjs
+!local/demo/identity.yaml
+!tools
+!tools/demo-seed.mjs

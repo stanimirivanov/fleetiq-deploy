@@ -4,6 +4,7 @@ export const requiredChecks = [
   'session-cookie-boundary',
   'csrf-and-cross-tenant-denial',
   'real-wasm-admission',
+  'owned-demo-metadata-reconciliation',
   'durable-tcp-to-property',
   'original-provenance',
   'browser-reading-and-history',

@@ -13,6 +13,7 @@ import {
 } from './browser-failure.mjs';
 import { waitPhase, writePhase } from './channel.mjs';
 import { requiredChecks } from './contract.mjs';
+import { qualifyDemoSeed } from './demo-seed.mjs';
 import { transmit } from './device.mjs';
 import { qualifyExport, qualifyRestoredHistory } from './lifecycle.mjs';
 import { verifyLogicalStorageUsage } from './lifecycle-cost.mjs';
@@ -145,6 +146,9 @@ try {
   step = 'commissioning';
   await seed(page);
   checks.push('csrf-and-cross-tenant-denial', 'real-wasm-admission');
+  step = 'demo-metadata-reconciliation';
+  await qualifyDemoSeed(page);
+  checks.push('owned-demo-metadata-reconciliation');
   writePhase(directory, 'setup-ready', checks);
   await waitPhase(directory, 'workers-started');
   step = 'archive-lifecycle';
