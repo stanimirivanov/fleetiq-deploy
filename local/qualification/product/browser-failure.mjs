@@ -107,19 +107,21 @@ const causes = new Set([
 ]);
 export function browserFailure(step, error, cspBlocked = false, uiCause) {
   const message = typeof error?.message === 'string' ? error.message : '';
-  const deviceCause = step.startsWith('device-')
-    ? [
-        ['Device connection failed', 'tcp-connection'],
-        ['Device connection closed', 'tcp-closed'],
-        ['Device deadline exceeded', 'tcp-deadline'],
-        ['Device reply budget exceeded', 'tcp-reply-budget'],
-        [
-          'Registered device identification must be accepted',
-          'tcp-identification-rejected',
-        ],
-        ['Only durable acceptance releases the record ACK', 'tcp-record-rejected'],
-      ].find(([fixed]) => message.includes(fixed))?.[1]
-    : undefined;
+  const deviceCause =
+    step.startsWith('device-') ||
+    ['live-update', 'live-recovery-send', 'mapping-correction-send'].includes(step)
+      ? [
+          ['Device connection failed', 'tcp-connection'],
+          ['Device connection closed', 'tcp-closed'],
+          ['Device deadline exceeded', 'tcp-deadline'],
+          ['Device reply budget exceeded', 'tcp-reply-budget'],
+          [
+            'Registered device identification must be accepted',
+            'tcp-identification-rejected',
+          ],
+          ['Only durable acceptance releases the record ACK', 'tcp-record-rejected'],
+        ].find(([fixed]) => message.includes(fixed))?.[1]
+      : undefined;
   // Project only known Playwright operation prefixes; never retain the error body.
   const timeoutCause = /[Tt]imeout|[Tt]imed out/u.test(message)
     ? [
@@ -139,7 +141,7 @@ export function browserFailure(step, error, cspBlocked = false, uiCause) {
     ['is interrupted by another navigation', 'navigation-interrupted'],
   ].find(([fixed]) => message.includes(fixed))?.[1];
   const responseCause =
-    /No resource with given identifier found|Request content was evicted from inspector cache/u.test(
+    /No resource with given identifier found|No data found for resource with given identifier|Request content was evicted from inspector cache/u.test(
       message,
     )
       ? 'response-body-unavailable'

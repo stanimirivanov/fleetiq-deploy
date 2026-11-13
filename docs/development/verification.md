@@ -108,3 +108,11 @@ an unknown identity, unchanged accepted data and owned cleanup. CI invokes this
 same command and records `ci-simulator` evidence; a missing or incomplete receipt
 cannot become a successful qualification. Existing Docker/product groups remain
 mandatory. No physical-device or broader simulator-scenario outcome is implied.
+
+
+The browser fixture build runs
+`node --test local/qualification/product/export-response.test.mjs` against real
+Chromium and synthetic loopback HTTP. It consumes an export receipt in the UI, crosses a
+document lifecycle boundary, and verifies qualification without relying on an
+evicted CDP response body or replaying the export PUT. Status, selected job,
+download filename, coverage, row/byte limits and Parquet checks remain required.

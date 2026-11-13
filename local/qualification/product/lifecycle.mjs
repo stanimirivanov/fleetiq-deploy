@@ -223,14 +223,28 @@ export async function qualifyExport({
   ]);
   assert.equal(request.status(), 202);
   setStep('browser-export-response');
-  const { export_id: exportId, state } = await request.json();
-  assert(typeof exportId === 'string' && /^[1-9][0-9]{0,18}$/u.test(exportId));
-  const exportPath = `${tenant}/exports/jobs/${exportId}`;
-  if (state === 'pending') {
-    setStep('browser-export-status');
-    await expect.poll(async () => (await api(page, exportPath)).state).toBe('ready');
-    await exportRegion.getByRole('button', { name: 'Refresh export status' }).click();
-  }
+  // The UI owns the response body. Scoped fetch disposal/navigation can evict CDP's copy.
+  // Observe its selected job through a real status action, without replaying the PUT.
+  const prefix = `${tenant}/exports/jobs/`;
+  const [selected] = await Promise.all([
+    page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return (
+        response.request().method() === 'GET' &&
+        url.pathname.startsWith(prefix) &&
+        /^[1-9][0-9]{0,18}$/u.test(url.pathname.slice(prefix.length))
+      );
+    }),
+    exportRegion.getByRole('button', { name: 'Refresh export status' }).click(),
+  ]);
+  assert.equal(selected.status(), 200);
+  assert.equal(new URL(selected.url()).search, '');
+  const exportId = new URL(selected.url()).pathname.slice(prefix.length);
+  assert(/^[1-9][0-9]{0,18}$/u.test(exportId));
+  const exportPath = `${prefix}${exportId}`;
+  setStep('browser-export-status');
+  await expect.poll(async () => (await api(page, exportPath)).state).toBe('ready');
+  await exportRegion.getByRole('button', { name: 'Refresh export status' }).click();
   const downloadButton = exportRegion.getByRole('button', { name: 'Download export' });
   setStep('browser-export-ready');
   await expect(downloadButton).toBeVisible();
@@ -244,6 +258,7 @@ export async function qualifyExport({
   const info = await api(page, exportPath);
   setStep('browser-export-file');
   const bytes = readFileSync(await download.path());
+  assert.equal(info.export_id, exportId);
   assert.equal(info.row_count, 1);
   assert.deepEqual(info.coverage, coverage);
   assert.equal(info.file_bytes, String(bytes.length));
