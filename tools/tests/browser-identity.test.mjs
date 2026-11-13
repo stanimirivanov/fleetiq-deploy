@@ -411,6 +411,10 @@ test('browser response-body failures have bounded categories without retaining r
       'response-body-unavailable',
     ],
     [
+      'response.body: Protocol error (Network.getResponseBody): No data found for resource with given identifier private-canary',
+      'response-body-unavailable',
+    ],
+    [
       'response.body: Request content was evicted from inspector cache private-canary',
       'response-body-unavailable',
     ],
@@ -422,5 +426,16 @@ test('browser response-body failures have bounded categories without retaining r
     const record = browserFailure('mixed-history-restored-inspect', new Error(message));
     assert.equal(record.cause, cause);
     assert(!formatBrowserFailure(record).includes('private-canary'));
+  }
+});
+
+test('live recovery and mapping sends preserve fixed TCP failure categories without private text', () => {
+  for (const step of ['live-update', 'live-recovery-send', 'mapping-correction-send']) {
+    const result = browserFailure(
+      step,
+      new Error('Device connection closed private-canary'),
+    );
+    assert.deepEqual(result, { step, cause: 'tcp-closed' });
+    assert(!formatBrowserFailure(result).includes('private-canary'));
   }
 });

@@ -77,5 +77,6 @@ metadata reconciliation and one bounded simulator run. The simulator joins only
 device ingress; ingestion has no host port. `pnpm qualify` additionally requires
 the real demo lifecycle and owned cleanup. Its disposable browser trust fixture
 does not install host trust or replace operator DNS/CA prerequisites. See the
-[demo runbook](docs/operations/simulator-demo.md); map/Inspect acceptance belongs
-to SIM-PR7.
+[demo runbook](docs/operations/simulator-demo.md); the separate `pnpm qualify:simulator` gate proves the published simulator
+through the normal map and Inspect. Its baseline raster grid is deployment-owned
+and mounted read-only.

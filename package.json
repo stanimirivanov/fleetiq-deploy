@@ -23,7 +23,8 @@
     "packages:check": "node tools/verify.mjs packages",
     "releases:verify-sources": "node tools/releases/cli.mjs verify-sources",
     "installation:check": "node tools/manifests/bootstrap.mjs",
-    "qualify:product": "node tools/verify.mjs product"
+    "qualify:product": "node tools/verify.mjs product",
+    "qualify:simulator": "node tools/verify.mjs simulator"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

@@ -5,8 +5,8 @@
 SIM-PR6 adds the explicit one-device lifecycle below. Startup provisions through
 real browser OIDC before starting the pipeline and the pinned simulator. Ordinary
 shutdown retains state; reset deletes only the positively identified demo. This
-is a synthetic local demo. SIM-PR7 owns map/Inspect acceptance; hardware issue #59
-remains separate and physical not-run.
+is a synthetic local demo. `pnpm qualify:simulator` qualifies map/Inspect against this lifecycle; hardware
+issue #59 remains separate and physical not-run.
 
 ## One-device lifecycle
 
@@ -34,7 +34,8 @@ Use these commands for the demo instance. The issuer and browser ports are fixed
 loopback 59443 and 58443; the ingestion listener has no host port. The simulator
 joins only the private ingress network, sends one retained Codec 8 record with a
 bounded retry budget, and exits only after the exact ACK. A CLI ACK is not a map
-or projection acceptance claim. Backend/database ports remain private.
+or projection acceptance claim. The separate simulator qualification proves those
+outcomes. Backend/database ports remain private.
 
 `demo-up` verifies owner/context/daemon, exact retained inputs and source/image
 provenance, waits for issuer/backend/edge health, idempotently bootstraps the
@@ -137,3 +138,32 @@ routes/binding pairs, cross-tenant denial and refusal to undo an operator revisi
 The fixture's existing device sender remains independent. Private scratch journals
 and owned product resources are cleaned up; public evidence contains only the
 fixed check identifier. Hardware issue #59 remains separate and physical not-run.
+
+
+## Simulator device-to-map acceptance
+
+Run `pnpm qualify:simulator` after `pnpm local build`. The gate uses the actual
+pinned simulator and normal Compose UI through real synthetic OIDC. It polls for
+the sealed record's exact latitude/longitude, device timestamp, binding, package
+and message provenance; selects its rendered geographic point and follows the
+coordinate's Inspect link. Sample mode, missing output and substituted/stale
+attribution cannot satisfy acceptance. The existing product gate remains separate.
+
+The opt-in demo mounts the deployment's existing synthetic raster grid read-only
+at `/srv/maps`. It is a local basemap background, not invented telemetry or
+navigation data. No external map provider is contacted. Earlier demo instances
+retain their original sealed Compose recipe: stop/reset them using their owned
+lifecycle, then initialize a fresh instance to adopt the new map mount. There is
+no silent recipe migration or deletion of retained data.
+
+An unregistered synthetic identity must be refused before acceptance. The pinned
+platform closes unknown-claim sessions; an explicit refusal byte is also
+recognized. Timeouts cannot count as rejection. The gate
+then rechecks exact history and unchanged accepted-message storage before the
+existing lifecycle proves restart, owned reset and unrelated-resource retention.
+Only fixed check IDs, immutable artifact/source identities and cleanup status
+enter `.verification/simulator-*.json`. Private IDs, records, keys, cookies,
+screenshots and raw browser/process diagnostics remain private and are removed
+with test-owned scratch state. The Inspect browser receives only the expected
+evidence and public CA; a runtime guard rejects seeder journal/WASM mounts. Browser CA trust is confined to disposable state;
+operator host DNS/trust prerequisites are unchanged.

@@ -9,6 +9,6 @@ COPY local/qualification/product ./local/qualification/product
 COPY local/demo/seed.mjs local/demo/identity.yaml ./local/demo/
 COPY tools/demo-seed.mjs ./tools/demo-seed.mjs
 COPY local/backend-entrypoint.sh ./local/backend-entrypoint.sh
-RUN bash -n local/backend-entrypoint.sh && bash -n local/qualification/product/init.sh && bash -n local/qualification/product/archive-client.sh && bash -n local/qualification/product/backend.sh && bash -n local/qualification/product/postgres-initialization.sh && node local/qualification/product/entrypoint-test.mjs
+RUN bash -n local/backend-entrypoint.sh && bash -n local/qualification/product/init.sh && bash -n local/qualification/product/archive-client.sh && bash -n local/qualification/product/backend.sh && bash -n local/qualification/product/postgres-initialization.sh && node local/qualification/product/entrypoint-test.mjs && node --test local/qualification/product/export-response.test.mjs
 USER pwuser
 ENTRYPOINT ["node"]

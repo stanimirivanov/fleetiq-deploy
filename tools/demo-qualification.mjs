@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import {
   chmodSync,
+  closeSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -25,6 +27,13 @@ import { imageInventory } from './sources.mjs';
 
 /** Keep native errors private while identifying only reviewed source modules and failure classes. */
 export function demoFailureDiagnostic(error) {
+  const simulatorPhase =
+    error instanceof Error
+      ? /^Simulator browser qualification failed: (trust|login|projection|map(?:-ready|-list|-point|-coordinate|-resources)?|inspect|storage)$/u.exec(
+          error.message,
+        )
+      : null;
+  if (simulatorPhase) return `simulator-browser-${simulatorPhase[1]}`;
   const category =
     error instanceof CommandFailure
       ? 'command-failed'
@@ -41,7 +50,7 @@ export function demoFailureDiagnostic(error) {
 }
 
 /** Exercises the actual producer and owned lifecycle; evidence contains fixed checks only. */
-export async function qualifyDemo() {
+export async function qualifyDemo({ afterSend } = {}) {
   assert(lock.simulator, 'Published simulator pin missing');
   const docker = context();
   const execute = (args, options = {}) =>
@@ -185,11 +194,20 @@ export async function qualifyDemo() {
               callback,
             ),
         }),
-      reconcile: async (directory, component, settings) => {
+      reconcile: async (
+        directory,
+        component,
+        settings,
+        script = 'qualify-browser.mjs',
+      ) => {
+        assert(['qualify-browser.mjs', 'browser.mjs'].includes(script));
         assert(component.equals(readFileSync(resolve(path, 'teltonika.wasm'))));
         writeFileSync(resolve(scratch, 'request.json'), JSON.stringify(settings), {
           mode: 0o600,
         });
+        const errorFile = resolve(scratch, 'browser.stderr');
+        const stderr =
+          script === 'browser.mjs' ? openSync(errorFile, 'w', 0o600) : undefined;
         try {
           const result = execute(
             [
@@ -217,26 +235,52 @@ export async function qualifyDemo() {
               'HOME=/tmp/home',
               '--tmpfs',
               '/tmp:size=256m,mode=1777,noexec,nosuid',
-              '--tmpfs',
-              `/run/seed-parent:size=1m,mode=0700,uid=${process.getuid()},gid=${process.getgid()},noexec,nosuid`,
-              ...bind(resolve(directory, 'seed'), '/run/seed-parent/seed', false),
-              ...bind(resolve(path, 'teltonika.wasm'), '/run/input/teltonika.wasm'),
+              ...(script === 'qualify-browser.mjs'
+                ? [
+                    '--tmpfs',
+                    `/run/seed-parent:size=1m,mode=0700,uid=${process.getuid()},gid=${process.getgid()},noexec,nosuid`,
+                    ...bind(resolve(directory, 'seed'), '/run/seed-parent/seed', false),
+                    ...bind(
+                      resolve(path, 'teltonika.wasm'),
+                      '/run/input/teltonika.wasm',
+                    ),
+                  ]
+                : []),
               ...bind(
                 resolve(scratch, 'request.json'),
                 '/run/qualification/request.json',
               ),
               ...bind(resolve(path, 'demo-public/ca.crt'), '/run/public/ca.crt'),
               ...bind(
-                resolve(root, 'local/demo/qualify-browser.mjs'),
-                '/fixture/local/demo/qualify-browser.mjs',
+                resolve(root, `local/demo/${script}`),
+                `/fixture/local/demo/${script}`,
+              ),
+              ...bind(
+                resolve(root, 'local/demo/evidence.mjs'),
+                '/fixture/local/demo/evidence.mjs',
               ),
               built.Id,
-              'local/demo/qualify-browser.mjs',
+              `local/demo/${script}`,
             ],
-            { timeout: 180000 },
+            {
+              timeout: 180000,
+              ...(stderr === undefined ? {} : { stdio: ['ignore', 'pipe', stderr] }),
+            },
           );
-          assert.equal(result, 'demo-seed-qualified');
+          if (script === 'qualify-browser.mjs')
+            assert.equal(result, 'demo-seed-qualified');
+          else return JSON.parse(result);
+        } catch (error) {
+          if (stderr !== undefined) {
+            const phase =
+              /^Simulator browser qualification failed: (trust|login|projection|map(?:-ready|-list|-point|-coordinate|-resources)?|inspect|storage)$/mu.exec(
+                readFileSync(errorFile, 'utf8'),
+              );
+            if (phase) throw new Error(phase[0]);
+          }
+          throw error;
         } finally {
+          if (stderr !== undefined) closeSync(stderr);
           const ids = execute([
             'ps',
             '--all',
@@ -251,6 +295,16 @@ export async function qualifyDemo() {
     phase = 'first-up';
     await demoCommand('up', name, docker, undefined, adapters);
     checks.push('real-producer-ack');
+    if (afterSend) {
+      phase = 'simulator-product';
+      await afterSend({
+        site,
+        directory: identity,
+        scratch,
+        browser: (settings) =>
+          adapters.reconcile(identity, readFileSync(artifact), settings, 'browser.mjs'),
+      });
+    }
     const provisioned = retained();
     phase = 'retained-restart';
     await demoCommand('down', name, docker);
