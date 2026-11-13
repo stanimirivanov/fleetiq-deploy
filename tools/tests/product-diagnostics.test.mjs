@@ -197,3 +197,24 @@ test('foreign identities, unknown roles, inspect failures and oversized output r
   assert.equal(logFailure.services.length, 1);
   assert(!JSON.stringify(logFailure).includes(marker));
 });
+
+test('owned demo roles share redacted runtime diagnostics without exposing private logs', () => {
+  for (const service of [
+    'demo-issuer',
+    'simulator',
+    'tcp-ingestion',
+    'replay-worker',
+    'semantic-worker',
+    'projection-worker',
+  ]) {
+    const candidate = resource();
+    candidate.Config.Labels['com.docker.compose.service'] = service;
+    const result = serviceDiagnostic(
+      candidate,
+      { stdout: 'private credential', stderr: '' },
+      { project, owner },
+    );
+    assert.equal(result.service, service);
+    assert(!JSON.stringify(result).includes('private credential'));
+  }
+});

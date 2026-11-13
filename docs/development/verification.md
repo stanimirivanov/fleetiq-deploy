@@ -88,6 +88,12 @@ source commits retain their exact version/digest pins. Change the authority in
 `tools/ci.mjs` and render it together with the workflow; mutation tests protect
 mandatory gates, major action versions and evidence collection.
 
+The Docker group also inventories `demo-lifecycle`: the pinned simulator, normal
+installation and real browser provisioning prove readiness ordering, retained
+down/up state, foreign-owner/context rejection and owned reset with unrelated
+resource canaries. It does not claim map/Inspect acceptance. Browser CA trust is
+confined to disposable qualification state.
+
 The Docker group also inventories analytics-routing: the pinned real Alertmanager
 and a synthetic-only receiver exercise firing/resolved, unreachable router and
 restart with owner-checked cleanup. No installed milestone outcome is implied.

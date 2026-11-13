@@ -85,9 +85,14 @@ export function demoSeedFailureMessage(error) {
 }
 
 /** A new isolated browser session authenticates on every run; only private journal state survives. */
-async function run(directory, artifact, settings) {
+export async function reconcileDemoBrowser(
+  directory,
+  artifact,
+  settings,
+  { launchOptions = {} } = {},
+) {
   const { chromium } = await import('@playwright/test');
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ ...launchOptions, headless: true });
   let page;
   try {
     const context = await browser.newContext({ serviceWorkers: 'block' });
@@ -153,7 +158,7 @@ if (
     if (command === 'init') initializeDemoSeed(directory, { ...settings, artifact });
     else {
       await preflightDemoIdentity();
-      await run(directory, artifact, settings);
+      await reconcileDemoBrowser(directory, artifact, settings);
     }
     console.log(`Demo seed ${command}: complete`);
   } catch (error) {

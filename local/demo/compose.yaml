@@ -1,0 +1,66 @@
+x-demo: &demo
+  labels: {com.fleetiq.deploy.owner: '${FLEETIQ_OWNER:?Missing owner}'}
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  mem_limit: 256m
+  pids_limit: 64
+  tmpfs: ['/tmp:size=16m,mode=1777,noexec,nosuid']
+services:
+  demo-issuer:
+    <<: *demo
+    image: ${FLEETIQ_SIMULATOR_IMAGE:?Missing qualified Node runtime}
+    pull_policy: never
+    user: ${FLEETIQ_DEMO_USER:?Missing nonroot owner}
+    restart: unless-stopped
+    working_dir: /app
+    entrypoint: [/usr/local/bin/node, --input-type=module, -e]
+    command: ["import {createDemoIssuer} from './local/demo/issuer.mjs';createDemoIssuer('/run/identity',{verifyCaKey:false}).listen(59443,'0.0.0.0');"]
+    ports: ['127.0.0.1:59443:59443']
+    networks:
+      application: {aliases: [issuer.fleetiq.test]}
+    volumes:
+      - ./demo:/app/local/demo:ro
+      - ../tools:/app/tools:ro
+      - ../node_modules:/app/node_modules:ro
+      - ${FLEETIQ_DEMO_ISSUER_DIR:?Missing owned issuer state}:/run/identity:ro
+    healthcheck:
+      test: [CMD, /usr/local/bin/node, --input-type=module, -e, "import https from 'node:https';import fs from 'node:fs';const r=https.get('https://issuer.fleetiq.test:59443/.well-known/openid-configuration',{ca:fs.readFileSync('/run/identity/ca.crt'),timeout:2000},s=>{s.resume();process.exit(s.statusCode===200?0:1)});r.on('error',()=>process.exit(1));r.on('timeout',()=>process.exit(1));"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+  backend:
+    environment:
+      FLEETIQ_OIDC_ADDITIONAL_CA_BUNDLE: /run/secrets/demo_ca
+    secrets: [demo_ca]
+    depends_on:
+      demo-issuer: {condition: service_healthy}
+  edge:
+    volumes: !override
+      - ${FLEETIQ_DEMO_CADDY_FILE:?Missing owned edge config}:/etc/caddy/Caddyfile:ro
+      - certificates:/data
+    secrets: [demo_tls_cert, demo_tls_key]
+  tcp-ingestion:
+    ports: !reset []
+    healthcheck:
+      test: [CMD, /bin/bash, -c, 'exec 3<>/dev/tcp/127.0.0.1/55027']
+      interval: 1s
+      timeout: 3s
+      retries: 60
+  simulator:
+    <<: *demo
+    image: ${FLEETIQ_SIMULATOR_IMAGE:?Missing published simulator digest}
+    pull_policy: never
+    user: ${FLEETIQ_DEMO_USER:?Missing nonroot owner}
+    cpus: 1
+    profiles: [demo-send]
+    restart: 'no'
+    command: [run, --config, /run/demo/config.json]
+    networks: [device-ingress]
+    volumes:
+      - ${FLEETIQ_DEMO_INPUT_DIR:?Missing owned simulator inputs}:/run/demo:ro
+secrets:
+  demo_ca: {file: '${FLEETIQ_DEMO_CA_FILE:?Missing public CA}'}
+  demo_tls_cert: {file: '${FLEETIQ_DEMO_CERT_FILE:?Missing leaf certificate}'}
+  demo_tls_key: {file: '${FLEETIQ_DEMO_KEY_FILE:?Missing private leaf key}'}

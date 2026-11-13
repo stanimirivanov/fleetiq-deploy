@@ -43,6 +43,11 @@ const steps = new Set([
   'analytics-recovery',
   'analytics-duplicate',
   'analytics-resolution',
+  'mapping-correction-snapshot',
+  'mapping-correction-bindings',
+  'mapping-correction-send',
+  'mapping-correction-current',
+  'mapping-correction-provenance',
   'logical-storage-usage',
   'logical-storage-bounds',
   'normal-compose-history-controls',
@@ -77,6 +82,9 @@ const causes = new Set([
   'locator-ambiguous',
   'navigation-interrupted',
   'assertion',
+  'type-error',
+  'response-body-unavailable',
+  'response-json-invalid',
   'metadata-invalid-response',
   'metadata-unavailable',
   'metadata-context',
@@ -130,7 +138,16 @@ export function browserFailure(step, error, cspBlocked = false, uiCause) {
     ['strict mode violation:', 'locator-ambiguous'],
     ['is interrupted by another navigation', 'navigation-interrupted'],
   ].find(([fixed]) => message.includes(fixed))?.[1];
+  const responseCause =
+    /No resource with given identifier found|Request content was evicted from inspector cache/u.test(
+      message,
+    )
+      ? 'response-body-unavailable'
+      : /Unexpected end of JSON input/u.test(message)
+        ? 'response-json-invalid'
+        : undefined;
   const cause =
+    responseCause ??
     deviceCause ??
     seedCause ??
     (cspBlocked
@@ -139,18 +156,20 @@ export function browserFailure(step, error, cspBlocked = false, uiCause) {
         ? 'certificate-trust'
         : error?.name === 'AssertionError' || /expect\(/u.test(message)
           ? 'assertion'
-          : browserCause
-            ? browserCause
-            : uiCause && uiCause !== 'metadata-context' && causes.has(uiCause)
-              ? uiCause
-              : timeoutCause
-                ? timeoutCause
-                : error?.name === 'TimeoutError' ||
-                    /[Tt]imeout|[Tt]imed out/u.test(message)
-                  ? 'timeout'
-                  : /Target.*closed|browser.*closed/iu.test(message)
-                    ? 'browser-closed'
-                    : 'unclassified');
+          : error?.name === 'TypeError'
+            ? 'type-error'
+            : browserCause
+              ? browserCause
+              : uiCause && uiCause !== 'metadata-context' && causes.has(uiCause)
+                ? uiCause
+                : timeoutCause
+                  ? timeoutCause
+                  : error?.name === 'TimeoutError' ||
+                      /[Tt]imeout|[Tt]imed out/u.test(message)
+                    ? 'timeout'
+                    : /Target.*closed|browser.*closed/iu.test(message)
+                      ? 'browser-closed'
+                      : 'unclassified');
   const frame =
     typeof error?.stack === 'string'
       ? error.stack

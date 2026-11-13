@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { qualifyDemo } from './demo-qualification.mjs';
 import { checkManifests } from './manifests/check.mjs';
 import { digest, lock } from './policy.mjs';
 import { pnpm, root, run } from './process.mjs';
@@ -72,6 +73,7 @@ try {
         item.measurements = await qualifyProduct((progress) => {
           item.measurements = progress;
         });
+      else if (check === 'demo-lifecycle') item.measurements = await qualifyDemo();
       else if (check === 'analytics-routing')
         item.measurements = await qualifyAnalytics();
       else if (check === 'installation')

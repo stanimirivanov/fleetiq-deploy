@@ -61,7 +61,7 @@ function privateFile(directory, name) {
 }
 
 /** Validate retained credentials and certificate identity before any reuse. */
-export function loadDemoIdentity(directory) {
+export function loadDemoIdentity(directory, { verifyCaKey = true } = {}) {
   try {
     validateDemoIdentity(demoIdentity);
     privateDirectory(directory);
@@ -97,7 +97,9 @@ export function loadDemoIdentity(directory) {
       'DNS:issuer.fleetiq.test, DNS:fleet.fleetiq.test',
     );
     assert(leaf.checkPrivateKey(createPrivateKey(privateFile(directory, 'tls.key'))));
-    assert(ca.checkPrivateKey(createPrivateKey(privateFile(directory, 'ca.key'))));
+    assert.equal(typeof verifyCaKey, 'boolean');
+    if (verifyCaKey)
+      assert(ca.checkPrivateKey(createPrivateKey(privateFile(directory, 'ca.key'))));
     return state;
   } catch {
     throw new Error('Demo identity state invalid');
@@ -217,6 +219,8 @@ export async function preflightDemoIdentity({
         `${demoIdentity.issuer}/.well-known/openid-configuration`,
         {
           timeout: 5000,
+          // Shutdown can leave a stale pooled socket while synchronous Compose blocks events.
+          agent: false,
           // Both names were validated above; prevent a second DNS lookup escaping loopback.
           lookup: (_name, options, callback) =>
             callback(

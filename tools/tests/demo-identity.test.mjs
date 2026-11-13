@@ -281,3 +281,54 @@ test('trust preflight refuses nonloopback DNS and verifies real HTTPS discovery'
     requestHttps: probe(readFileSync(join(directory, 'ca.crt'))),
   });
 });
+
+test('container issuer validates retained identity without mounting the CA signing key', (t) => {
+  const directory = fixture(t);
+  initializeDemoIdentity(directory);
+  rmSync(join(directory, 'ca.key'));
+  assert.throws(() => loadDemoIdentity(directory), /Demo identity state invalid/);
+  assert.equal(
+    loadDemoIdentity(directory, { verifyCaKey: false }).clientId,
+    'fleetiq-simulator-demo',
+  );
+  const server = createDemoIssuer(directory, { verifyCaKey: false });
+  server.close();
+});
+
+test('a fresh trust preflight survives an idle HTTPS connection closed by issuer shutdown', async (t) => {
+  const directory = fixture(t);
+  initializeDemoIdentity(directory);
+  const server = await listen(t, directory);
+  const ca = readFileSync(join(directory, 'ca.crt'));
+  const failures = [];
+  const requestHttps = (_url, options, callback) => {
+    const req = request(
+      {
+        ...options,
+        hostname: 'issuer.fleetiq.test',
+        port: server.address().port,
+        path: '/.well-known/openid-configuration',
+        servername: 'issuer.fleetiq.test',
+        headers: { host: 'issuer.fleetiq.test:59443' },
+        ca,
+      },
+      callback,
+    );
+    req.on('error', (error) =>
+      failures.push({ code: error.code, reused: req.reusedSocket }),
+    );
+    return req;
+  };
+  const probe = () =>
+    preflightDemoIdentity({
+      resolveHost: async () => [{ address: '127.0.0.1' }],
+      requestHttps,
+    });
+  await probe();
+  await new Promise((resolve) => setImmediate(resolve));
+  server.closeIdleConnections();
+  await probe().catch((error) => {
+    assert.deepEqual(failures, [{ code: 'ECONNRESET', reused: true }]);
+    throw error;
+  });
+});

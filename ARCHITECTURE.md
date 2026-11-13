@@ -69,3 +69,13 @@ listener and self-hosted map fixture root adapt its source-owned template. The
 actual source/image identity and restricted process are verified before startup;
 CSP, proxy semantics, MIME types and SSE behavior remain upstream-owned. The
 separate diagnostic bridge is not image-security or product-acceptance evidence.
+
+## Opt-in simulator demo
+
+The owned demo overlay adds a retained synthetic HTTPS issuer, authenticated
+metadata reconciliation and one bounded simulator run. The simulator joins only
+device ingress; ingestion has no host port. `pnpm qualify` additionally requires
+the real demo lifecycle and owned cleanup. Its disposable browser trust fixture
+does not install host trust or replace operator DNS/CA prerequisites. See the
+[demo runbook](docs/operations/simulator-demo.md); map/Inspect acceptance belongs
+to SIM-PR7.

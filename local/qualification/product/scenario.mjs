@@ -312,12 +312,16 @@ try {
     },
   });
   // Temporal correction is additive. Already committed interpretations never rebind.
+  step = 'mapping-correction-snapshot';
   const beforeCorrection = (await api(page, currentPath())).items[0].change;
   const correctionStart = Date.now();
+  step = 'mapping-correction-bindings';
   for (const axis of ['latitude', 'longitude'])
     await binding(page, axis, 'asset-secondary', 2, correctionStart);
   assert.deepEqual((await api(page, currentPath())).items[0].change, beforeCorrection);
+  step = 'mapping-correction-send';
   await transmit(correctionStart + 1, 515000300, -1200300);
+  step = 'mapping-correction-current';
   await expect
     .poll(
       async () =>
@@ -327,6 +331,7 @@ try {
     )
     .toBe('2');
   assert.deepEqual((await api(page, currentPath())).items[0].change, beforeCorrection);
+  step = 'mapping-correction-provenance';
   assert.deepEqual(
     await api(page, `${evidencePath}/interpretations/${original.interpretation}`),
     provenance,
