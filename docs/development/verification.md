@@ -97,3 +97,14 @@ confined to disposable qualification state.
 The Docker group also inventories analytics-routing: the pinned real Alertmanager
 and a synthetic-only receiver exercise firing/resolved, unreachable router and
 restart with owner-checked cleanup. No installed milestone outcome is implied.
+
+
+## Published simulator acceptance
+
+`pnpm qualify:simulator` is the separate `simulator` group. Its mandatory
+`installed-simulator` check runs the reviewed producer through normal Compose,
+real OIDC, projection, map-point selection and Inspect, then proves rejection of
+an unknown identity, unchanged accepted data and owned cleanup. CI invokes this
+same command and records `ci-simulator` evidence; a missing or incomplete receipt
+cannot become a successful qualification. Existing Docker/product groups remain
+mandatory. No physical-device or broader simulator-scenario outcome is implied.

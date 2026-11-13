@@ -17,6 +17,7 @@ export const catalogue = {
     'demo-lifecycle',
   ],
   product: ['toolchain', 'policy', 'installed-product'],
+  simulator: ['toolchain', 'policy', 'installed-simulator'],
   manifests: ['toolchain', 'policy', 'manifests'],
   packages: ['toolchain', 'policy', 'release-contracts', 'oci-packages'],
   acceptance: [
@@ -32,6 +33,7 @@ export const catalogue = {
     'analytics-routing',
     'demo-lifecycle',
     'installed-product',
+    'installed-simulator',
     'oci-packages',
   ],
 };

@@ -40,6 +40,7 @@ services:
     volumes: !override
       - ${FLEETIQ_DEMO_CADDY_FILE:?Missing owned edge config}:/etc/caddy/Caddyfile:ro
       - certificates:/data
+      - ./qualification/product/maps:/srv/maps:ro
     secrets: [demo_tls_cert, demo_tls_key]
   tcp-ingestion:
     ports: !reset []

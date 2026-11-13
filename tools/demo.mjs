@@ -358,6 +358,13 @@ export function validateDemoModel(model, site, pin) {
     } else if (name === 'edge') {
       expected.volumes.find((v) => v.target === '/etc/caddy/Caddyfile').source =
         resolve(site.path, 'demo-public/Caddyfile');
+      expected.volumes.push({
+        type: 'bind',
+        source: resolve(root, 'local/qualification/product/maps'),
+        target: '/srv/maps',
+        read_only: true,
+        bind: {},
+      });
       expected.secrets = ['demo_tls_cert', 'demo_tls_key'].map((source) => ({
         source,
         target: `/run/secrets/${source}`,

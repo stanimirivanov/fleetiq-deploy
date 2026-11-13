@@ -72,6 +72,8 @@ jobs:
         run: pnpm qualify
       - name: Qualify installed device-to-web product with real OIDC and TCP
         run: pnpm qualify:product
+      - name: Qualify the published simulator through normal map and Inspect
+        run: pnpm qualify:simulator
       - name: Record job verification outcome
         if: always()
         run: node tools/ci-evidence.mjs docker
@@ -80,6 +82,11 @@ jobs:
       - name: Record installed product verification outcome
         if: always()
         run: node tools/ci-evidence.mjs product
+        env:
+          FLEETIQ_CI_STATUS: ${{ job.status }}
+      - name: Record simulator qualification outcome
+        if: always()
+        run: node tools/ci-evidence.mjs simulator
         env:
           FLEETIQ_CI_STATUS: ${{ job.status }}
       - uses: actions/upload-artifact@v7

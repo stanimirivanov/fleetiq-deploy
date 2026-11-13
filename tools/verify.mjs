@@ -12,6 +12,7 @@ import { checkContracts } from './releases/contracts.mjs';
 import { checkReleaseBoundaries } from './releases/git-policy.mjs';
 import { qualifyPackages } from './releases/qualify.mjs';
 import { checkSecrets } from './secrets.mjs';
+import { qualifySimulator } from './simulator-qualification.mjs';
 import { structure } from './structure.mjs';
 import { catalogue } from './verification-catalogue.mjs';
 
@@ -73,6 +74,8 @@ try {
         item.measurements = await qualifyProduct((progress) => {
           item.measurements = progress;
         });
+      else if (check === 'installed-simulator')
+        item.measurements = await qualifySimulator();
       else if (check === 'demo-lifecycle') item.measurements = await qualifyDemo();
       else if (check === 'analytics-routing')
         item.measurements = await qualifyAnalytics();

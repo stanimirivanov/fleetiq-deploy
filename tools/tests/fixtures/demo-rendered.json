@@ -622,6 +622,13 @@
             "source": "certificates",
             "target": "/data",
             "volume": {}
+          },
+          {
+            "type": "bind",
+            "source": "/fixture-repository/local/qualification/product/maps",
+            "target": "/srv/maps",
+            "read_only": true,
+            "bind": {}
           }
         ]
       },
