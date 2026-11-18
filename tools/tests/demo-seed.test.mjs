@@ -420,3 +420,19 @@ test('command failures print a fixed reviewed phase and never private details', 
   );
   assert(demoSeedFailureMessage({ phase: 'route-write' }).includes('route-write'));
 });
+
+test('seed browser diagnostics expose reviewed source locations without private error text', async () => {
+  const { seedBrowserDiagnostic } = await import('../../local/demo/seed.mjs');
+  assert.equal(
+    seedBrowserDiagnostic({
+      stack: 'Error: private-canary\n at /fixture/local/demo/seed.mjs:106:12',
+    }),
+    'seed.mjs:106',
+  );
+  assert.equal(
+    seedBrowserDiagnostic({
+      stack: 'Error: private-canary\n at /operator/private-file:12:3',
+    }),
+    'unclassified',
+  );
+});

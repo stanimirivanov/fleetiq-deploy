@@ -7,6 +7,8 @@ import { qualifyDemo } from './demo-qualification.mjs';
 import { lock } from './policy.mjs';
 import { CommandFailure } from './process.mjs';
 import { prepareRecovery } from './simulator-recovery.mjs';
+import { qualifyTiming } from './simulator-timing.mjs';
+import { completeTiming } from './simulator-timing-evidence.mjs';
 
 /** Compose may add status lines; only the reviewed simulator's terminal refusal and exit count. */
 export function rejectedLogin(error, stderr) {
@@ -24,6 +26,8 @@ export async function qualifySimulator() {
     images,
     recovery,
     recovered,
+    timed,
+    timingContext,
     expected,
     rejected = false;
   const base = await qualifyDemo({
@@ -93,9 +97,16 @@ export async function qualifySimulator() {
       );
       after = await browser(expected);
       recovery = prepareRecovery(site, config, scratch);
+      timingContext = { site, config };
     },
     afterRestart: async ({ browser }) => {
       recovered = await recovery.resume(browser, expected);
+      timed = await qualifyTiming(
+        timingContext.site,
+        timingContext.config,
+        browser,
+        expected,
+      );
     },
   });
   return {
@@ -103,7 +114,9 @@ export async function qualifySimulator() {
     checks: [
       ...completeSimulator(base, before, after, rejected),
       ...completeRecovery(base, recovered),
+      ...completeTiming(base, timed),
     ],
+    timing: { idle: timed.idle, lifetime: timed.lifetime },
     sources: { platform: lock.sources.platform.commit, ui: lock.sources.ux.commit },
     images,
     identity: 'real-demo-oidc',

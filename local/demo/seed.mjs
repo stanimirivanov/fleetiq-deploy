@@ -14,6 +14,14 @@ const identity = parse(
   readFileSync(new URL('./identity.yaml', import.meta.url), 'utf8'),
 );
 
+/** Source locations are enough to localize qualification failures; native messages and private paths stay hidden. */
+export function seedBrowserDiagnostic(error) {
+  const location = error?.stack?.match(
+    /\/(seed\.mjs|demo-seed\.mjs|qualify-browser\.mjs):([0-9]+):[0-9]+/u,
+  );
+  return location ? `${location[1]}:${location[2]}` : 'unclassified';
+}
+
 /** Native same-origin cookie/Origin/CSRF requests; never install bearer or browser credentials. */
 export async function demoSeedRequest(
   page,

@@ -272,8 +272,12 @@ try {
       }),
     );
   }
-} catch {
-  console.error(`Simulator browser qualification failed: ${phase}`);
+} catch (error) {
+  const location = error?.stack?.match(
+    /\/(browser\.mjs|recovery\.mjs):([0-9]+):[0-9]+/u,
+  );
+  const source = location ? `@${location[1]}:${location[2]}` : '';
+  console.error(`Simulator browser qualification failed: ${phase}${source}`);
   process.exitCode = 1;
 } finally {
   await browser?.close();

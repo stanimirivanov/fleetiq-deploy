@@ -27,13 +27,19 @@ import { imageInventory } from './sources.mjs';
 
 /** Keep native errors private while identifying only reviewed source modules and failure classes. */
 export function demoFailureDiagnostic(error) {
+  const seedPhase =
+    /^demo-seed-qualification-failed:(?:(?:seed|demo-seed|qualify-browser)\.mjs:[0-9]+|unclassified)$/u.exec(
+      error?.message ?? '',
+    );
+  if (seedPhase) return seedPhase[0];
   const simulatorPhase =
     error instanceof Error
-      ? /^Simulator browser qualification failed: (trust|login|projection|map(?:-ready|-list|-point|-coordinate|-resources)?|inspect|storage|recovery-history)$/u.exec(
+      ? /^Simulator browser qualification failed: (trust|login|projection|map(?:-ready|-list|-point|-coordinate|-resources)?|inspect|storage|recovery-history)((?:@(?:browser|recovery)\.mjs:[0-9]+)?)$/u.exec(
           error.message,
         )
       : null;
-  if (simulatorPhase) return `simulator-browser-${simulatorPhase[1]}`;
+  if (simulatorPhase)
+    return `simulator-browser-${simulatorPhase[1]}${simulatorPhase[2]}`;
   const category =
     error instanceof CommandFailure
       ? 'command-failed'
@@ -43,7 +49,7 @@ export function demoFailureDiagnostic(error) {
   const location =
     error instanceof Error
       ? error.stack?.match(
-          /tools\/(demo(?:-qualification|-seed)?\.mjs):([0-9]+):[0-9]+/u,
+          /tools\/((?:demo(?:-qualification|-seed)?|simulator-timing(?:-evidence)?)\.mjs):([0-9]+):[0-9]+/u,
         )
       : null;
   return `${category}${location ? `@${location[1]}:${location[2]}` : ''}`;
@@ -206,8 +212,7 @@ export async function qualifyDemo({ afterSend, afterRestart } = {}) {
           mode: 0o600,
         });
         const errorFile = resolve(scratch, 'browser.stderr');
-        const stderr =
-          script === 'browser.mjs' ? openSync(errorFile, 'w', 0o600) : undefined;
+        const stderr = openSync(errorFile, 'w', 0o600);
         try {
           const result = execute(
             [
@@ -277,10 +282,15 @@ export async function qualifyDemo({ afterSend, afterRestart } = {}) {
         } catch (error) {
           if (stderr !== undefined) {
             const phase =
-              /^Simulator browser qualification failed: (trust|login|projection|map(?:-ready|-list|-point|-coordinate|-resources)?|inspect|storage|recovery-history)$/mu.exec(
+              /^Simulator browser qualification failed: (trust|login|projection|map(?:-ready|-list|-point|-coordinate|-resources)?|inspect|storage|recovery-history)((?:@(?:browser|recovery)\.mjs:[0-9]+)?)$/mu.exec(
                 readFileSync(errorFile, 'utf8'),
               );
             if (phase) throw new Error(phase[0]);
+            const seedPhase =
+              /^demo-seed-qualification-failed:(?:(?:seed|demo-seed|qualify-browser)\.mjs:[0-9]+|unclassified)$/mu.exec(
+                readFileSync(errorFile, 'utf8'),
+              );
+            if (seedPhase) throw new Error(seedPhase[0]);
           }
           throw error;
         } finally {

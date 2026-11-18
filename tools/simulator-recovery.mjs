@@ -15,7 +15,7 @@ import { digest } from './policy.mjs';
 import { CommandFailure, run } from './process.mjs';
 
 /** Opens only owned private regular files, never symlinks, devices or oversized captures. */
-function privateBytes(path) {
+export function privateBytes(path) {
   const fd = openSync(
     path,
     constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,

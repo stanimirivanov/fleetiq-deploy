@@ -178,3 +178,32 @@ test('the pinned platform rejects unknown identity claims by closing before acce
   assert(!rejectedLogin(failure, 'login-timeout\n'));
   assert(!rejectedLogin(failure, 'ack-timeout\n'));
 });
+
+test('recovery diagnostics keep only a reviewed module location, never native messages', () => {
+  assert.equal(
+    demoFailureDiagnostic(
+      new Error(
+        'Simulator browser qualification failed: recovery-history@recovery.mjs:123',
+      ),
+    ),
+    'simulator-browser-recovery-history@recovery.mjs:123',
+  );
+  assert.equal(
+    demoFailureDiagnostic(
+      new Error(
+        'Simulator browser qualification failed: recovery-history@private-canary:123',
+      ),
+    ),
+    'unexpected',
+  );
+});
+
+test('timing failures expose only reviewed qualification module locations', () => {
+  const error = new assert.AssertionError({ message: 'private-canary' });
+  error.stack =
+    'AssertionError: private-canary\n at verifyTiming (/fixture/tools/simulator-timing-evidence.mjs:90:5)';
+  assert.equal(
+    demoFailureDiagnostic(error),
+    'assertion@simulator-timing-evidence.mjs:90',
+  );
+});
