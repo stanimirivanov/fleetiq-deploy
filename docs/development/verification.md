@@ -107,7 +107,18 @@ real OIDC, projection, map-point selection and Inspect, then proves rejection of
 an unknown identity, unchanged accepted data and owned cleanup. CI invokes this
 same command and records `ci-simulator` evidence; a missing or incomplete receipt
 cannot become a successful qualification. Existing Docker/product groups remain
-mandatory. No physical-device or broader simulator-scenario outcome is implied.
+mandatory. The same simulator check now stops the owned ingestion service,
+captures a three-record offline backlog, and compares the private checkpoint,
+identity and replay inputs across actual demo down/up. Resume must deliver every
+source timestamp with exact authenticated history/provenance, and a completed
+resume must leave accepted-message totals unchanged. The normal demo service
+keeps its read-only input mount; only this disposable qualification adds an owned
+writable replay directory, removed by reset. Private inputs, packet bytes and
+checkpoints are never evidence artifacts.
+
+This accelerated offline/restart slice does not qualify real idle (>15 seconds)
+or connection lifetime (>300 seconds), which remain under issue #71. No physical-device
+or broader simulator-scenario outcome is implied.
 
 
 The browser fixture build runs

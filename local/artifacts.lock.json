@@ -25,8 +25,8 @@
   },
   "simulator": {
     "repository": "https://github.com/stanimirivanov/fleetiq-simulator",
-    "commit": "ba598f8342e9991897a12d40f6a95f577a4b4b56",
-    "sourceSha256": "9624a1c8c5edd378f81c0dc9d9ee18bd5af04e0e0f0ba53bd639fe784de5a9d3",
-    "image": "ghcr.io/stanimirivanov/fleetiq-simulator@sha256:cb10d3dffa97d91a650122cd3fc8999e1f3024e01175bbeb3247a4bbed6e1436"
+    "commit": "eebaae64cf0fc1c0d3e7cbeff38d09974f131f99",
+    "sourceSha256": "5e817193790e244f9efc5bb0c3e415b3efe0b64609b4815df234479455c002e1",
+    "image": "ghcr.io/stanimirivanov/fleetiq-simulator@sha256:8317dd7f366dd1d76f5230cdcbd88fb29627bb49b563659fd730dcd9c968686e"
   }
 }
