@@ -116,9 +116,18 @@ keeps its read-only input mount; only this disposable qualification adds an owne
 writable replay directory, removed by reset. Private inputs, packet bytes and
 checkpoints are never evidence artifacts.
 
-This accelerated offline/restart slice does not qualify real idle (>15 seconds)
-or connection lifetime (>300 seconds), which remain under issue #71. No physical-device
-or broader simulator-scenario outcome is implied.
+Real idle/lifetime qualification additionally uses monotonic persistent playback:
+three source captures 20 seconds apart, then 33 captures every 10 seconds through
+320 seconds. One-second queue polling releases the first capture promptly; empty
+ticks transmit nothing. It observes only established ingestion socket identities inside the
+restricted producer namespace (no proxy, traffic capture or changed server limits).
+The idle case must witness closure after 15 seconds and a replacement; the lifetime
+case must retain the original socket to the 300-second boundary before replacement.
+Sparse/missing observations, early churn, accelerated playback, short runs or missing
+ACK/history/checkpoint/cleanup evidence fail acceptance. Only elapsed milliseconds,
+connection counts and fixed check names enter public evidence; socket identities
+remain transient. The extra real-time qualification takes approximately six minutes.
+No physical-device or broader simulator-scenario outcome is implied.
 
 
 The browser fixture build runs

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
-import { reconcileDemoBrowser } from './seed.mjs';
+import { reconcileDemoBrowser, seedBrowserDiagnostic } from './seed.mjs';
 
 // Only the disposable qualification container receives this public-CA trust.
 try {
@@ -37,7 +37,7 @@ try {
     },
   });
   console.log('demo-seed-qualified');
-} catch {
-  console.error('demo-seed-qualification-failed');
+} catch (error) {
+  console.error(`demo-seed-qualification-failed:${seedBrowserDiagnostic(error)}`);
   process.exitCode = 1;
 }
