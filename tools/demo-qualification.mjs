@@ -29,7 +29,7 @@ import { imageInventory } from './sources.mjs';
 export function demoFailureDiagnostic(error) {
   const simulatorPhase =
     error instanceof Error
-      ? /^Simulator browser qualification failed: (trust|login|projection|map(?:-ready|-list|-point|-coordinate|-resources)?|inspect|storage)$/u.exec(
+      ? /^Simulator browser qualification failed: (trust|login|projection|map(?:-ready|-list|-point|-coordinate|-resources)?|inspect|storage|recovery-history)$/u.exec(
           error.message,
         )
       : null;
@@ -50,7 +50,7 @@ export function demoFailureDiagnostic(error) {
 }
 
 /** Exercises the actual producer and owned lifecycle; evidence contains fixed checks only. */
-export async function qualifyDemo({ afterSend } = {}) {
+export async function qualifyDemo({ afterSend, afterRestart } = {}) {
   assert(lock.simulator, 'Published simulator pin missing');
   const docker = context();
   const execute = (args, options = {}) =>
@@ -259,6 +259,10 @@ export async function qualifyDemo({ afterSend } = {}) {
                 resolve(root, 'local/demo/evidence.mjs'),
                 '/fixture/local/demo/evidence.mjs',
               ),
+              ...bind(
+                resolve(root, 'local/demo/recovery.mjs'),
+                '/fixture/local/demo/recovery.mjs',
+              ),
               built.Id,
               `local/demo/${script}`,
             ],
@@ -273,7 +277,7 @@ export async function qualifyDemo({ afterSend } = {}) {
         } catch (error) {
           if (stderr !== undefined) {
             const phase =
-              /^Simulator browser qualification failed: (trust|login|projection|map(?:-ready|-list|-point|-coordinate|-resources)?|inspect|storage)$/mu.exec(
+              /^Simulator browser qualification failed: (trust|login|projection|map(?:-ready|-list|-point|-coordinate|-resources)?|inspect|storage|recovery-history)$/mu.exec(
                 readFileSync(errorFile, 'utf8'),
               );
             if (phase) throw new Error(phase[0]);
@@ -312,6 +316,13 @@ export async function qualifyDemo({ afterSend } = {}) {
     await demoCommand('up', name, docker, undefined, adapters);
     assert.equal(retained(), provisioned);
     checks.push('retained-restart');
+    if (afterRestart) {
+      phase = 'simulator-recovery';
+      await afterRestart({
+        browser: (settings) =>
+          adapters.reconcile(identity, readFileSync(artifact), settings, 'browser.mjs'),
+      });
+    }
     phase = 'reset';
     await demoCommand('reset', name, docker);
     initialized = false;

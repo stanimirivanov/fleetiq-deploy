@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { expect as baseExpect, chromium } from '@playwright/test';
 import { verifyMapCoordinates, verifySimulatorReading } from './evidence.mjs';
+import { verifyRecoveryHistory } from './recovery.mjs';
 
 const expect = baseExpect.configure({ timeout: 30000 });
 const origin = 'https://fleet.fleetiq.test:58443';
@@ -110,123 +111,167 @@ try {
     kind: 'grant',
     action: 'operations.read',
   });
-  phase = 'projection';
-  const evidence = {};
-  for (const axis of ['latitude', 'longitude']) {
-    const property = `${tenant}/assets/${expected.assetId}/properties/position.${axis}/versions/1`;
-    await expect
-      .poll(
-        async () => {
-          const snapshot = await api(`${property}/current`);
-          return (
-            !snapshot.pending &&
-            snapshot.items.length === 1 &&
-            snapshot.items[0].change.event_at_ms === expected.record.timestampMs
-          );
-        },
-        { timeout: 90000 },
-      )
-      .toBe(true);
-    const snapshot = await api(`${property}/current`),
-      change = snapshot.items[0].change;
-    const history = await api(
-      `${property}/history?start_at_ms=${expected.record.timestampMs}&end_at_ms=${BigInt(expected.record.timestampMs) + 1n}&limit=10`,
+  if (expected.recovery) {
+    phase = 'recovery-history';
+    for (const axis of ['latitude', 'longitude']) {
+      const property = `${tenant}/assets/${expected.assetId}/properties/position.${axis}/versions/1`;
+      const timestamps = expected.recovery.timestamps;
+      const read = () =>
+        api(
+          `${property}/history?start_at_ms=${timestamps[0]}&end_at_ms=${BigInt(timestamps.at(-1)) + 1n}&limit=100`,
+        );
+      await expect
+        .poll(
+          async () => {
+            const history = await read();
+            return timestamps.every((time) =>
+              history.changes.some((row) => row.event_at_ms === time),
+            );
+          },
+          { timeout: 90000 },
+        )
+        .toBe(true);
+      const history = await read();
+      verifyRecoveryHistory(history, { ...expected, timestamps }, axis);
+      for (const row of history.changes) {
+        const provenance = await api(
+          `${property}/interpretations/${encodeURIComponent(row.interpretation)}`,
+        );
+        assert.deepEqual(provenance, row);
+      }
+    }
+    assert.equal(pageErrors, 0);
+    assert(!foreign && !sample);
+    const usage = await api(`${tenant}/storage-usage`);
+    const accepted = usage.classes.find((c) => c.kind === 'accepted_messages').records;
+    await api('/api/v1/auth/logout', 'POST');
+    console.log(
+      JSON.stringify({
+        checks: ['recovered-source-history', 'matching-provenance'],
+        accepted,
+      }),
     );
-    const provenance = await api(
-      `${property}/interpretations/${encodeURIComponent(change.interpretation)}`,
+  } else {
+    phase = 'projection';
+    const evidence = {};
+    for (const axis of ['latitude', 'longitude']) {
+      const property = `${tenant}/assets/${expected.assetId}/properties/position.${axis}/versions/1`;
+      await expect
+        .poll(
+          async () => {
+            const snapshot = await api(`${property}/current`);
+            return (
+              !snapshot.pending &&
+              snapshot.items.length === 1 &&
+              snapshot.items[0].change.event_at_ms === expected.record.timestampMs
+            );
+          },
+          { timeout: 90000 },
+        )
+        .toBe(true);
+      const snapshot = await api(`${property}/current`),
+        change = snapshot.items[0].change;
+      const history = await api(
+        `${property}/history?start_at_ms=${expected.record.timestampMs}&end_at_ms=${BigInt(expected.record.timestampMs) + 1n}&limit=10`,
+      );
+      const provenance = await api(
+        `${property}/interpretations/${encodeURIComponent(change.interpretation)}`,
+      );
+      verifySimulatorReading({ snapshot, history, provenance }, expected, axis);
+      evidence[axis] = change;
+    }
+    assert.equal(
+      evidence.latitude.source.message_id,
+      evidence.longitude.source.message_id,
     );
-    verifySimulatorReading({ snapshot, history, provenance }, expected, axis);
-    evidence[axis] = change;
-  }
-  assert.equal(
-    evidence.latitude.source.message_id,
-    evidence.longitude.source.message_id,
-  );
-  phase = 'map-ready';
-  const query = new URLSearchParams({
-    tenant: expected.tenantId,
-    latitude_property: 'position.latitude',
-    latitude_version: '1',
-    longitude_property: 'position.longitude',
-    longitude_version: '1',
-    encoding: 'e7',
-  });
-  await page.goto(`${origin}/map?${query}`);
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Geodetic map · observed points only' }),
-  ).toBeVisible();
-  const canvas = page.getByTestId('geodetic-canvas').locator('canvas');
-  await expect(canvas).toHaveCount(1);
-  const list = page.getByRole('region', { name: 'Loaded fleet page', exact: true });
-  const selection = page.getByRole('complementary', {
-    name: 'Selected location evidence',
-    exact: true,
-  });
-  phase = 'map-list';
-  await list.getByRole('button', { name: new RegExp(expected.assetId) }).click();
-  await expect(selection).toContainText(expected.assetId);
-  // Center via normal list selection, then select the unlocated device to clear the point selection.
-  await list.getByRole('button', { name: new RegExp(expected.deviceId) }).click();
-  await expect(selection).toContainText(expected.deviceId);
-  phase = 'map-point';
-  await canvas.click();
-  await expect(selection).toContainText(expected.assetId);
-  await expect(page).toHaveURL(
-    (url) => url.searchParams.get('asset') === expected.assetId,
-  );
-  phase = 'map-coordinate';
-  verifyMapCoordinates(
-    await selection
-      .getByText(/^-?[0-9]+(?:\.[0-9]+)?,\s*-?[0-9]+(?:\.[0-9]+)?$/u)
-      .textContent(),
-    expected.record,
-  );
-  phase = 'map-resources';
-  assert(style && tile && !foreign && !sample);
-  phase = 'inspect';
-  const link = selection
-    .getByRole('link', { name: 'Inspect reading and provenance', exact: true })
-    .first();
-  const href = new URL(await link.getAttribute('href'), origin);
-  assert.equal(href.origin, origin);
-  assert.equal(href.pathname, `/assets/${expected.assetId}`);
-  assert.equal(
-    href.searchParams.get('interpretation'),
-    evidence.latitude.interpretation,
-  );
-  await link.click();
-  const panel = page.getByRole('region', {
-    name: 'Interpretation provenance',
-    exact: true,
-  });
-  for (const [label, value] of [
-    ['Original binding', `${expected.deviceId}-latitude · revision 1`],
-    ['Source', `${expected.deviceId} / main / gps.latitude_e7`],
-    ['Decoder', 'vendor.teltonika / simulator-demo-1'],
-    ['Device recorded', new Date(Number(expected.record.timestampMs)).toISOString()],
-    [
-      'Message / output',
-      `${evidence.latitude.source.message_id} / ${evidence.latitude.source.output_index}`,
-    ],
-  ])
+    phase = 'map-ready';
+    const query = new URLSearchParams({
+      tenant: expected.tenantId,
+      latitude_property: 'position.latitude',
+      latitude_version: '1',
+      longitude_property: 'position.longitude',
+      longitude_version: '1',
+      encoding: 'e7',
+    });
+    await page.goto(`${origin}/map?${query}`);
     await expect(
-      panel.getByText(label, { exact: true }).locator('..').locator('dd'),
-    ).toHaveText(value);
-  await expect(
-    panel.getByText('Value / quality', { exact: true }).locator('..').locator('dd'),
-  ).toContainText(String(expected.record.latitudeE7));
-  assert.equal(pageErrors, 0);
-  assert(!foreign && !sample);
-  phase = 'storage';
-  const usage = await api(`${tenant}/storage-usage`);
-  const accepted = usage.classes.find((c) => c.kind === 'accepted_messages').records;
-  await api('/api/v1/auth/logout', 'POST');
-  console.log(
-    JSON.stringify({
-      checks: ['durable-projection', 'selected-map-point', 'matching-inspect'],
-      accepted,
-    }),
-  );
+      page
+        .getByRole('status')
+        .filter({ hasText: 'Geodetic map · observed points only' }),
+    ).toBeVisible();
+    const canvas = page.getByTestId('geodetic-canvas').locator('canvas');
+    await expect(canvas).toHaveCount(1);
+    const list = page.getByRole('region', { name: 'Loaded fleet page', exact: true });
+    const selection = page.getByRole('complementary', {
+      name: 'Selected location evidence',
+      exact: true,
+    });
+    phase = 'map-list';
+    await list.getByRole('button', { name: new RegExp(expected.assetId) }).click();
+    await expect(selection).toContainText(expected.assetId);
+    // Center via normal list selection, then select the unlocated device to clear the point selection.
+    await list.getByRole('button', { name: new RegExp(expected.deviceId) }).click();
+    await expect(selection).toContainText(expected.deviceId);
+    phase = 'map-point';
+    await canvas.click();
+    await expect(selection).toContainText(expected.assetId);
+    await expect(page).toHaveURL(
+      (url) => url.searchParams.get('asset') === expected.assetId,
+    );
+    phase = 'map-coordinate';
+    verifyMapCoordinates(
+      await selection
+        .getByText(/^-?[0-9]+(?:\.[0-9]+)?,\s*-?[0-9]+(?:\.[0-9]+)?$/u)
+        .textContent(),
+      expected.record,
+    );
+    phase = 'map-resources';
+    assert(style && tile && !foreign && !sample);
+    phase = 'inspect';
+    const link = selection
+      .getByRole('link', { name: 'Inspect reading and provenance', exact: true })
+      .first();
+    const href = new URL(await link.getAttribute('href'), origin);
+    assert.equal(href.origin, origin);
+    assert.equal(href.pathname, `/assets/${expected.assetId}`);
+    assert.equal(
+      href.searchParams.get('interpretation'),
+      evidence.latitude.interpretation,
+    );
+    await link.click();
+    const panel = page.getByRole('region', {
+      name: 'Interpretation provenance',
+      exact: true,
+    });
+    for (const [label, value] of [
+      ['Original binding', `${expected.deviceId}-latitude · revision 1`],
+      ['Source', `${expected.deviceId} / main / gps.latitude_e7`],
+      ['Decoder', 'vendor.teltonika / simulator-demo-1'],
+      ['Device recorded', new Date(Number(expected.record.timestampMs)).toISOString()],
+      [
+        'Message / output',
+        `${evidence.latitude.source.message_id} / ${evidence.latitude.source.output_index}`,
+      ],
+    ])
+      await expect(
+        panel.getByText(label, { exact: true }).locator('..').locator('dd'),
+      ).toHaveText(value);
+    await expect(
+      panel.getByText('Value / quality', { exact: true }).locator('..').locator('dd'),
+    ).toContainText(String(expected.record.latitudeE7));
+    assert.equal(pageErrors, 0);
+    assert(!foreign && !sample);
+    phase = 'storage';
+    const usage = await api(`${tenant}/storage-usage`);
+    const accepted = usage.classes.find((c) => c.kind === 'accepted_messages').records;
+    await api('/api/v1/auth/logout', 'POST');
+    console.log(
+      JSON.stringify({
+        checks: ['durable-projection', 'selected-map-point', 'matching-inspect'],
+        accepted,
+      }),
+    );
+  }
 } catch {
   console.error(`Simulator browser qualification failed: ${phase}`);
   process.exitCode = 1;
