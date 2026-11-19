@@ -235,8 +235,21 @@ test('real Compose development overlay preserves private networks and rejects un
     ),
   );
   const settings = { owner: 'fixture', source, caddy };
+  for (const volume of [
+    ...model.services['ui-dev'].volumes,
+    model.services.edge.volumes.find((v) => v.target === '/etc/caddy/Caddyfile'),
+  ])
+    assert.equal(volume.bind.create_host_path, false);
   validateDevelopmentModel(model, reviewed, settings);
   for (const mutate of [
+    (v) => {
+      v.services['ui-dev'].volumes[0].bind.create_host_path = true;
+    },
+    (v) => {
+      v.services.edge.volumes.find(
+        (volume) => volume.target === '/etc/caddy/Caddyfile',
+      ).bind.create_host_path = true;
+    },
     (v) => {
       v.services['ui-dev'].healthcheck.test = ['CMD', 'true'];
     },

@@ -136,9 +136,11 @@ export function validateDevelopmentModel(
     assert.equal(ui.init, true);
     assert.equal(ui.working_dir, '/workspace/apps/web');
     assert.deepEqual(ui.tmpfs, ['/tmp:size=256m,mode=1777,nosuid']);
-    expected.services.edge.volumes.find(
+    const edgeConfiguration = expected.services.edge.volumes.find(
       (v) => v.target === '/etc/caddy/Caddyfile',
-    ).source = caddy;
+    );
+    edgeConfiguration.source = caddy;
+    edgeConfiguration.bind = { create_host_path: false };
     assert.equal(ui.image, lock.images.node);
     assert.equal(ui.pull_policy, 'never');
     assert.equal(ui.user, `${process.getuid()}:${process.getgid()}`);
@@ -194,14 +196,14 @@ export function validateDevelopmentModel(
         source: source.path,
         target: '/workspace',
         read_only: true,
-        bind: {},
+        bind: { create_host_path: false },
       },
       {
         type: 'bind',
         source: resolve(root, 'local/demo/vite.config.mjs'),
         target: '/opt/fleetiq/vite.config.mjs',
         read_only: true,
-        bind: {},
+        bind: { create_host_path: false },
       },
     ]);
     expected.services['ui-dev'] = ui;

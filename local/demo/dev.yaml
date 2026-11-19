@@ -22,8 +22,18 @@ services:
       FLEETIQ_CONNECTED_ORIGIN: https://fleet.fleetiq.test:58443
     networks: [application]
     volumes:
-      - ${FLEETIQ_DEV_UI_SOURCE:?Missing owned UI source}:/workspace:ro
-      - ${FLEETIQ_DEV_VITE_FILE:?Missing owned development wrapper}:/opt/fleetiq/vite.config.mjs:ro
+      - type: bind
+        source: ${FLEETIQ_DEV_UI_SOURCE:?Missing owned UI source}
+        target: /workspace
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${FLEETIQ_DEV_VITE_FILE:?Missing owned development wrapper}
+        target: /opt/fleetiq/vite.config.mjs
+        read_only: true
+        bind:
+          create_host_path: false
     healthcheck:
       test: [CMD, /usr/local/bin/node, -e, "fetch('http://127.0.0.1:5173/@vite/client').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 3s
@@ -31,4 +41,9 @@ services:
       retries: 40
   edge:
     volumes:
-      - ${FLEETIQ_DEV_CADDY_FILE:?Missing owned development edge config}:/etc/caddy/Caddyfile:ro
+      - type: bind
+        source: ${FLEETIQ_DEV_CADDY_FILE:?Missing owned development edge config}
+        target: /etc/caddy/Caddyfile
+        read_only: true
+        bind:
+          create_host_path: false
