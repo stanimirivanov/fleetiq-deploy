@@ -167,3 +167,91 @@ screenshots and raw browser/process diagnostics remain private and are removed
 with test-owned scratch state. The Inspect browser receives only the expected
 evidence and public CA; a runtime guard rejects seeder journal/WASM mounts. Browser CA trust is confined to disposable state;
 operator host DNS/trust prerequisites are unchanged.
+
+## Explicit unqualified development reload
+
+SIM-PR20 adds developer mode; its success never qualifies a reviewed release.
+First start the normal owned demo above. Keep the same explicit host DNS and
+public-CA trust prerequisites. Development source clones are independent of both
+sibling checkouts and `.local/sources`, which remains reviewed-build authority.
+
+Prepare source objects with `pnpm development:sources` (source-read credentials,
+if required, belong only to this network-only command). Create **fresh** clones:
+
+```bash
+mkdir -p .local/dev-sources
+git clone .local/dev-objects/ui.git .local/dev-sources/ui
+git -C .local/dev-sources/ui remote set-url origin https://github.com/stanimirivanov/fleetiq-ui.git
+git clone .local/dev-objects/platform.git .local/dev-sources/platform
+git -C .local/dev-sources/platform remote set-url origin https://github.com/stanimirivanov/fleetiq-platform.git
+chmod 700 .local/dev-sources/ui .local/dev-sources/platform
+pnpm --dir .local/dev-sources/ui install --frozen-lockfile
+pnpm local demo-dev-up simulator-demo
+```
+
+Select a revision descending from UI b2169ee30bc516cb5bdb79f4506a7a51970db0af
+and the locked platform revision, respectively. Source acquisition never checks
+out or resets an existing developer tree. Stage new files explicitly; ordinary
+tracked edits remain dirty and are fingerprinted. Foreign origins, path links,
+private environment/key inputs and unexpected ignored files are refused. Keep
+credentials and captures outside these clones; only dependency/build directories
+are accepted as ignored UI inputs. Install Linux dependencies using the pinned
+Node/pnpm versions; the container does not install packages or inherit host tokens.
+
+Edit `.local/dev-sources/ui/apps/web/src` and use the existing trusted
+`https://fleet.fleetiq.test:58443` browser origin. UI/HMR go to private Vite;
+API/auth/SSE and map fixtures retain their normal edge handlers. No Vite, backend
+or database host port is published. Vite has no TLS/client secrets, Docker socket
+or database network. Bind-mounted source watching uses 100 ms polling inside the
+existing 2 CPU / 1 GiB service budget, trading extra development CPU for reliable
+host edits ([Vite watch guidance](https://v8.vite.dev/config/server-options#server-watch)).
+Explicit sample previews are rejected in this mode.
+
+For a deliberate backend replacement and return to reviewed mode:
+
+```bash
+pnpm local demo-rebuild-backend simulator-demo
+pnpm local demo-reviewed simulator-demo
+```
+
+Backend source is snapshotted from tracked files. A failed build/admission cannot
+stop or partially replace current consumers. The new image contains the server
+and admission/decode/live executors, and all pipeline processes use that exact
+image. Changed migration inventories are refused; development startup uses
+`serve --check-schema`. No migration or provisioning command is run by the dev
+controller. Database, identity and producer queue mounts are retained.
+
+The controller writes a private recovery recipe before stopping processes. On a
+failed startup retain that state, correct the source/runtime problem and use
+`demo-reviewed` for rollback before attempting another development command.
+Pending and ready states are persisted explicitly; an interrupted transition
+permits only reviewed recovery. Rollback reconstructs the owned reviewed recipe,
+so an interrupted development recipe/marker update or abandoned draft cannot
+strand the instance. Run lifecycle commands serially for each owned instance.
+Normal demo startup/reset refuses active development
+state; ordinary down retains it. The reviewed recipe and `.local/images.json`
+are never replaced. A development-marked image cannot pass reviewed inventory
+admission even with otherwise matching revision/packaging labels.
+
+`pnpm qualify:development` is the separate Linux/Docker smoke after source-object
+preparation and the normal reviewed-image build. It requires absent developer
+clones, creates positively identified disposable clones, runs trusted Chromium
+with an ephemeral CA profile, verifies a real edit, pending-queue recovery and
+reviewed-mode restoration, and cleans only its owned resources. It never installs
+host trust or accepts development output as product/release acceptance. Run
+`pnpm check`, `pnpm qualify`, `pnpm qualify:product` and `pnpm qualify:simulator`
+separately against reviewed artifacts.
+
+UI source scanning uses the UI-owned detector policy already approved at its
+reviewed base (including its exact public storage-identifier classification).
+Scanner/tooling and package-control edits are refused until that development
+base is reviewed again. The installed smoke proves that a new credential in the
+same file is still rejected. Platform checks run the immutable upstream Rust
+wrapper in an unqualified tool image; it preserves the platform's exact public
+signing-fixture classification. That image builds only the reviewed source, then
+scans candidate files/index/incoming history with no network, a read-only source
+mount and the pinned detector. Host `target` tools are masked by tmpfs (an empty
+`target` mountpoint is created if absent). A real credential in the signing-fixture
+file must fail even with a forged local detector. Deployment policy has no new
+exception. The tool image installs Git from the pinned Debian base's repositories;
+it is local verification tooling, never a reviewed application artifact.
