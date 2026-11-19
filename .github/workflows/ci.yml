@@ -29,6 +29,8 @@ jobs:
       - run: pnpm secrets:install
       - name: Install checksum-verified offline manifest tools and schemas
         run: pnpm manifests:install
+      - name: Install checksum-verified Compose
+        run: node tools/install-compose.mjs
       - run: pnpm check
         env:
           FLEETIQ_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -66,6 +68,10 @@ jobs:
         run: pnpm local sources
         env:
           GH_TOKEN: ${{ secrets.FLEETIQ_SOURCE_READ_TOKEN }}
+      - name: Fetch reviewed development source objects without executing source
+        run: pnpm development:sources
+        env:
+          GH_TOKEN: ${{ secrets.FLEETIQ_SOURCE_READ_TOKEN }}
       - name: Build reviewed application sources (no source credential)
         run: pnpm local build
       - name: Qualify infrastructure separately from product acceptance
@@ -74,6 +80,13 @@ jobs:
         run: pnpm qualify:product
       - name: Qualify the published simulator through normal map and Inspect
         run: pnpm qualify:simulator
+      - name: Qualify explicit unqualified development reload separately
+        run: pnpm qualify:development
+      - name: Record development verification outcome
+        if: always()
+        run: node tools/ci-evidence.mjs development
+        env:
+          FLEETIQ_CI_STATUS: ${{ job.status }}
       - name: Record job verification outcome
         if: always()
         run: node tools/ci-evidence.mjs docker

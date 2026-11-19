@@ -1,4 +1,5 @@
 export const catalogue = {
+  development: ['toolchain', 'policy', 'development-reload'],
   structural: [
     'toolchain',
     'harness-tests',

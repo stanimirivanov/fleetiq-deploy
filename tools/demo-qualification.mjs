@@ -315,6 +315,7 @@ export async function qualifyDemo({ afterSend, afterRestart } = {}) {
         site,
         directory: identity,
         scratch,
+        browserImage: built.Id,
         browser: (settings) =>
           adapters.reconcile(identity, readFileSync(artifact), settings, 'browser.mjs'),
       });

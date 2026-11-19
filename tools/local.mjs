@@ -2,6 +2,10 @@ import { analyticsInstallation, analyticsServices } from './analytics.mjs';
 import { archiveInstallation, archiveService } from './archive.mjs';
 import { demoCommand, parseDemoArguments } from './demo.mjs';
 import {
+  developmentCommand,
+  parseDevelopmentArguments,
+} from './demo-dev-lifecycle.mjs';
+import {
   appliedInstallation,
   assertOwnership,
   context,
@@ -18,11 +22,26 @@ import { buildImages, prepareSources } from './sources.mjs';
 try {
   const args = process.argv.slice(2);
   const [command, name = 'development'] = args;
-  const demo = command?.startsWith('demo-') ? parseDemoArguments(args) : null;
+  const development = ['demo-dev-up', 'demo-rebuild-backend', 'demo-reviewed'].includes(
+    command,
+  )
+    ? parseDevelopmentArguments(args)
+    : null;
+  const demo =
+    !development && command?.startsWith('demo-') ? parseDemoArguments(args) : null;
   if (command === 'sources') prepareSources();
   else {
     const docker = context();
-    if (command?.startsWith('demo-')) {
+    if (development) {
+      try {
+        await developmentCommand(development.command, development.name, docker);
+      } catch {
+        throw new Error(
+          'Development lifecycle failed; retain owned state, verify isolated source/provenance and use demo-reviewed for recovery',
+        );
+      }
+      console.log('Unqualified development lifecycle: complete');
+    } else if (command?.startsWith('demo-')) {
       try {
         await demoCommand(demo.command, demo.name, docker, demo.artifactPath);
       } catch {

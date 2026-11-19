@@ -210,6 +210,13 @@ export function buildImages(docker) {
     )}\n`,
   );
 }
+/** Even matching revision labels cannot turn a development image into a reviewed artifact. */
+export function rejectDevelopmentImage(image) {
+  assert(
+    !Object.hasOwn(image.Config.Labels ?? {}, 'com.fleetiq.development'),
+    'Development artifacts cannot qualify reviewed releases',
+  );
+}
 export function imageInventory(docker) {
   const images = JSON.parse(readFileSync(resolve(root, '.local/images.json')));
   assert.equal(
@@ -223,6 +230,7 @@ export function imageInventory(docker) {
       run('docker', ['--context', docker, 'image', 'inspect', images[name]]),
     );
     const source = name === 'backend' ? lock.sources.platform : lock.sources.ux;
+    rejectDevelopmentImage(image);
     assert.equal(image.Id, images[name]);
     assert.equal(
       image.Config.Labels['org.opencontainers.image.revision'],

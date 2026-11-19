@@ -31,7 +31,7 @@ commands, changed source bytes or failed cleanup produce a nonzero exit.
 | Candidate is not activation | Closed Ajv contracts, active-path rejection, registered protected-ref Argo source-graph checks and independent admission-context fixtures |
 
 The executable catalogue is in `tools/verification-catalogue.mjs`. Groups are structural, manifests,
-packages, docker, product and acceptance. Reports include group/check outcomes, source fingerprints,
+packages, docker, product, simulator, development and acceptance. Reports include group/check outcomes, source fingerprints,
 Git head and timestamps. Docker measurements name the real images and checks,
 but contain no raw command output, cookies, provider subjects or configuration.
 All acceptance requires unchanged candidate file bytes before/after execution.
@@ -131,8 +131,31 @@ No physical-device or broader simulator-scenario outcome is implied.
 
 
 The browser fixture build runs
-`node --test local/qualification/product/export-response.test.mjs` against real
+`node --test local/qualification/product/export-response.test.mjs local/qualification/product/inspect-response.test.mjs` against real
 Chromium and synthetic loopback HTTP. It consumes an export receipt in the UI, crosses a
 document lifecycle boundary, and verifies qualification without relying on an
 evicted CDP response body or replaying the export PUT. Status, selected job,
 download filename, coverage, row/byte limits and Parquet checks remain required.
+The Inspect cases likewise evict hot/restored response bodies after UI consumption.
+They require the exact same-origin request URL/status and an independent bounded
+authenticated read of the immutable interpretation; the installed witness still
+checks the selected route and rendered provenance. Wrong restore selection, denied
+reads and different evidence fail. The Inspect action is never repeated.
+
+## Explicit development qualification
+
+SIM-PR20 has a separate `development` inventory. Prepare network-only reviewed
+source objects with `pnpm development:sources`, build the normal artifacts, then
+run `pnpm qualify:development`. This group cannot replace structural, Docker,
+product or simulator acceptance; CI runs each independently. No development
+image changes the reviewed artifact lock or passes reviewed image admission.
+
+The smoke requires absent `.local/dev-sources/ui` and `platform` directories.
+It creates owned disposable clones, installs frozen UI dependencies without
+source credentials, trusts the disposable public CA only inside Chromium, and
+checks authenticated HTTPS, SSE, a real source edit through HMR without document
+reload, logout, and sample/foreign-origin rejection. It then rebuilds the backend
+and matching executors, preserves and resumes a pending producer queue, returns
+to reviewed images, and proves owned cleanup. Existing developer clones are
+never adopted or reset. See [developer reload](../operations/simulator-demo.md#explicit-unqualified-development-reload)
+for manual preparation, recovery, and the source scanner ownership boundary.

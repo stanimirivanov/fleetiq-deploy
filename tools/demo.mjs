@@ -497,7 +497,7 @@ function admitSimulator(docker) {
   validateSimulatorImage(lock.simulator, images[0]);
 }
 
-function prepareDemoInstallation(name, docker) {
+export function prepareDemoInstallation(name, docker) {
   validateDemoParents();
   assert(lock.simulator, 'Published simulator pin missing');
   const base = installation(name, docker);
@@ -579,6 +579,10 @@ export async function demoCommand(
     return;
   }
   assert(['up', 'down', 'reset'].includes(command));
+  assert(
+    command === 'down' || !existsSync(resolve(instancePath(name), 'development.json')),
+    'Return to reviewed mode before normal startup or reset',
+  );
   const data =
     command === 'up'
       ? prepareDemoInstallation(name, docker)
