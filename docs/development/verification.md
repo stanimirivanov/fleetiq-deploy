@@ -159,3 +159,33 @@ and matching executors, preserves and resumes a pending producer queue, returns
 to reviewed images, and proves owned cleanup. Existing developer clones are
 never adopted or reset. See [developer reload](../operations/simulator-demo.md#explicit-unqualified-development-reload)
 for manual preparation, recovery, and the source scanner ownership boundary.
+
+## Installed simulator fault envelope
+
+SIM-PR18 adds a qualification-only second registered device; normal demo startup
+still creates one. The installed simulator gate requires all eight explicit fault
+actions, a two-member/six-capture product fleet, a 12-login disconnect workload
+alongside a healthy three-capture producer, and preflight queue-overflow rejection.
+A shared start barrier coordinates the concurrent producers. All use the normal
+restricted image and private ingress; qualification inputs are mounted read-only.
+
+Fleet execution must report at most 64 KiB queued bytes, six queued records,
+256 MiB process RSS, 64 sampled descriptors and five seconds of user+system CPU.
+The two-member workload must reach two active client attempts; the neighbor uses
+one slot alongside the disconnect producer. These are measured producer workload
+bounds, not installed throughput or backend-resource guarantees. FD peaks are
+sampled, and producer CPU excludes preparation as defined by the reviewed runtime.
+
+Authenticated history must contain every required source timestamp and no output
+from malformed, unregistered or before-write-disconnected records. Duplicates and
+optional after-write acceptance remain explicitly allowed. Terminal ingestion
+diagnostics require all persisted turns decoded: the pinned live executor rejects
+bad input before enqueue, so no poisoned replay record is invented. Relative to
+a measured fleet baseline, require eight registered handshakes and four valid data
+turns, plus at most one valid after-write turn. The reconnect workload adds exactly
+12 empty handshake turns and no decoded data; overflow adds no frames on either
+device. The real browser opens each device's selected historical interpretation
+in Inspect. Closed receipts/diagnostic
+shapes reject private fields; public evidence contains fixed checks and numeric
+resource peaks only. Every producer is owner-checked before removal, then the
+parent lifecycle must reset its owned installation and retain unrelated resources.

@@ -34,7 +34,7 @@ export function demoFailureDiagnostic(error) {
   if (seedPhase) return seedPhase[0];
   const simulatorPhase =
     error instanceof Error
-      ? /^Simulator browser qualification failed: (trust|login|projection|map(?:-ready|-list|-point|-coordinate|-resources)?|inspect|storage|recovery-history)((?:@(?:browser|recovery)\.mjs:[0-9]+)?)$/u.exec(
+      ? /^Simulator browser qualification failed: (trust|login|projection|map(?:-ready|-list|-point|-coordinate|-resources)?|inspect|storage|recovery-history)((?:@(?:browser|recovery|fault-acceptance)\.mjs:[0-9]+)?)$/u.exec(
           error.message,
         )
       : null;
@@ -49,14 +49,14 @@ export function demoFailureDiagnostic(error) {
   const location =
     error instanceof Error
       ? error.stack?.match(
-          /tools\/((?:demo(?:-qualification|-seed)?|simulator-timing(?:-evidence)?)\.mjs):([0-9]+):[0-9]+/u,
+          /tools\/((?:demo(?:-qualification|-seed)?|simulator-(?:timing(?:-evidence)?|faults))\.mjs):([0-9]+):[0-9]+/u,
         )
       : null;
   return `${category}${location ? `@${location[1]}:${location[2]}` : ''}`;
 }
 
 /** Exercises the actual producer and owned lifecycle; evidence contains fixed checks only. */
-export async function qualifyDemo({ afterSend, afterRestart } = {}) {
+export async function qualifyDemo({ afterSend, afterRestart, deviceCount = 1 } = {}) {
   assert(lock.simulator, 'Published simulator pin missing');
   const docker = context();
   const execute = (args, options = {}) =>
@@ -118,7 +118,7 @@ export async function qualifyDemo({ afterSend, afterRestart } = {}) {
     ]);
     chmodSync(artifact, 0o600);
     phase = 'initialize';
-    await demoCommand('init', name, docker, artifact);
+    await demoCommand('init', name, docker, artifact, { deviceCount });
     initialized = true;
     const site = appliedInstallation(name, docker);
     siteOwner = site.owner.id;
@@ -268,6 +268,10 @@ export async function qualifyDemo({ afterSend, afterRestart } = {}) {
                 resolve(root, 'local/demo/recovery.mjs'),
                 '/fixture/local/demo/recovery.mjs',
               ),
+              ...bind(
+                resolve(root, 'local/demo/fault-acceptance.mjs'),
+                '/fixture/local/demo/fault-acceptance.mjs',
+              ),
               built.Id,
               `local/demo/${script}`,
             ],
@@ -282,7 +286,7 @@ export async function qualifyDemo({ afterSend, afterRestart } = {}) {
         } catch (error) {
           if (stderr !== undefined) {
             const phase =
-              /^Simulator browser qualification failed: (trust|login|projection|map(?:-ready|-list|-point|-coordinate|-resources)?|inspect|storage|recovery-history)((?:@(?:browser|recovery)\.mjs:[0-9]+)?)$/mu.exec(
+              /^Simulator browser qualification failed: (trust|login|projection|map(?:-ready|-list|-point|-coordinate|-resources)?|inspect|storage|recovery-history)((?:@(?:browser|recovery|fault-acceptance)\.mjs:[0-9]+)?)$/mu.exec(
                 readFileSync(errorFile, 'utf8'),
               );
             if (phase) throw new Error(phase[0]);
