@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { api } from './api.mjs';
 import { waitPhase, writePhase } from './channel.mjs';
+import { qualifyInspection } from './inspect-response.mjs';
 
 const tenant = '/api/v1/tenants/tenant-lifecycle';
 const property = `${tenant}/assets/asset/properties/electrical.voltage/versions/1`;
@@ -131,18 +132,19 @@ export async function qualifyRestoredHistory({
     [1, interpretation, selectedQuery, provenance],
   ]) {
     setStep(row === 2 ? 'mixed-history-hot-inspect' : 'mixed-history-restored-inspect');
-    const [inspected] = await Promise.all([
-      page.waitForResponse(responseFor(path)),
-      historyReview
-        .getByRole('button', {
-          name: `Inspect history interpretation ${row}`,
-          exact: true,
-        })
-        .click(),
-    ]);
-    assert.equal(new URL(inspected.url()).search, search);
-    assert.equal(inspected.status(), 200);
-    assert.deepEqual(await inspected.json(), expected);
+    await qualifyInspection({
+      page,
+      path,
+      search,
+      expected,
+      click: () =>
+        historyReview
+          .getByRole('button', {
+            name: `Inspect history interpretation ${row}`,
+            exact: true,
+          })
+          .click(),
+    });
     await expect(page).toHaveURL(
       ({ searchParams }) =>
         searchParams.get('history_manifest') === '1' &&

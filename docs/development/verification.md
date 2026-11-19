@@ -131,11 +131,16 @@ No physical-device or broader simulator-scenario outcome is implied.
 
 
 The browser fixture build runs
-`node --test local/qualification/product/export-response.test.mjs` against real
+`node --test local/qualification/product/export-response.test.mjs local/qualification/product/inspect-response.test.mjs` against real
 Chromium and synthetic loopback HTTP. It consumes an export receipt in the UI, crosses a
 document lifecycle boundary, and verifies qualification without relying on an
 evicted CDP response body or replaying the export PUT. Status, selected job,
 download filename, coverage, row/byte limits and Parquet checks remain required.
+The Inspect cases likewise evict hot/restored response bodies after UI consumption.
+They require the exact same-origin request URL/status and an independent bounded
+authenticated read of the immutable interpretation; the installed witness still
+checks the selected route and rendered provenance. Wrong restore selection, denied
+reads and different evidence fail. The Inspect action is never repeated.
 
 ## Explicit development qualification
 
