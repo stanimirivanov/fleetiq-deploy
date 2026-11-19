@@ -55,6 +55,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm secrets:install
       - run: pnpm manifests:install
+      - name: Install checksum-verified Compose
+        run: node tools/install-compose.mjs
       - run: pnpm check
       - run: pnpm packages:check
       - name: Publish qualified bytes with isolated registry credentials

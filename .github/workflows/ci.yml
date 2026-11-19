@@ -29,6 +29,8 @@ jobs:
       - run: pnpm secrets:install
       - name: Install checksum-verified offline manifest tools and schemas
         run: pnpm manifests:install
+      - name: Install checksum-verified Compose
+        run: node tools/install-compose.mjs
       - run: pnpm check
         env:
           FLEETIQ_BASE_SHA: ${{ github.event.pull_request.base.sha }}

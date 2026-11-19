@@ -167,6 +167,11 @@ test('reviewed image admission rejects development markers even with matching re
 test('real Compose development overlay preserves private networks and rejects unsafe deltas', async (t) => {
   const { root } = await import('../process.mjs');
   const { lock } = await import('../policy.mjs');
+  assert.equal(
+    run('docker', ['compose', 'version', '--short']).replace(/^v/u, ''),
+    lock.tools.compose,
+    'Native rendering requires the reviewed Compose; run node tools/install-compose.mjs',
+  );
   const { validateDevelopmentModel, developmentCaddy, parseDevelopmentArguments } =
     await import('../demo-dev-lifecycle.mjs');
   for (const args of [
@@ -450,4 +455,25 @@ test('reviewed recovery discards stale development details while retaining every
     assert.throws(() =>
       admitDevelopmentState({ ...interrupted, [key]: 'foreign' }, binding, 'reviewed'),
     );
+});
+
+test('every CI consumer of native harness verification installs the reviewed Compose first', async () => {
+  const { parse } = await import('yaml');
+  const { expectedWorkflow, expectedPublicationWorkflow } = await import('../ci.mjs');
+  for (const authority of [expectedWorkflow, expectedPublicationWorkflow]) {
+    const consumers = Object.values(parse(authority).jobs).filter((job) =>
+      job.steps.some((step) => step.run === 'pnpm check'),
+    );
+    assert(consumers.length > 0);
+    for (const { steps } of consumers) {
+      const install = steps.findIndex(
+        (step) => step.run === 'node tools/install-compose.mjs',
+      );
+      const check = steps.findIndex((step) => step.run === 'pnpm check');
+      assert(
+        install >= 0 && install < check,
+        'Native rendering requires the same checksum-verified Compose as runtime qualification',
+      );
+    }
+  }
 });

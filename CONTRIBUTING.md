@@ -12,11 +12,16 @@ in the pull request. CI runs only on pull requests.
 pnpm install --frozen-lockfile
 pnpm secrets:install
 pnpm manifests:install
+node tools/install-compose.mjs
 pnpm check
 pnpm local build
 pnpm qualify
 pnpm qualify:product
 ```
+
+`pnpm check` includes actual Compose rendering. Install the checksum-verified
+Compose pin before running it, as its CI consumers do; native rendering refuses
+unsupported versions rather than comparing different serializers.
 
 `pnpm check` is the structural group: toolchain, harness fixtures, Biome,
 repository/CI policy, offline Helm/Kustomize/schema/manifest qualification,
