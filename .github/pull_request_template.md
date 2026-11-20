@@ -1,18 +1,25 @@
-Closes #
+## Summary
 
-## Behavior
+Describe the problem and resulting behavior using the smallest useful diagram,
+diff sketch or tree. Link the owning issue and relevant milestone.
 
-Describe the installation change and its boundary.
+Installation/release boundary, immutable source and image identities, credential handling and real Docker/product qualification.
 
-## Verification
+## Evidence
 
-- [ ] `pnpm check` passed; evidence inspected.
-- [ ] `pnpm local build` and `pnpm qualify` passed for installation changes.
-- [ ] Secret/configuration files and private CA material are absent from the diff.
+- **Before:** Reproduction, output or previous behavior.
+- **After:** Verified result and exact commands.
 
-State actual evidence and any required checks that remain incomplete.
+`pnpm check`; installation changes also require `pnpm local build`, `pnpm qualify` and applicable product/package qualification.
 
-## Harness verdict
+Checks not run, blocking conditions, and residual risk:
 
-Which guide changed? Which deterministic sensor proves the behavior?
-Describe rejection fixtures, operational limits and follow-up work.
+## Merge Danger
+
+**Door:** one-way or two-way
+
+**Blast Radius:** affected scope
+
+Describe material compatibility, security and operational risks, limitations and
+rollback. Evidence and checked boxes do not grant publication, merge or live
+infrastructure authority.

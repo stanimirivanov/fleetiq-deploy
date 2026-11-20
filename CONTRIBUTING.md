@@ -6,6 +6,14 @@ Use the pinned tools. Read the nearest scoped guide, implement a coherent slice,
 run the declared verification groups, inspect evidence, and include limitations
 in the pull request. CI runs only on pull requests.
 
+## Workflow authority
+
+Installed `mattpocock/skills` owns planning, implementation and review workflows.
+The root [AGENTS.md](AGENTS.md) routes skills; this guide owns technical verification.
+See [issue tracker](docs/agents/issue-tracker.md), [triage labels](docs/agents/triage-labels.md)
+and [domain docs](docs/agents/domain.md). Existing execution plans retain historical
+evidence; new work follows the selected skill's artifact format.
+
 ## Verification
 
 ```bash

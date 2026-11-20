@@ -1,5 +1,7 @@
 # Installation constraints
 
+Technical constraints for this scope; the repository root `AGENTS.md` owns workflow routing.
+
 Read [architecture](../ARCHITECTURE.md) and
 [operations](../docs/operations/local-installation.md) before changing composition.
 

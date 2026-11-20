@@ -1,5 +1,7 @@
 # Kubernetes package constraints
 
+Technical constraints for this scope; the repository root `AGENTS.md` owns workflow routing.
+
 - Read [package contracts](../docs/operations/kubernetes-packages.md).
 - Helm owns workload fields; Kustomize composes namespace policy. Neither installs
   shared controllers/CRDs or creates credentials. No live apply command belongs here.

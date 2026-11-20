@@ -1,5 +1,7 @@
 # Release automation boundaries
 
+Technical constraints for this scope; the repository root `AGENTS.md` owns workflow routing.
+
 Read [release operations](../../docs/operations/release-packages.md) and the
 [contracts](../../contracts/releases/README.md) before changing these modules.
 
