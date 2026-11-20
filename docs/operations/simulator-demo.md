@@ -255,3 +255,15 @@ mount and the pinned detector. Host `target` tools are masked by tmpfs (an empty
 file must fail even with a forged local detector. Deployment policy has no new
 exception. The tool image installs Git from the pinned Debian base's repositories;
 it is local verification tooling, never a reviewed application artifact.
+
+## Installed fault and fleet qualification
+
+Run `pnpm qualify:simulator` against the reviewed producer image after building
+the locked product artifacts. Its disposable installation registers two synthetic
+devices for fault/fleet isolation; these fixtures do not change the normal
+one-device lifecycle above. It exercises explicit malformed-frame denials,
+concurrent product-profile producers, bounded reconnect traffic and queue overflow,
+then verifies authenticated history/Inspect and terminal ingestion diagnostics.
+See the [declared workload/resource envelope](../development/verification.md#installed-simulator-fault-envelope).
+Missing producer capabilities, observed private fields, over-budget metrics or
+incomplete owned cleanup fail qualification; no physical-device outcome is implied.

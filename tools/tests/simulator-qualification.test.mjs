@@ -207,3 +207,18 @@ test('timing failures expose only reviewed qualification module locations', () =
     'assertion@simulator-timing-evidence.mjs:90',
   );
 });
+
+test('fault diagnostics allow only the reviewed host and browser module locations', () => {
+  const error = new assert.AssertionError({ message: 'private-canary' });
+  error.stack =
+    'AssertionError: private-canary\n at qualifyFaults (/fixture/tools/simulator-faults.mjs:90:5)';
+  assert.equal(demoFailureDiagnostic(error), 'assertion@simulator-faults.mjs:90');
+  assert.equal(
+    demoFailureDiagnostic(
+      new Error(
+        'Simulator browser qualification failed: recovery-history@fault-acceptance.mjs:91',
+      ),
+    ),
+    'simulator-browser-recovery-history@fault-acceptance.mjs:91',
+  );
+});

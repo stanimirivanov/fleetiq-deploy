@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { closeSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { completeSimulator } from '../local/demo/evidence.mjs';
+import { completeFaults } from '../local/demo/fault-acceptance.mjs';
 import { completeRecovery } from '../local/demo/recovery.mjs';
 import { qualifyDemo } from './demo-qualification.mjs';
 import { lock } from './policy.mjs';
 import { CommandFailure } from './process.mjs';
+import { qualifyFaults } from './simulator-faults.mjs';
 import { prepareRecovery } from './simulator-recovery.mjs';
 import { qualifyTiming } from './simulator-timing.mjs';
 import { completeTiming } from './simulator-timing-evidence.mjs';
@@ -26,11 +28,13 @@ export async function qualifySimulator() {
     images,
     recovery,
     recovered,
+    faultEvidence,
     timed,
     timingContext,
     expected,
     rejected = false;
   const base = await qualifyDemo({
+    deviceCount: 2,
     afterSend: async ({ site, directory, scratch, browser }) => {
       images = {
         backend: site.model.services.backend.image,
@@ -96,6 +100,7 @@ export async function qualifySimulator() {
         'Unregistered simulator identity was not rejected before acceptance',
       );
       after = await browser(expected);
+      faultEvidence = await qualifyFaults(site, config, seed, browser);
       recovery = prepareRecovery(site, config, scratch);
       timingContext = { site, config };
     },
@@ -115,7 +120,9 @@ export async function qualifySimulator() {
       ...completeSimulator(base, before, after, rejected),
       ...completeRecovery(base, recovered),
       ...completeTiming(base, timed),
+      ...completeFaults(base, faultEvidence),
     ],
+    faultResources: faultEvidence.resources,
     timing: { idle: timed.idle, lifetime: timed.lifetime },
     sources: { platform: lock.sources.platform.commit, ui: lock.sources.ux.commit },
     images,

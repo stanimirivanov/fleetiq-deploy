@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { expect as baseExpect, chromium } from '@playwright/test';
 import { verifyMapCoordinates, verifySimulatorReading } from './evidence.mjs';
+import { verifyFaultDiagnostics, verifyFaultHistory } from './fault-acceptance.mjs';
 import { verifyRecoveryHistory } from './recovery.mjs';
 
 const expect = baseExpect.configure({ timeout: 30000 });
@@ -113,12 +114,13 @@ try {
   });
   if (expected.recovery) {
     phase = 'recovery-history';
+    let selected;
     for (const axis of ['latitude', 'longitude']) {
       const property = `${tenant}/assets/${expected.assetId}/properties/position.${axis}/versions/1`;
       const timestamps = expected.recovery.timestamps;
       const read = () =>
         api(
-          `${property}/history?start_at_ms=${timestamps[0]}&end_at_ms=${BigInt(timestamps.at(-1)) + 1n}&limit=100`,
+          `${property}/history?start_at_ms=${expected.recovery.window?.start ?? timestamps[0]}&end_at_ms=${expected.recovery.window?.end ?? BigInt(timestamps.at(-1)) + 1n}&limit=100`,
         );
       await expect
         .poll(
@@ -132,13 +134,65 @@ try {
         )
         .toBe(true);
       const history = await read();
-      verifyRecoveryHistory(history, { ...expected, timestamps }, axis);
+      if (expected.recovery.allowed)
+        verifyFaultHistory(
+          history,
+          { ...expected, required: timestamps, allowed: expected.recovery.allowed },
+          axis,
+        );
+      else verifyRecoveryHistory(history, { ...expected, timestamps }, axis);
+      if (axis === 'latitude') selected = history.changes[0];
       for (const row of history.changes) {
         const provenance = await api(
           `${property}/interpretations/${encodeURIComponent(row.interpretation)}`,
         );
         assert.deepEqual(provenance, row);
       }
+    }
+    let decodedFrames, frames;
+    if (expected.recovery.inspect) {
+      const read = () =>
+        api(`${tenant}/assets/${expected.deviceId}/ingestion-diagnostics`);
+      await expect
+        .poll(
+          async () => {
+            const frames = (await read()).frames;
+            return (
+              frames.length > 0 &&
+              frames.every((frame) => frame.processing === 'decoded')
+            );
+          },
+          { timeout: 90000 },
+        )
+        .toBe(true);
+      const diagnostics = await read();
+      decodedFrames = verifyFaultDiagnostics(diagnostics);
+      frames = diagnostics.frames.length;
+    }
+    if (expected.recovery.inspect) {
+      const query = new URLSearchParams({
+        tenant: expected.tenantId,
+        property: 'position.latitude',
+        property_version: '1',
+        interpretation: selected.interpretation,
+        interpretation_source: 'hot',
+        history_start: expected.recovery.window.start,
+        history_end: expected.recovery.window.end,
+      });
+      await page.goto(`${origin}/assets/${expected.assetId}?${query}`);
+      const panel = page.getByRole('region', {
+        name: 'Interpretation provenance',
+        exact: true,
+      });
+      for (const value of [
+        `${expected.deviceId} / main / gps.latitude_e7`,
+        `${expected.deviceId}-latitude · revision 1`,
+        'vendor.teltonika / simulator-demo-1',
+      ])
+        await expect(panel).toContainText(value);
+      await expect(panel).toContainText(
+        new Date(Number(selected.event_at_ms)).toISOString(),
+      );
     }
     assert.equal(pageErrors, 0);
     assert(!foreign && !sample);
@@ -147,7 +201,12 @@ try {
     await api('/api/v1/auth/logout', 'POST');
     console.log(
       JSON.stringify({
-        checks: ['recovered-source-history', 'matching-provenance'],
+        checks: [
+          'recovered-source-history',
+          'matching-provenance',
+          ...(expected.recovery.inspect ? ['matching-inspect'] : []),
+        ],
+        ...(decodedFrames === undefined ? {} : { decodedFrames, frames }),
         accepted,
       }),
     );
@@ -274,7 +333,7 @@ try {
   }
 } catch (error) {
   const location = error?.stack?.match(
-    /\/(browser\.mjs|recovery\.mjs):([0-9]+):[0-9]+/u,
+    /\/(browser\.mjs|recovery\.mjs|fault-acceptance\.mjs):([0-9]+):[0-9]+/u,
   );
   const source = location ? `@${location[1]}:${location[2]}` : '';
   console.error(`Simulator browser qualification failed: ${phase}${source}`);

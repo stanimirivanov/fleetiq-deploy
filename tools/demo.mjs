@@ -203,7 +203,8 @@ export function validateDemoOwner(state, site, seed, pin, inputsSha256) {
 }
 
 /** Initialize only a fresh installation; interrupted or foreign state is never adopted. */
-export function initializeDemo(name, docker, artifactPath) {
+export function initializeDemo(name, docker, artifactPath, deviceCount = 1) {
+  assert([1, 2].includes(deviceCount), 'Invalid qualification device count');
   instancePath(name);
   validateDemoParents();
   assert(process.getuid() > 0, 'Demo requires a nonroot host owner');
@@ -221,8 +222,8 @@ export function initializeDemo(name, docker, artifactPath) {
   const directory = identityDirectory(name);
   const identity = initializeDemoIdentity(directory);
   const settings = seedSettings(identity);
-  const seed = initializeDemoSeed(directory, { ...settings, artifact });
-  assert.equal(seed.devices.length, 1);
+  const seed = initializeDemoSeed(directory, { ...settings, artifact, deviceCount });
+  assert.equal(seed.devices.length, deviceCount);
   const owner = initialize(name, docker, {
     httpsPort: 58443,
     oidc: {
@@ -572,10 +573,14 @@ export async function demoCommand(
   name,
   docker,
   artifactPath,
-  { preflight = preflightDemoIdentity, reconcile = reconcileDemoBrowser } = {},
+  {
+    preflight = preflightDemoIdentity,
+    reconcile = reconcileDemoBrowser,
+    deviceCount = 1,
+  } = {},
 ) {
   if (command === 'init') {
-    initializeDemo(name, docker, artifactPath);
+    initializeDemo(name, docker, artifactPath, deviceCount);
     return;
   }
   assert(['up', 'down', 'reset'].includes(command));
