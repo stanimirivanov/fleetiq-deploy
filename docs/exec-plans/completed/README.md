@@ -1,4 +1,8 @@
 # Completed execution plans
 
-Move an accepted implementation plan here with its issue/PR reference and actual
-verification evidence. Keep follow-up work in the active directory.
+Historical planning records: new work follows the installed Matt Pocock skill
+and `docs/agents/issue-tracker.md`. These records do not establish a parallel workflow.
+
+
+Retained plans preserve issue/PR references and actual verification evidence.
+Track follow-up work in the owning GitHub issue tracker.

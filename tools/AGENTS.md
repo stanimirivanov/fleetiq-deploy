@@ -1,5 +1,7 @@
 # Verification automation constraints
 
+Technical constraints for this scope; the repository root `AGENTS.md` owns workflow routing.
+
 Read [verification](../docs/development/verification.md).
 
 - Use the shared process adapter with argument arrays, bounded timeouts and
