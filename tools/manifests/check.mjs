@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkBootstrap } from './bootstrap.mjs';
+import { checkMinimalDemo } from './minimal-demo-render.mjs';
 import { manifestPolicy } from './policy.mjs';
 import { fixtureStates, renderFixture, validateSchemas } from './render.mjs';
 import { manifestTools, toolsLock } from './toolchain.mjs';
@@ -24,6 +25,7 @@ export function checkManifests() {
   return {
     kubernetes: toolsLock.kubernetes,
     bootstrap,
+    minimalDemo: checkMinimalDemo(tools),
     tools: Object.fromEntries(
       Object.entries(toolsLock.tools).map(([name, tool]) => [name, tool.version]),
     ),

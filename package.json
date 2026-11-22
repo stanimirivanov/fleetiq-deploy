@@ -17,6 +17,8 @@
     "qualify": "node tools/verify.mjs docker",
     "secrets:install": "node tools/install-gitleaks.mjs",
     "manifests:install": "node tools/manifests/install.mjs",
+    "minimal-demo:network:probe": "node tools/manifests/minimal-demo-probe-cli.mjs",
+    "minimal-demo:network:render": "node tools/manifests/minimal-demo-render.mjs",
     "manifests:check": "node tools/verify.mjs manifests",
     "releases:check": "node tools/releases/cli.mjs contracts",
     "releases:verify-artifacts": "node tools/releases/cli.mjs verify-artifacts",
