@@ -22,6 +22,15 @@ export const application = (role) => ({ [nameLabel]: `fleetiq-${role}` });
 export const database = { 'cnpg.io/cluster': 'fleetiq-db' };
 export const dns = { 'k8s-app': 'kube-dns' };
 export const postgresPort = 5432;
+export const cnpgControlPort = 8000;
+export const foreignProbePort = 8080;
+export const additionalDatabaseRoles = [
+  'replay-worker',
+  'semantic-worker',
+  'project-current',
+  'analytics-worker',
+];
+export const demoProbePhases = ['ingestion', 'services', 'database'];
 
 export function admittedIPv4(address) {
   if (!isIPv4(address)) return false;
@@ -156,10 +165,7 @@ export function minimalDemoResources(selection) {
   const databaseRoles = [
     'backend',
     'ingest-tcp',
-    'replay-worker',
-    'semantic-worker',
-    'project-current',
-    'analytics-worker',
+    ...additionalDatabaseRoles,
     'notification-worker',
     'archive-worker',
   ];
@@ -280,10 +286,13 @@ export function minimalDemoResources(selection) {
           databaseRoles.map((name) => peer(application(name), apps)),
           postgresPort,
         ),
-        ingress([peer(database)], postgresPort, 8000),
-        ingress([peer({ [nameLabel]: 'cloudnative-pg' }, 'cnpg-system')], 8000),
+        ingress([peer(database)], postgresPort, cnpgControlPort),
+        ingress(
+          [peer({ [nameLabel]: 'cloudnative-pg' }, 'cnpg-system')],
+          cnpgControlPort,
+        ),
       ],
-      egress: [dnsEgress, egress([peer(database)], postgresPort, 8000)],
+      egress: [dnsEgress, egress([peer(database)], postgresPort, cnpgControlPort)],
     }),
     network(support, 'receiver', application('receiver'), {
       ingress: [
@@ -391,14 +400,15 @@ export function demoServiceRoutes(spaces) {
 }
 
 export function demoProbeRoles(phase) {
-  const ingestion = ['simulator', 'other', 'foreign'];
-  assert(
-    ['ingestion', 'services'].includes(phase),
-    'Select the ingestion or services probe phase',
-  );
-  return phase === 'ingestion'
-    ? ingestion
-    : [
+  const ingestion = ['simulator', 'other', 'foreign', 'foreign-listener'];
+  assert(demoProbePhases.includes(phase), 'Select an installed network probe phase');
+  switch (phase) {
+    case 'ingestion':
+      return ingestion;
+    case 'database':
+      return [...ingestion, ...additionalDatabaseRoles, 'database', 'database-peer'];
+    default:
+      return [
         ...ingestion,
         'ingest-tcp',
         'backend',
@@ -407,4 +417,13 @@ export function demoProbeRoles(phase) {
         'alertmanager',
         'archive-worker',
       ];
+  }
+}
+
+export function demoProbeRoutes(phase, spaces) {
+  const routes = demoServiceRoutes(spaces);
+  if (phase === 'ingestion') return { ingestion: routes.ingestion };
+  if (phase === 'database')
+    return { ingestion: routes.ingestion, database: routes.database };
+  return routes;
 }

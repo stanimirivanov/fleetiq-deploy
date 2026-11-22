@@ -2,10 +2,13 @@ import assert from 'node:assert/strict';
 import {
   application,
   attemptLabel,
+  cnpgControlPort,
   consumerLabel,
   demoNamespaces,
   demoProbeRoles,
+  demoProbeRoutes,
   demoServiceRoutes,
+  foreignProbePort,
   minimalDemoResources,
   simulatorAccount,
 } from './minimal-demo-network.mjs';
@@ -13,12 +16,17 @@ import {
 export const fixtureLabel = { 'app.kubernetes.io/part-of': 'fleetiq-network-probe' };
 export const foreignNamespace = (consumer) => `${consumer}-network-probe-foreign`;
 const portName = 'probe';
-const listener = `import socket, sys
-with socket.socket() as server:
+const databasePrimary = { 'app.kubernetes.io/component': 'network-probe-primary' };
+const listener = `import select, socket, sys
+listeners = []
+for port in sys.argv[1:]:
+    server = socket.socket()
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server.bind(('0.0.0.0', int(sys.argv[1])))
+    server.bind(('0.0.0.0', int(port)))
     server.listen(8)
-    while True:
+    listeners.append(server)
+while True:
+    for server in select.select(listeners, [], [])[0]:
         conn, _ = server.accept()
         conn.close()`;
 
@@ -36,7 +44,7 @@ export function minimalDemoProbeFixtures(selection, phase, image) {
     labels,
     namespace = spaces.apps,
     serviceAccountName = 'default',
-    port,
+    ports = [],
   }) {
     return {
       apiVersion: 'v1',
@@ -74,7 +82,9 @@ export function minimalDemoProbeFixtures(selection, phase, image) {
               '-I',
               '-B',
               '-c',
-              ...(port ? [listener, String(port)] : ['import time; time.sleep(600)']),
+              ...(ports.length
+                ? [listener, ...ports.map(String)]
+                : ['import time; time.sleep(600)']),
             ],
             securityContext: {
               allowPrivilegeEscalation: false,
@@ -85,9 +95,12 @@ export function minimalDemoProbeFixtures(selection, phase, image) {
               requests: { cpu: '5m', memory: '16Mi' },
               limits: { cpu: '100m', memory: '32Mi' },
             },
-            ...(port
+            ...(ports.length
               ? {
-                  ports: [{ name: portName, containerPort: port }],
+                  ports: ports.map((containerPort, index) => ({
+                    name: index === 0 ? portName : `${portName}-${index}`,
+                    containerPort,
+                  })),
                   readinessProbe: {
                     tcpSocket: { port: portName },
                     periodSeconds: 2,
@@ -109,6 +122,9 @@ export function minimalDemoProbeFixtures(selection, phase, image) {
     ['receiver', routes.receiver],
     ['object-store', routes.objectStore],
   ]);
+  function listenerPod(role, route, ports = [route.podPort]) {
+    return pod({ role, labels: route.labels, namespace: route.namespace, ports });
+  }
   const pods = demoProbeRoles(phase).map((role) => {
     if (['simulator', 'other', 'foreign'].includes(role))
       return pod({
@@ -117,24 +133,27 @@ export function minimalDemoProbeFixtures(selection, phase, image) {
         namespace: role === 'foreign' ? foreign : spaces.apps,
         serviceAccountName: role === 'other' ? 'default' : account,
       });
+    if (role === 'foreign-listener')
+      return pod({ role, namespace: foreign, ports: [foreignProbePort] });
+    if (role === 'database' || role === 'database-peer') {
+      const db = routes.database;
+      const labels =
+        role === 'database-peer'
+          ? { ...db.labels, 'app.kubernetes.io/name': 'fleetiq-network-probe-peer' }
+          : { ...db.labels, ...databasePrimary };
+      return listenerPod(role, { ...db, labels }, [db.podPort, cnpgControlPort]);
+    }
     return pod({
       role,
       labels: application(role),
-      port: assignments.get(role)?.podPort,
+      ports: assignments.has(role) ? [assignments.get(role).podPort] : [],
     });
   });
   const extraListeners =
-    phase === 'ingestion' ? ['ingest-tcp'] : ['database', 'receiver', 'object-store'];
+    phase === 'services' ? ['database', 'receiver', 'object-store'] : ['ingest-tcp'];
   for (const role of extraListeners) {
     const route = assignments.get(role);
-    pods.push(
-      pod({
-        role,
-        labels: route.labels,
-        namespace: route.namespace,
-        port: route.podPort,
-      }),
-    );
+    pods.push(listenerPod(role, route));
   }
   return [
     {
@@ -156,32 +175,36 @@ export function minimalDemoProbeFixtures(selection, phase, image) {
       automountServiceAccountToken: false,
     },
     ...pods,
-    ...(phase === 'ingestion'
-      ? []
-      : Object.entries(routes)
-          .filter(([role]) => role !== 'ingestion')
-          .map(([, route]) => ({
-            apiVersion: 'v1',
-            kind: 'Service',
-            metadata: {
-              name: route.name,
-              namespace: route.namespace,
-              labels: fixtureLabel,
+    ...Object.entries(demoProbeRoutes(phase, spaces))
+      .filter(([role]) => role !== 'ingestion')
+      .map(([, route]) => ({
+        apiVersion: 'v1',
+        kind: 'Service',
+        metadata: {
+          name: route.name,
+          namespace: route.namespace,
+          labels: fixtureLabel,
+        },
+        spec: {
+          type: 'ClusterIP',
+          ipFamilyPolicy: 'SingleStack',
+          ipFamilies: ['IPv4'],
+          selector: {
+            ...route.labels,
+            ...fixtureLabel,
+            ...(phase === 'database' && route.name === routes.database.name
+              ? databasePrimary
+              : {}),
+          },
+          ports: [
+            {
+              name: 'tcp',
+              protocol: 'TCP',
+              port: route.servicePort,
+              targetPort: route.podPort,
             },
-            spec: {
-              type: 'ClusterIP',
-              ipFamilyPolicy: 'SingleStack',
-              ipFamilies: ['IPv4'],
-              selector: { ...route.labels, ...fixtureLabel },
-              ports: [
-                {
-                  name: 'tcp',
-                  protocol: 'TCP',
-                  port: route.servicePort,
-                  targetPort: route.podPort,
-                },
-              ],
-            },
-          }))),
+          ],
+        },
+      })),
   ];
 }

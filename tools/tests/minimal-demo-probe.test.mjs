@@ -76,7 +76,7 @@ const identifier = (index) =>
   `00000000-0000-0000-0000-${String(index).padStart(12, '0')}`;
 const checkReady = [{ type: 'Ready', status: 'True' }];
 
-async function installed({ phase = 'ingestion', mutate }) {
+async function installed({ phase = 'ingestion', mutate, connect, tls }) {
   const { minimalDemoProbeFixtures, foreignNamespace } = await import(
     '../manifests/minimal-demo-fixtures.mjs'
   );
@@ -177,7 +177,12 @@ async function installed({ phase = 'ingestion', mutate }) {
   const request = {
     selection: testSelection,
     phase,
-    ...(phase === 'services' ? { issuerHostname: 'issuer.local.test' } : {}),
+    ...(phase === 'services'
+      ? {
+          issuerHostname: 'issuer.local.test',
+          issuerWitness: { certificate: artifact, response: artifact },
+        }
+      : {}),
     candidate: artifact,
     target: {
       name: 'fleetiq-local',
@@ -229,6 +234,21 @@ async function installed({ phase = 'ingestion', mutate }) {
           args,
           desired.find((item) => item.kind === 'ConfigMap'),
         );
+      if (kind === 'service' && name === 'kube-dns')
+        return code(args, {
+          metadata: { namespace, name, uid: identifier(90) },
+          spec: {
+            type: 'ClusterIP',
+            clusterIP: '10.96.0.10',
+            clusterIPs: ['10.96.0.10'],
+            ipFamilies: ['IPv4'],
+            selector: { 'k8s-app': 'kube-dns' },
+            ports: [
+              { port: 53, protocol: 'TCP' },
+              { port: 53, protocol: 'UDP' },
+            ],
+          },
+        });
       if (kind === 'service')
         return code(
           args,
@@ -265,16 +285,47 @@ async function installed({ phase = 'ingestion', mutate }) {
       return JSON.stringify([
         address === 'tcp-ingestion'
           ? routes.ingestion.service.spec.clusterIP
-          : testSelection.issuerAddress,
+          : address === 'kubernetes.default.svc'
+            ? '10.96.0.1'
+            : testSelection.issuerAddress,
       ]);
+    if (operation === 'https-witness') {
+      assert.equal(role, 'backend');
+      assert(args.includes('issuer.local.test'));
+      return JSON.stringify({
+        certificate: artifact,
+        response: tls?.(address, port) ?? artifact,
+      });
+    }
     assert.equal(operation, 'connect');
+    const measured = connect?.(role, address, Number(port), pods);
+    if (measured) return measured;
+    if (address === '10.96.0.10' && port === '53') return 'connected';
+    if (address === '10.96.0.1' && port === '6443') return 'connected';
+    const listener = pods.find(({ status }) => status.podIP === address);
+    if (listener?.metadata.name === 'network-probe-foreign-listener')
+      return role === 'foreign' ? 'connected' : 'timeout';
+    if (listener?.metadata.name.startsWith('network-probe-database') && port === '8000')
+      return ['database', 'database-peer'].includes(role) ? 'connected' : 'timeout';
+    if (listener?.metadata.name === 'network-probe-database-peer' && port === '5432')
+      return role === 'database' ? 'connected' : 'timeout';
     const target = Object.entries(routes).find(([, { service, endpoint }]) =>
       [service.spec.clusterIP, endpoint.status.podIP].includes(address),
     );
     const roleByTarget = {
       ingestion: ['simulator'],
       backend: ['edge'],
-      database: ['ingest-tcp', 'backend', 'archive-worker', 'notification-worker'],
+      database: [
+        'ingest-tcp',
+        'backend',
+        'archive-worker',
+        'notification-worker',
+        'replay-worker',
+        'semantic-worker',
+        'project-current',
+        'analytics-worker',
+        'database-peer',
+      ],
       alertmanager: ['notification-worker'],
       receiver: ['alertmanager'],
       objectStore: ['backend', 'archive-worker'],
@@ -344,5 +395,100 @@ test('an unbound target, changed probe UID, or replaced Service endpoint cannot 
     assert.equal(result.outcome, 'failed');
     if (resource !== 'pod')
       assert(!calls.some((args) => args.includes('exec') && !args.includes('auth')));
+  }
+});
+
+test('two responsive issuer sockets with different HTTPS witnesses fail qualification', async () => {
+  const { result } = await installed({
+    phase: 'services',
+    tls: (address) =>
+      address === testSelection.issuerAddress ? artifact : `sha256:${'b'.repeat(64)}`,
+  });
+  assert.equal(result.outcome, 'failed');
+  assert.match(result.reason, /HTTPS witness/);
+});
+
+test('simulator egress is tested against a reachable foreign listener, independent of protected ingress', async () => {
+  const good = await installed({});
+  assert.equal(good.result.outcome, 'passed', JSON.stringify(good.result));
+  assert(
+    good.result.checks.some(({ name }) => name === 'simulator-egress-foreign-pod'),
+  );
+  const opened = await installed({
+    connect: (role, address, port, pods) => {
+      const witness = pods.find(
+        ({ metadata }) => metadata.name === 'network-probe-foreign-listener',
+      );
+      if (role === 'simulator' && address === witness?.status.podIP && port === 8080)
+        return 'connected';
+    },
+  });
+  assert.equal(opened.result.outcome, 'failed');
+  assert.match(opened.result.reason, /simulator egress/);
+  const clusterWide = await installed({
+    mutate: (args, value) =>
+      args.includes('ciliumclusterwidenetworkpolicies.cilium.io')
+        ? { items: [{ metadata: { name: 'unexpected' } }] }
+        : value,
+  });
+  assert.equal(clusterWide.result.outcome, 'failed');
+  assert.match(clusterWide.result.reason, /cluster-wide/);
+});
+
+test('database staging covers the four remaining clients, DNS TCP and both directions on CNPG peer ports', async () => {
+  const { result, calls } = await installed({ phase: 'database' });
+  assert.equal(result.outcome, 'passed', JSON.stringify(result));
+  for (const role of [
+    'replay-worker',
+    'semantic-worker',
+    'project-current',
+    'analytics-worker',
+  ])
+    assert(
+      calls.some(
+        (args) => args[3] === `network-probe-${role}` && args.at(-1) === '5432',
+      ),
+    );
+  for (const name of ['coredns-tcp', 'cnpg-peer-postgres', 'cnpg-peer-control'])
+    assert(
+      result.checks.some((check) => check.name === name && check.outcome === 'passed'),
+    );
+  for (const name of ['gateway-ingress-edge-and-issuer', 'cnpg-operator-and-apiserver'])
+    assert(
+      result.requiredFollowOn.some(
+        (gate) => gate.name === name && gate.outcome === 'pending',
+      ),
+    );
+});
+
+test('each fixture batch fits in the provider apps namespace quota', async () => {
+  const { minimalDemoProbeFixtures } = await import(
+    '../manifests/minimal-demo-fixtures.mjs'
+  );
+  for (const [phase, counts] of Object.entries({
+    ingestion: [3, 0, 0, 2],
+    services: [8, 1, 2, 2],
+    database: [7, 2, 0, 2],
+  })) {
+    const pods = minimalDemoProbeFixtures(testSelection, phase, probeImage).filter(
+      ({ kind }) => kind === 'Pod',
+    );
+    const names = [
+      'fleetiq-apps',
+      'fleetiq-data',
+      'fleetiq-demo-support',
+      'fleetiq-network-probe-foreign',
+    ];
+    assert.deepEqual(
+      names.map(
+        (namespace) =>
+          pods.filter((pod) => pod.metadata.namespace === namespace).length,
+      ),
+      counts,
+    );
+    assert.equal(
+      pods.length,
+      counts.reduce((total, count) => total + count, 0),
+    );
   }
 });

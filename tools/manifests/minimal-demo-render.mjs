@@ -7,6 +7,7 @@ import { stringify } from 'yaml';
 import { minimalDemoProbeFixtures } from './minimal-demo-fixtures.mjs';
 import {
   assertMinimalDemoResources,
+  demoProbePhases,
   minimalDemoResources,
 } from './minimal-demo-network.mjs';
 import { documents, validateSchemas } from './render.mjs';
@@ -53,7 +54,7 @@ export function checkMinimalDemo(tools) {
   const resources = renderMinimalDemo(tools, selection);
   const fixtureImage = `registry.invalid/probe@sha256:${'0'.repeat(64)}`;
   const fixtureSchemas = Object.fromEntries(
-    ['ingestion', 'services'].map((phase) => [
+    demoProbePhases.map((phase) => [
       phase,
       validateSchemas(tools, minimalDemoProbeFixtures(selection, phase, fixtureImage)),
     ]),

@@ -29,22 +29,37 @@ function privateFile(value, maxBytes) {
 function sourceIdentity() {
   const hash = createHash('sha256');
   for (const file of [
-    'minimal-demo-fixtures.mjs',
-    'minimal-demo-network.mjs',
-    'minimal-demo-probe-cli.mjs',
-    'minimal-demo-probe.mjs',
-    'minimal-demo-render.mjs',
-    'tools.lock.json',
+    'package.json',
+    'tools/git-diagnostics.mjs',
+    'tools/manifests/minimal-demo-fixtures.mjs',
+    'tools/manifests/minimal-demo-network.mjs',
+    'tools/manifests/minimal-demo-probe-cli.mjs',
+    'tools/manifests/minimal-demo-probe.mjs',
+    'tools/manifests/minimal-demo-render.mjs',
+    'tools/manifests/tools.lock.json',
+    'tools/pnpm-launchers.mjs',
+    'tools/process.mjs',
   ]) {
     hash.update(file);
     hash.update('\0');
-    hash.update(readFileSync(join(root, 'tools/manifests', file)));
+    hash.update(readFileSync(join(root, file)));
     hash.update('\0');
   }
   return {
     commit: run('git', ['rev-parse', 'HEAD'], { timeout: 4_000 }),
     fingerprint: `sha256:${hash.digest('hex')}`,
   };
+}
+
+function pinnedKubectl() {
+  const { kubernetes } = JSON.parse(
+    readFileSync(join(root, 'tools/manifests/tools.lock.json'), 'utf8'),
+  );
+  const { clientVersion } = JSON.parse(
+    run('kubectl', ['version', '--client', '-o', 'json'], { timeout: 4_000 }),
+  );
+  assert(clientVersion?.gitVersion === `v${kubernetes}`);
+  return clientVersion.gitVersion;
 }
 
 function main() {
@@ -70,8 +85,17 @@ function main() {
   );
   const kubeconfig = privateFile(values.kubeconfig, 1024 * 1024);
   const source = sourceIdentity();
+  let kubectlVersion;
+  try {
+    kubectlVersion = pinnedKubectl();
+  } catch {
+    console.error('Select the exact pinned Kubernetes client on PATH.');
+    process.exitCode = 1;
+    return;
+  }
   const cache = mkdtempSync(join(tmpdir(), 'fleetiq-minimal-network-kube-'));
   const started = performance.now();
+  let receipt;
   try {
     const kube = (args) => {
       const remaining = Math.floor(300_000 - (performance.now() - started));
@@ -91,19 +115,36 @@ function main() {
         { timeout: Math.min(8_000, remaining) },
       );
     };
-    const receipt = qualifyMinimalNetwork(request, { kube, source });
+    receipt = qualifyMinimalNetwork(request, { kube, source });
     try {
       assert.deepEqual(sourceIdentity(), source);
     } catch {
       receipt.outcome = 'failed';
       receipt.reason = 'source identity changed or became unavailable during probe';
     }
-    receipt.elapsedMilliseconds = Math.round(performance.now() - started);
-    console.log(JSON.stringify(receipt, null, 2));
-    if (receipt.outcome !== 'passed') process.exitCode = 1;
+  } catch {
+    receipt = {
+      format: 'fleetiq-minimal-demo-network.v1',
+      source,
+      checks: [],
+      outcome: 'failed',
+      reason: 'probe request could not be qualified',
+    };
   } finally {
-    rmSync(cache, { recursive: true, force: true });
+    const cleanup = { name: 'private-cache-cleanup', outcome: 'passed' };
+    try {
+      rmSync(cache, { recursive: true, force: true });
+    } catch {
+      cleanup.outcome = 'failed';
+      receipt.outcome = 'failed';
+      receipt.reason = 'private kubectl cache cleanup failed';
+    }
+    receipt.checks.push(cleanup);
   }
+  receipt.kubectlVersion = kubectlVersion;
+  receipt.elapsedMilliseconds = Math.round(performance.now() - started);
+  console.log(JSON.stringify(receipt, null, 2));
+  if (receipt.outcome !== 'passed') process.exitCode = 1;
 }
 
 try {

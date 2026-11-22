@@ -7,20 +7,23 @@ import {
   minimalDemoProbeFixtures,
 } from './minimal-demo-fixtures.mjs';
 import {
+  additionalDatabaseRoles,
   admittedIPv4,
-  application,
-  attemptLabel,
+  cnpgControlPort,
   consumerLabel,
   demoNamespaces,
+  demoProbePhases,
   demoProbeRoles,
-  demoServiceRoutes,
+  demoProbeRoutes,
+  dns,
+  foreignProbePort,
   gatewayPort,
   ingestionService,
   issuerPort,
   minimalDemoResources,
   namespaceLabel,
+  postgresPort,
   routineLabel,
-  simulatorAccount,
 } from './minimal-demo-network.mjs';
 
 const uid = /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/u;
@@ -104,11 +107,30 @@ export function checkIngestionRoute(sources, route, connectivity, record) {
   );
 }
 
-const socketProgram = `import errno, json, socket, sys
+const socketProgram = `import errno, hashlib, http.client, json, socket, ssl, sys
 operation, address = sys.argv[1:3]
 if operation == 'lookup':
     answers = socket.getaddrinfo(address, None, socket.AF_INET, socket.SOCK_STREAM)
     print(json.dumps(sorted(set(item[4][0] for item in answers))))
+elif operation == 'https-witness':
+    port, hostname, certificate = sys.argv[3:6]
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    with socket.create_connection((address, int(port)), timeout=2) as transport:
+        with context.wrap_socket(transport, server_hostname=hostname) as conn:
+            fingerprint = 'sha256:' + hashlib.sha256(conn.getpeercert(binary_form=True)).hexdigest()
+            if fingerprint != certificate:
+                raise SystemExit('Unexpected issuer witness certificate')
+            request = 'GET /.well-known/fleetiq-network-witness HTTP/1.1\\r\\nHost: ' + hostname + ':18443\\r\\nConnection: close\\r\\n\\r\\n'
+            conn.sendall(request.encode('ascii'))
+            with http.client.HTTPResponse(conn) as reply:
+                reply.begin()
+                body = reply.read(4097)
+                if reply.status != 200 or not 0 < len(body) <= 4096:
+                    raise SystemExit('Unexpected issuer witness response')
+                print(json.dumps({'certificate': fingerprint, 'response': 'sha256:' + hashlib.sha256(body).hexdigest()}))
 else:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as conn:
         conn.settimeout(2)
@@ -144,6 +166,10 @@ function probeConnectivity(kube) {
     lookup: (source, name) => JSON.parse(execute(source, 'lookup', name)),
     connect: (source, { address, port }) =>
       execute(source, 'connect', address, String(port)),
+    httpsWitness: (source, { address, port }, hostname, certificate) =>
+      JSON.parse(
+        execute(source, 'https-witness', address, String(port), hostname, certificate),
+      ),
   };
 }
 
@@ -161,14 +187,15 @@ function get(kube, resource, name, namespace) {
 }
 
 function validateRequest(request) {
-  const { selection, target, phase, candidate, issuerHostname, probes } = request;
+  const { selection, target, phase, candidate, issuerHostname, issuerWitness, probes } =
+    request;
   const entries = (value, keys) => value && Object.keys(value).sort().join() === keys;
   requireCheck(
     entries(
       request,
-      phase === 'ingestion'
-        ? 'candidate,phase,probes,selection,target'
-        : 'candidate,issuerHostname,phase,probes,selection,target',
+      phase === 'services'
+        ? 'candidate,issuerHostname,issuerWitness,phase,probes,selection,target'
+        : 'candidate,phase,probes,selection,target',
     ) &&
       entries(target, 'name,namespaceUids,workerUid') &&
       entries(target.namespaceUids, 'apps,data,foreign,support,system'),
@@ -185,15 +212,18 @@ function validateRequest(request) {
     'select the exact target incarnation and all five namespace UIDs',
   );
   requireCheck(
-    ['ingestion', 'services'].includes(phase) && digest.test(candidate),
+    demoProbePhases.includes(phase) && digest.test(candidate),
     'select a reviewed candidate and supported probe phase',
   );
   requireCheck(
-    phase === 'ingestion' ||
+    phase !== 'services' ||
       (typeof issuerHostname === 'string' &&
         issuerHostname.length <= 253 &&
-        hostname.test(issuerHostname)),
-    'select the canonical issuer DNS hostname',
+        hostname.test(issuerHostname) &&
+        entries(issuerWitness, 'certificate,response') &&
+        digest.test(issuerWitness.certificate) &&
+        digest.test(issuerWitness.response)),
+    'select the canonical issuer DNS hostname and reviewed HTTPS witness digests',
   );
   const required = demoProbeRoles(phase);
   same(
@@ -220,7 +250,14 @@ function validateRequest(request) {
     required.length,
     'probe Pod UIDs must be distinct',
   );
-  return { desired, spaces, foreign: foreignNamespace(selection.consumer) };
+  const images = new Set(Object.values(probes).map(({ probeImage }) => probeImage));
+  same(images.size, 1, 'select one immutable image reference for the fixture bundle');
+  const fixtures = minimalDemoProbeFixtures(
+    selection,
+    phase,
+    images.values().next().value,
+  );
+  return { desired, spaces, foreign: foreignNamespace(selection.consumer), fixtures };
 }
 
 function inspectTarget(kube, request, spaces, foreign) {
@@ -284,12 +321,17 @@ const normalizedPolicy = (spec) =>
     ),
   );
 
-function inspectPolicy(kube, desired, spaces) {
+function inspectPolicy(kube, desired, spaces, foreign) {
   const policyKinds = {
     NetworkPolicy: 'networkpolicies.networking.k8s.io',
     CiliumNetworkPolicy: 'ciliumnetworkpolicies.cilium.io',
   };
-  for (const space of Object.values(spaces)) {
+  same(
+    get(kube, 'ciliumclusterwidenetworkpolicies.cilium.io').items.length,
+    0,
+    'unexpected cluster-wide Cilium policy on disposable target',
+  );
+  for (const space of [...Object.values(spaces), foreign]) {
     for (const [kind, name] of Object.entries(policyKinds)) {
       const expected = desired.filter(
         (item) => item.kind === kind && item.metadata.namespace === space,
@@ -326,29 +368,22 @@ function inspectPolicy(kube, desired, spaces) {
   );
 }
 
-function inspectSources(kube, request, spaces, foreign) {
+function inspectSources(kube, request, fixtures) {
+  const pods = new Map(
+    fixtures
+      .filter(({ kind }) => kind === 'Pod')
+      .map((pod) => [pod.metadata.name, pod]),
+  );
   const result = {};
   for (const [role, expected] of Object.entries(request.probes)) {
-    const namespace = role === 'foreign' ? foreign : spaces.apps;
-    const fixture = minimalDemoProbeFixtures(
-      request.selection,
-      request.phase,
-      expected.probeImage,
-    ).find(
-      (item) => item.kind === 'Pod' && item.metadata.name === `network-probe-${role}`,
-    );
+    const fixture = pods.get(expected.name);
     requireCheck(
-      expected.name === fixture.metadata.name,
+      fixture?.metadata.name === `network-probe-${role}`,
       'probe name differs from the reviewed manifest',
     );
+    const { namespace, labels } = fixture.metadata;
+    const template = fixture.spec.containers[0];
     const pod = get(kube, 'pod', expected.name, namespace);
-    const attempt = ['simulator', 'foreign', 'other'].includes(role);
-    const labels = attempt
-      ? { [attemptLabel]: request.selection.simulatorAttempt }
-      : application(role);
-    const account = ['simulator', 'foreign'].includes(role)
-      ? simulatorAccount(request.selection.simulatorAttempt)
-      : 'default';
     const container = pod.spec?.containers?.[0];
     const status = pod.status?.containerStatuses?.[0];
     requireCheck(
@@ -356,15 +391,13 @@ function inspectSources(kube, request, spaces, foreign) {
         pod.metadata.namespace === namespace &&
         pod.metadata.uid === expected.podUid &&
         !pod.metadata.deletionTimestamp &&
-        includesLabels(pod.metadata, labels) &&
-        includesLabels(pod.metadata, fixtureLabel) &&
-        !Object.hasOwn(pod.metadata.labels ?? {}, routineLabel) &&
+        isDeepStrictEqual(pod.metadata.labels, labels) &&
         !pod.spec.hostNetwork &&
         !pod.spec.hostPID &&
         !pod.spec.hostIPC &&
         pod.spec.automountServiceAccountToken === false &&
-        pod.spec.serviceAccountName === account &&
-        pod.spec.dnsPolicy === 'ClusterFirst' &&
+        pod.spec.serviceAccountName === fixture.spec.serviceAccountName &&
+        pod.spec.dnsPolicy === fixture.spec.dnsPolicy &&
         !pod.spec.dnsConfig &&
         !pod.spec.hostAliases?.length &&
         pod.spec.restartPolicy === 'Never' &&
@@ -376,35 +409,36 @@ function inspectSources(kube, request, spaces, foreign) {
         !pod.spec.volumes?.length &&
         container?.name === 'probe' &&
         container.image === expected.probeImage &&
+        container.imagePullPolicy === template.imagePullPolicy &&
+        !container.args?.length &&
         !container.env?.length &&
         !container.envFrom?.length &&
         !container.volumeMounts?.length &&
-        isDeepStrictEqual(container.command, fixture.spec.containers[0].command) &&
-        isDeepStrictEqual(container.resources, fixture.spec.containers[0].resources) &&
-        isDeepStrictEqual(
-          container.securityContext,
-          fixture.spec.containers[0].securityContext,
-        ) &&
+        isDeepStrictEqual(container.command, template.command) &&
+        isDeepStrictEqual(container.resources, template.resources) &&
+        isDeepStrictEqual(container.securityContext, template.securityContext) &&
         isDeepStrictEqual(pod.spec.securityContext, fixture.spec.securityContext) &&
         !container.ports?.some(({ hostPort }) => hostPort) &&
         ready(pod) &&
+        isPrivate(pod.status?.podIP) &&
         status?.ready &&
         imageDigest(status.imageID) === expected.imageId,
       'probe Pod identity, isolation, readiness or running image differs',
     );
-    requireCheck(
-      kube([
-        '--namespace',
-        namespace,
-        'auth',
-        'can-i',
-        'create',
-        `pods/${expected.name}`,
-        '--subresource=exec',
-      ]) === 'yes',
-      'selected operator lacks exec authority on an exact probe Pod',
-    );
-    result[role] = { namespace, name: expected.name };
+    if (role !== 'foreign-listener')
+      requireCheck(
+        kube([
+          '--namespace',
+          namespace,
+          'auth',
+          'can-i',
+          'create',
+          `pods/${expected.name}`,
+          '--subresource=exec',
+        ]) === 'yes',
+        'selected operator lacks exec authority on an exact probe Pod',
+      );
+    result[role] = { namespace, name: expected.name, address: pod.status.podIP };
   }
   return result;
 }
@@ -553,13 +587,11 @@ function inspectService(
 }
 
 function inspectRoutes(kube, spaces, desired, phase) {
-  const routes = demoServiceRoutes(spaces);
-  const required = phase === 'ingestion' ? ['ingestion'] : Object.keys(routes);
   return Object.fromEntries(
-    required.map((role) => [
+    Object.entries(demoProbeRoutes(phase, spaces)).map(([role, route]) => [
       role,
       inspectService(kube, {
-        ...routes[role],
+        ...route,
         ...(role === 'ingestion'
           ? { exact: desired.find(({ kind }) => kind === 'Service') }
           : {}),
@@ -568,10 +600,86 @@ function inspectRoutes(kube, spaces, desired, phase) {
   );
 }
 
+function inspectDns(kube) {
+  const { metadata, spec } = get(kube, 'service', 'kube-dns', 'kube-system');
+  requireCheck(
+    metadata?.name === 'kube-dns' &&
+      metadata.namespace === 'kube-system' &&
+      uid.test(metadata.uid) &&
+      !metadata.deletionTimestamp &&
+      includesLabels({ labels: spec?.selector }, dns) &&
+      spec.type === 'ClusterIP' &&
+      isPrivate(spec.clusterIP) &&
+      isDeepStrictEqual(spec.clusterIPs, [spec.clusterIP]) &&
+      isDeepStrictEqual(spec.ipFamilies, ['IPv4']) &&
+      spec.ports?.some(({ port, protocol }) => port === 53 && protocol === 'TCP'),
+    'CoreDNS TCP Service identity differs',
+  );
+  return { address: spec.clusterIP, port: 53, uid: metadata.uid };
+}
+
+function checkCoreDns(sources, destination, { connect }, record) {
+  record('coredns-tcp', () => {
+    for (const [role, source] of Object.entries(sources)) {
+      if (['other', 'foreign', 'foreign-listener'].includes(role)) continue;
+      requireCheck(
+        connect(source, destination) === 'connected',
+        'CoreDNS TCP route failed',
+      );
+    }
+  });
+}
+
+function checkSimulatorEgress(sources, { connect }, record) {
+  record('simulator-egress-foreign-pod', () => {
+    const destination = {
+      address: sources['foreign-listener'].address,
+      port: foreignProbePort,
+    };
+    const witness = () =>
+      requireCheck(
+        connect(sources.foreign, destination) === 'connected',
+        'independent foreign listener unavailable',
+      );
+    witness();
+    requireCheck(
+      connect(sources.simulator, destination) === 'timeout',
+      'simulator egress against permissive foreign ingress did not time out',
+    );
+    witness();
+  });
+}
+
+function checkDatabase(sources, route, connectivity, record) {
+  checkRoute(
+    'postgres-additional-clients',
+    additionalDatabaseRoles.map((role) => sources[role]),
+    [sources.simulator, sources.foreign],
+    route,
+    connectivity,
+    record,
+  );
+  const pair = [sources.database, sources['database-peer']];
+  for (const [name, port] of [
+    ['postgres', postgresPort],
+    ['control', cnpgControlPort],
+  ]) {
+    record(`cnpg-peer-${name}`, () => {
+      for (const [source, destination] of [pair, pair.toReversed()]) {
+        requireCheck(
+          connectivity.connect(source, { address: destination.address, port }) ===
+            'connected',
+          'same-cluster CNPG peer route failed',
+        );
+      }
+    });
+  }
+}
+
 function checkServices(
   sources,
   routes,
-  { workerAddress, selection, issuerHostname },
+  { workerAddress, selection, issuerHostname, issuerWitness },
   connectivity,
   record,
 ) {
@@ -627,14 +735,44 @@ function checkServices(
       serviceKind: 'canonical',
       endpointKind: 'worker',
     },
-    connectivity,
+    {
+      connect: (source, destination) => {
+        if (source !== backend) return connectivity.connect(source, destination);
+        let observed;
+        try {
+          observed = connectivity.httpsWitness(
+            source,
+            destination,
+            issuerHostname,
+            issuerWitness.certificate,
+          );
+        } catch {
+          requireCheck(false, 'reviewed issuer HTTPS witness unavailable');
+        }
+        same(observed, issuerWitness, 'reviewed issuer HTTPS witness differs');
+        return 'connected';
+      },
+    },
     record,
   );
 }
 
+const requiredFollowOn = [
+  {
+    name: 'gateway-ingress-edge-and-issuer',
+    owner: 'fleetiq-deploy#103',
+    outcome: 'pending',
+  },
+  {
+    name: 'cnpg-operator-and-apiserver',
+    owner: 'k8s-infrastructure',
+    outcome: 'pending',
+  },
+];
+
 /** The caller supplies a time-limited, explicitly configured kubectl adapter. */
 export function qualifyMinimalNetwork(request, { kube, source }) {
-  const { desired, spaces, foreign } = validateRequest(request);
+  const { desired, spaces, foreign, fixtures } = validateRequest(request);
   requireCheck(
     source && /^[a-f0-9]{40}$/u.test(source.commit) && digest.test(source.fingerprint),
     'source identity unavailable',
@@ -649,7 +787,10 @@ export function qualifyMinimalNetwork(request, { kube, source }) {
       workerUid: request.target.workerUid,
     },
     phase: request.phase,
+    requiredFollowOn,
+    ...(request.issuerWitness ? { issuerWitness: request.issuerWitness } : {}),
     networkArtifact: hash(desired),
+    fixtureArtifact: hash(fixtures),
     fixtures: Object.fromEntries(
       Object.entries(request.probes).map(([role, { podUid, probeImage, imageId }]) => [
         role,
@@ -670,10 +811,11 @@ export function qualifyMinimalNetwork(request, { kube, source }) {
     const workerAddress = record('target', () =>
       inspectTarget(kube, request, spaces, foreign),
     );
-    record('policy-and-bind', () => inspectPolicy(kube, desired, spaces));
+    record('policy-and-bind', () => inspectPolicy(kube, desired, spaces, foreign));
     const sources = record('probe-identities', () =>
-      inspectSources(kube, request, spaces, foreign),
+      inspectSources(kube, request, fixtures),
     );
+    const dnsService = record('coredns-service', () => inspectDns(kube));
     const routes = record('service-endpoints-and-privacy', () =>
       inspectRoutes(kube, spaces, desired, request.phase),
     );
@@ -688,6 +830,10 @@ export function qualifyMinimalNetwork(request, { kube, source }) {
     );
     const connectivity = probeConnectivity(kube);
     checkIngestionRoute(sources, routes.ingestion, connectivity, record);
+    checkSimulatorEgress(sources, connectivity, record);
+    checkCoreDns(sources, dnsService, connectivity, record);
+    if (request.phase === 'database')
+      checkDatabase(sources, routes.database, connectivity, record);
     if (request.phase === 'services')
       checkServices(
         sources,
@@ -702,8 +848,9 @@ export function qualifyMinimalNetwork(request, { kube, source }) {
         workerAddress,
         'target changed during probe',
       );
-      inspectPolicy(kube, desired, spaces);
-      inspectSources(kube, request, spaces, foreign);
+      inspectPolicy(kube, desired, spaces, foreign);
+      same(inspectSources(kube, request, fixtures), sources, 'probe addresses changed');
+      same(inspectDns(kube), dnsService, 'CoreDNS Service changed');
       same(
         inspectRoutes(kube, spaces, desired, request.phase),
         routes,
