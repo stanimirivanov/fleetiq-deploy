@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { checkManifests } from '../manifests/check.mjs';
-import { checkMinimalDemoData } from '../manifests/minimal-demo-data.mjs';
+import {
+  checkMinimalDemoData,
+  validateBackendSelection,
+} from '../manifests/minimal-demo-data.mjs';
 import { documents } from '../manifests/render.mjs';
 import { manifestTools, toolsLock } from '../manifests/toolchain.mjs';
 import { root } from '../process.mjs';
@@ -57,12 +60,36 @@ test('offline candidate records the published backend and matching grant invento
     attempt: 1,
     artifactDigest:
       'sha256:615e8c0161df6840a22ccd79479e162c44af8ab44042279baddc291b33e6325f',
+    recordDigest:
+      'sha256:d90bd4be1bfc1d24b37e29e5219b08338af22ff2a03d8349f55440bf3bd81c29',
   });
   assert.equal(backendSelection.migrationInventory.count, 59);
   assert.equal(
     backendSelection.grantContract.digest,
     'sha256:d84aac89be4cc42f185c441355cfb3a504dc77e6eeb43086751161b4e3b21821',
   );
+});
+
+test('the candidate pin rejects mutable images, source drift, and missing receipt digests', () => {
+  const { backendSelection } = checkMinimalDemoData(tools, 'qual-fleet');
+  for (const edit of [
+    ({ backend }) => {
+      backend.reference = 'ghcr.io/stanimirivanov/fleetiq-platform:latest';
+    },
+    ({ backend }) => {
+      backend.source.revision = 'a'.repeat(40);
+    },
+    ({ backend }) => {
+      delete backend.publication.recordDigest;
+    },
+    ({ grantContract }) => {
+      grantContract.migrationHead.sha384 = 'a'.repeat(64);
+    },
+  ]) {
+    const invalid = structuredClone(backendSelection);
+    edit(invalid);
+    assert.throws(() => validateBackendSelection(invalid), assert.AssertionError);
+  }
 });
 
 test('the offline candidate rejects invalid consumer names', () => {

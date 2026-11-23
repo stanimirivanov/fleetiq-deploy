@@ -16,8 +16,7 @@ const selectionPath = new URL(
 );
 const sha256 = /^sha256:[a-f0-9]{64}$/u;
 
-function readBackendSelection() {
-  const selection = JSON.parse(readFileSync(selectionPath, 'utf8'));
+export function validateBackendSelection(selection) {
   assert.equal(selection.format, 'fleetiq-minimal-demo-backend.v1');
   const { backend, migrationInventory, grantContract } = selection;
   assert.equal(backend.source.repository, 'stanimirivanov/fleetiq-platform');
@@ -91,7 +90,9 @@ function connectionBudget(maximum) {
 
 export function checkMinimalDemoData(tools, consumer) {
   const namespace = demoNamespaces(consumer).data;
-  const backendSelection = readBackendSelection();
+  const backendSelection = validateBackendSelection(
+    JSON.parse(readFileSync(selectionPath, 'utf8')),
+  );
   const args = [
     resolve(root, 'charts/fleetiq-data'),
     '--namespace',
