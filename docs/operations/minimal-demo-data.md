@@ -48,17 +48,8 @@ for the replay-to-semantic and semantic-to-projection writes that occur with the
 caller’s privileges. [Publication run](https://github.com/stanimirivanov/fleetiq-platform/actions/runs/45174819423),
 [platform grant contract](https://github.com/stanimirivanov/fleetiq-platform/blob/c0d71a56dad0596d3c6a6b866e4338d25b597af2/docs/operations/postgres-runtime-grants.md)
 
-This selection is an input to M10-PR22. The offline PostgreSQL fixture retains
-its placeholder database image and Secret. The legacy Compose source lock and
-protected environment selections each have their own review and rollout path.
-
-The installed gate remains pending under [#96](https://github.com/stanimirivanov/fleetiq-deploy/issues/96).
-It needs a reviewed installable selection and separate execution authorization for
-one positively identified disposable target. Collect the exact candidate, image,
-Cluster and claim identities, effective memory and connection settings, role and
-ledger checks, live pool peaks, and authenticated commissioning evidence. For
-retention, verify a bounded commissioned observation before and after the
-authorized restart and compare the claim and volume identities. Preserve
-the installed data and sanitized evidence if any check fails. A failed schema
-mutation requires reviewed recovery before product writers restart. [Installation
-acceptance](https://github.com/stanimirivanov/fleetiq-deploy/issues/89#issuecomment-7071307181)
+Use the [scoped roles and installed probe](minimal-demo-database-roles.md) to
+render the installation phases and collect target-bound database evidence.
+The offline PostgreSQL fixture retains its placeholder image and Secret.
+Legacy Compose source locks and protected environment selections each have
+their own review and rollout path.

@@ -154,6 +154,48 @@ function ciliumPorts(...ports) {
   return [{ ports: ports.map((port) => ({ protocol: 'TCP', port: String(port) })) }];
 }
 
+/** Additional owner-installed route for one provider-approved data Job. */
+export function demoDatabaseInstallationPolicies(consumer, attempt) {
+  assert(
+    typeof attempt === 'string' && /^demo-launch-[a-f0-9]{24}$/u.test(attempt),
+    'Select the exact approved database installation attempt',
+  );
+  const { data } = demoNamespaces(consumer);
+  const client = {
+    [attemptLabel]: attempt,
+    [serviceAccount]: simulatorAccount(attempt),
+  };
+  return [
+    cilium(data, 'installation-client', client, {
+      egress: [
+        {
+          toEndpoints: [ciliumPeer(dns, 'kube-system')],
+          toPorts: [
+            {
+              ports: [
+                { port: '53', protocol: 'UDP' },
+                { port: '53', protocol: 'TCP' },
+              ],
+            },
+          ],
+        },
+        {
+          toEndpoints: [ciliumPeer(database, data)],
+          toPorts: ciliumPorts(postgresPort),
+        },
+      ],
+    }),
+    cilium(data, 'installation-postgres', database, {
+      ingress: [
+        {
+          fromEndpoints: [ciliumPeer(client, data)],
+          toPorts: ciliumPorts(postgresPort),
+        },
+      ],
+    }),
+  ];
+}
+
 /** Desired state for separate namespace/network installation and the routine TCP Service. */
 export function minimalDemoResources(selection) {
   const { apps, data, support } = validateSelection(selection);

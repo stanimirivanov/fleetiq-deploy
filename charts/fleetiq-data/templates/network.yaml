@@ -1,4 +1,4 @@
-{{- if ne .Values.profile "minimal-demo-candidate" }}
+{{- if not (has .Values.profile (list "minimal-demo-candidate" "minimal-demo-install")) }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

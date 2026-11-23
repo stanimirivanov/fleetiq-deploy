@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { checkBootstrap } from './bootstrap.mjs';
 import { checkMinimalDemoData } from './minimal-demo-data.mjs';
 import { checkMinimalDemo } from './minimal-demo-render.mjs';
+import { renderMinimalDemoRoles } from './minimal-demo-roles-render.mjs';
 import { manifestPolicy } from './policy.mjs';
 import { fixtureStates, renderFixture, validateSchemas } from './render.mjs';
 import { manifestTools, toolsLock } from './toolchain.mjs';
@@ -24,11 +25,29 @@ export function checkManifests() {
     measurements.push({ ...state, resources: rendered.length, schemas });
   }
   const { fingerprint, schemas, execution } = checkMinimalDemoData(tools, 'fleetiq');
+  const attempt = 'demo-launch-0123456789ab0123456789ab';
+  const roleProfiles = ['installation', 'bootstrap', 'runtime'].map((phase) =>
+    renderMinimalDemoRoles(
+      tools,
+      'fleetiq',
+      phase,
+      phase === 'runtime' ? undefined : attempt,
+    ),
+  );
   return {
     kubernetes: toolsLock.kubernetes,
     bootstrap,
     minimalDemo: checkMinimalDemo(tools),
     minimalDemoData: { resources: 1, schemas, fingerprint, execution },
+    minimalDemoRoles: roleProfiles.map(
+      ({ phase, candidate, fingerprint, schemas, execution }) => ({
+        phase,
+        candidate,
+        fingerprint,
+        schemas,
+        execution,
+      }),
+    ),
     tools: Object.fromEntries(
       Object.entries(toolsLock.tools).map(([name, tool]) => [name, tool.version]),
     ),

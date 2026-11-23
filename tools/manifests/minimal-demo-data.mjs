@@ -46,6 +46,10 @@ export function validateBackendSelection(selection) {
   assert.match(grantContract.migrationHead.sha384, /^[a-f0-9]{96}$/u);
   return selection;
 }
+export function selectedMinimalDemoBackend() {
+  return validateBackendSelection(JSON.parse(readFileSync(selectionPath, 'utf8')));
+}
+
 const residentPools = {
   serve: 10,
   'ingest-tcp': 8,
@@ -90,9 +94,7 @@ function connectionBudget(maximum) {
 
 export function checkMinimalDemoData(tools, consumer) {
   const namespace = demoNamespaces(consumer).data;
-  const backendSelection = validateBackendSelection(
-    JSON.parse(readFileSync(selectionPath, 'utf8')),
-  );
+  const backendSelection = selectedMinimalDemoBackend();
   const args = [
     resolve(root, 'charts/fleetiq-data'),
     '--namespace',
