@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { checkManifests } from '../manifests/check.mjs';
-import { checkMinimalDemoData } from '../manifests/minimal-demo-data.mjs';
+import {
+  checkMinimalDemoData,
+  validateBackendSelection,
+} from '../manifests/minimal-demo-data.mjs';
 import { documents } from '../manifests/render.mjs';
 import { manifestTools, toolsLock } from '../manifests/toolchain.mjs';
 import { root } from '../process.mjs';
@@ -42,7 +45,51 @@ test('connection budget counts normal roles, archive and recurring operations se
   assert.equal(connections.conservativeCeiling, 38);
   assert.equal(connections.remaining, 26);
   assert.deepEqual(connections.installation, { migrate: 1, bootstrap: 10 });
-  assert.equal(connections.producer, 'a40217ae14c467ec91de163e46ced68590731f6b');
+  assert.equal(connections.producer, 'c0d71a56dad0596d3c6a6b866e4338d25b597af2');
+});
+
+test('offline candidate records the published backend and matching grant inventory', () => {
+  const { backendSelection, connections } = checkMinimalDemoData(tools, 'qual-fleet');
+  assert.equal(backendSelection.backend.source.revision, connections.producer);
+  assert.equal(
+    backendSelection.backend.reference,
+    'ghcr.io/stanimirivanov/fleetiq-platform@sha256:628ad77776211aab854e179feaceb700257c64c1286f9129807c308efc3901a1',
+  );
+  assert.deepEqual(backendSelection.backend.publication, {
+    run: 45174819423,
+    attempt: 1,
+    artifactDigest:
+      'sha256:615e8c0161df6840a22ccd79479e162c44af8ab44042279baddc291b33e6325f',
+    recordDigest:
+      'sha256:d90bd4be1bfc1d24b37e29e5219b08338af22ff2a03d8349f55440bf3bd81c29',
+  });
+  assert.equal(backendSelection.migrationInventory.count, 59);
+  assert.equal(
+    backendSelection.grantContract.digest,
+    'sha256:d84aac89be4cc42f185c441355cfb3a504dc77e6eeb43086751161b4e3b21821',
+  );
+});
+
+test('the candidate pin rejects mutable images, source drift, and missing receipt digests', () => {
+  const { backendSelection } = checkMinimalDemoData(tools, 'qual-fleet');
+  for (const edit of [
+    ({ backend }) => {
+      backend.reference = 'ghcr.io/stanimirivanov/fleetiq-platform:latest';
+    },
+    ({ backend }) => {
+      backend.source.revision = 'a'.repeat(40);
+    },
+    ({ backend }) => {
+      delete backend.publication.recordDigest;
+    },
+    ({ grantContract }) => {
+      grantContract.migrationHead.sha384 = 'a'.repeat(64);
+    },
+  ]) {
+    const invalid = structuredClone(backendSelection);
+    edit(invalid);
+    assert.throws(() => validateBackendSelection(invalid), assert.AssertionError);
+  }
 });
 
 test('the offline candidate rejects invalid consumer names', () => {

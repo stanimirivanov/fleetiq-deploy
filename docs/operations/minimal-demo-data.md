@@ -15,7 +15,7 @@ pnpm --silent minimal-demo:data:render qual-fleet > /private/data-candidate.json
 ```
 
 The explicit renderer records the Cluster, schema result, fingerprint, platform pin
-and calculated pool budget. The default manifest receipt records resource and
+and calculated pool budget. It also records the reviewed backend selection. The default manifest receipt records resource and
 schema counts, the fingerprint and execution state. `execution: not-performed`
 identifies offline evidence. The Cluster contains a synthetic image and a placeholder migration
 Secret reference. Keep this output for review and use the supported release flow
@@ -33,22 +33,24 @@ receipt and account for actual PostgreSQL reserved slots, controller and health
 traffic during managed maintenance.
 Initial checked bootstrap inherits SQLx's 10-connection ceiling, and migration
 has a ceiling of one. Run these installation operations serially with product
-writers fenced. [Serving pool](https://github.com/stanimirivanov/fleetiq-platform/blob/a40217ae14c467ec91de163e46ced68590731f6b/crates/server/src/runtime.rs#L52),
-[bootstrap pool](https://github.com/stanimirivanov/fleetiq-platform/blob/a40217ae14c467ec91de163e46ced68590731f6b/crates/server/src/bootstrap.rs#L124),
-[migration pool](https://github.com/stanimirivanov/fleetiq-platform/blob/a40217ae14c467ec91de163e46ced68590731f6b/crates/server/src/migration.rs#L64),
+writers fenced. [Serving pool](https://github.com/stanimirivanov/fleetiq-platform/blob/c0d71a56dad0596d3c6a6b866e4338d25b597af2/crates/server/src/runtime.rs#L52),
+[bootstrap pool](https://github.com/stanimirivanov/fleetiq-platform/blob/c0d71a56dad0596d3c6a6b866e4338d25b597af2/crates/server/src/bootstrap.rs#L124),
+[migration pool](https://github.com/stanimirivanov/fleetiq-platform/blob/c0d71a56dad0596d3c6a6b866e4338d25b597af2/crates/server/src/migration.rs#L64),
 [SQLx pool defaults](https://docs.rs/sqlx-core/0.9.0/src/sqlx_core/pool/options.rs.html#151)
 
 ## Grant contract and installed evidence
 
-The pinned platform publishes the bootstrap and migration-ledger rights. The
-platform must publish and verify the remaining per-command runtime privileges
-before deploy can provision them. The exact contract must account for the
-decoded-output trigger writing semantic work and the semantic-output trigger
-writing projection work with the caller's privileges. Review and publish the
-producer result and select its immutable artifact in a separate deployment pin
-update. [Platform runtime contract](https://github.com/stanimirivanov/fleetiq-platform/blob/a40217ae14c467ec91de163e46ced68590731f6b/docs/operations/runtime-and-migrations.md#database-roles-and-first-installation),
-[semantic handoff](https://github.com/stanimirivanov/fleetiq-platform/blob/a40217ae14c467ec91de163e46ced68590731f6b/migrations/0035_durable_semantic_work.sql#L93),
-[projection handoff](https://github.com/stanimirivanov/fleetiq-platform/blob/a40217ae14c467ec91de163e46ced68590731f6b/migrations/0037_current_property_projection.sql#L99)
+The [minimal-demo backend selection](../../environments/minimal-demo-candidate/backend.json)
+pins the published image, exact platform revision, workflow artifact digest,
+migration inventory, and PostgreSQL grant contract. The grant contract’s
+ledger head matches the published image inventory. Use the producer contract
+for the replay-to-semantic and semantic-to-projection writes that occur with the
+caller’s privileges. [Publication run](https://github.com/stanimirivanov/fleetiq-platform/actions/runs/45174819423),
+[platform grant contract](https://github.com/stanimirivanov/fleetiq-platform/blob/c0d71a56dad0596d3c6a6b866e4338d25b597af2/docs/operations/postgres-runtime-grants.md)
+
+This selection is an input to M10-PR22. The offline PostgreSQL fixture retains
+its placeholder database image and Secret. The legacy Compose source lock and
+protected environment selections each have their own review and rollout path.
 
 The installed gate remains pending under [#96](https://github.com/stanimirivanov/fleetiq-deploy/issues/96).
 It needs a reviewed installable selection and separate execution authorization for

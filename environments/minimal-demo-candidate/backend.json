@@ -1,0 +1,28 @@
+{
+  "format": "fleetiq-minimal-demo-backend.v1",
+  "backend": {
+    "reference": "ghcr.io/stanimirivanov/fleetiq-platform@sha256:628ad77776211aab854e179feaceb700257c64c1286f9129807c308efc3901a1",
+    "source": {
+      "repository": "stanimirivanov/fleetiq-platform",
+      "revision": "c0d71a56dad0596d3c6a6b866e4338d25b597af2"
+    },
+    "publication": {
+      "run": 45174819423,
+      "attempt": 1,
+      "artifactDigest": "sha256:615e8c0161df6840a22ccd79479e162c44af8ab44042279baddc291b33e6325f",
+      "recordDigest": "sha256:d90bd4be1bfc1d24b37e29e5219b08338af22ff2a03d8349f55440bf3bd81c29"
+    }
+  },
+  "migrationInventory": {
+    "count": 59,
+    "digest": "sha256:67772e214e26fdc892b65b1636acd721d14ca1291bb49f1c209c9ffba8f64927"
+  },
+  "grantContract": {
+    "path": "contracts/postgresql/runtime-grants.v1.json",
+    "digest": "sha256:d84aac89be4cc42f185c441355cfb3a504dc77e6eeb43086751161b4e3b21821",
+    "migrationHead": {
+      "version": 59,
+      "sha384": "5a15322f1602ef8795034e781a638a33d96d855234757318f613c6d409ea3e86853ebf49cf081e78d6cf135c23135ae1"
+    }
+  }
+}
