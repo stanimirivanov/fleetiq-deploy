@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { checkBootstrap } from './bootstrap.mjs';
+import { checkMinimalDemoData } from './minimal-demo-data.mjs';
 import { checkMinimalDemo } from './minimal-demo-render.mjs';
 import { manifestPolicy } from './policy.mjs';
 import { fixtureStates, renderFixture, validateSchemas } from './render.mjs';
@@ -22,10 +23,12 @@ export function checkManifests() {
     manifestPolicy(rendered, state);
     measurements.push({ ...state, resources: rendered.length, schemas });
   }
+  const { fingerprint, schemas, execution } = checkMinimalDemoData(tools, 'fleetiq');
   return {
     kubernetes: toolsLock.kubernetes,
     bootstrap,
     minimalDemo: checkMinimalDemo(tools),
+    minimalDemoData: { resources: 1, schemas, fingerprint, execution },
     tools: Object.fromEntries(
       Object.entries(toolsLock.tools).map(([name, tool]) => [name, tool.version]),
     ),
