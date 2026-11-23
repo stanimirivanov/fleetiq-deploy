@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { selectedMinimalDemoBackend } from './minimal-demo-data.mjs';
+import {
+  databaseConnectionSettings,
+  selectedMinimalDemoBackend,
+} from './minimal-demo-data.mjs';
 
 export const databaseName = 'fleetiq';
 export const migrator = 'fleetiq_migrator';
@@ -125,8 +128,10 @@ export function ledgerCheck({ inventory }) {
 DO $$ BEGIN
   IF current_database() <> '${databaseName}'
       OR current_setting('server_version_num')::integer / 10000 <> 18
-      OR current_setting('max_connections') <> '64' THEN
-    RAISE EXCEPTION 'Wrong FleetIQ database, version, or connection ceiling';
+      ${Object.entries(databaseConnectionSettings)
+        .map(([name, value]) => `OR current_setting('${name}') <> '${value}'`)
+        .join('\n      ')} THEN
+    RAISE EXCEPTION 'Wrong FleetIQ database, version, or connection settings';
   END IF;
   IF (SELECT count(*) FROM public._sqlx_migrations) <> ${inventory.migrations.length}
       OR EXISTS (
@@ -167,19 +172,22 @@ function privileges(command, grants) {
   return acl.join('\n');
 }
 
+function requireDatabaseIdentity({ databaseOid, startedMicros }) {
+  assert.match(databaseOid, /^[1-9][0-9]{0,11}$/u);
+  assert.match(startedMicros, /^[1-9][0-9]{0,19}$/u);
+  return `
+  IF (SELECT oid::text FROM pg_database WHERE datname = current_database()) IS DISTINCT FROM '${databaseOid}'
+     OR (extract(epoch FROM pg_postmaster_start_time()) * 1000000)::bigint::text IS DISTINCT FROM '${startedMicros}'
+     OR pg_is_in_recovery() THEN RAISE EXCEPTION 'Primary identity changed before database writes'; END IF;`;
+}
+
 export function grantSql(inputs, identity) {
-  const bound = identity
-    ? `
-  IF (SELECT oid::text FROM pg_database WHERE datname = current_database()) <> '${identity.databaseOid}'
-     OR (extract(epoch FROM pg_postmaster_start_time()) * 1000000)::bigint::text <> '${identity.startedMicros}'
-     OR pg_is_in_recovery() THEN RAISE EXCEPTION 'Primary identity changed before applying grants'; END IF;`
-    : '';
   return `
 BEGIN;
 ${configure}
 ${ledgerCheck(inputs)}
 DO $$ BEGIN
-${bound}
+${requireDatabaseIdentity(identity)}
   IF session_user <> '${migrator}' OR current_user <> session_user
       OR NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = current_database() AND datdba = session_user::regrole)
       OR EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND backend_type = 'client backend' AND pid <> pg_backend_pid()) THEN
@@ -315,7 +323,7 @@ END $$;
 ROLLBACK;`;
 }
 
-export function roleFixtureSql(inputs, sourceFixture, retentionQueries) {
+export function roleFixtureSql(inputs, sourceFixture, retentionQueries, identity) {
   assert.equal(typeof sourceFixture, 'string');
   const fixture = sourceFixture.replace(/\bgrant_test_[a-z_]+\b/gu, (name) => {
     const command = Object.keys(inputs.contract.commands).find(
@@ -331,7 +339,9 @@ ${configure}
 ${ledgerCheck(inputs)}
 ${verifyPrivileges(inputs)}
 DO $$ BEGIN
-  IF EXISTS (SELECT 1 FROM identity.platform_bootstrap)
+${requireDatabaseIdentity(identity)}
+  IF current_user <> 'postgres' OR session_user <> current_user
+     OR EXISTS (SELECT 1 FROM identity.platform_bootstrap)
      OR EXISTS (SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND backend_type = 'client backend' AND pid <> pg_backend_pid()) THEN
     RAISE EXCEPTION 'Require a writer-fenced database before the initial operator bootstrap';
   END IF;
@@ -365,11 +375,9 @@ DO $$ BEGIN
          WHERE r.rolcanlogin IS DISTINCT FROM e.login
             OR (r.rolpassword LIKE 'SCRAM-SHA-256$%') IS DISTINCT FROM CASE WHEN e.login THEN true ELSE null END
       ) OR EXISTS (
-        SELECT 1 FROM pg_stat_activity WHERE usename IN (${roleValues(
-          roles
-            .filter(({ login }) => !login)
-            .map(({ name }) => (name === migrator ? 'migrate' : bootstrap)),
-        )})
+        SELECT 1 FROM pg_stat_activity a
+          JOIN (VALUES ${expected}) e(name, login) ON e.name = a.usename
+         WHERE NOT e.login
       )
   THEN RAISE EXCEPTION 'Credential attributes, ownership or withdrawal differ'; END IF;
 END $$;`;

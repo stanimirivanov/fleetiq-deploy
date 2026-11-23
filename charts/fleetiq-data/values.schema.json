@@ -162,10 +162,24 @@
           "replication",
           "bypassrls",
           "inherit",
-          "inRoles"
+          "inRoles",
+          "connectionLimit"
         ],
         "properties": {
-          "name": { "type": "string", "pattern": "^fleetiq_[a-z_]+$" },
+          "name": {
+            "enum": [
+              "fleetiq_migrator",
+              "fleetiq_bootstrap_platform_operator",
+              "fleetiq_serve",
+              "fleetiq_ingest_tcp",
+              "fleetiq_replay_worker",
+              "fleetiq_semantic_worker",
+              "fleetiq_project_current",
+              "fleetiq_analytics_worker",
+              "fleetiq_notification_worker",
+              "fleetiq_archive_worker"
+            ]
+          },
           "ensure": { "const": "present" },
           "login": { "type": "boolean" },
           "superuser": { "const": false },

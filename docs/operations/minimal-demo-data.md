@@ -26,7 +26,9 @@ and [provider delegation](https://github.com/stanimirivanov/k8s-infrastructure/b
 
 The pinned producer's resident pool ceilings total 34, with another two for the
 archive worker. The conservative budget adds two for one recurring operation.
-That sum of 38 leaves 26 of the configured 64 for nonproduct uses. Run at
+That sum of 38 leaves 26 of the configured 64 for nonproduct uses. The
+candidate configures zero regular reserved slots and three superuser-reserved
+slots. Run at
 most one administrative operation at a time and fence both the simulator and
 the archive worker for its duration. Check the individual pools in the render
 receipt and account for actual PostgreSQL reserved slots, controller and health

@@ -12,6 +12,7 @@ import {
   ledgerCheck,
   roleFixtureSql,
   roleLoginSql,
+  roleName,
   runtimeCommands,
   sha256,
   verifyPrivileges,
@@ -80,14 +81,12 @@ export function validateRoleProbeRequest(request) {
   const retains = stage.endsWith('-restart');
   requireCheck(
     retains
-      ? keysAre(observation, 'commissioningReceipt,message,tenant') &&
+      ? keysAre(observation, 'message,tenant') &&
           [observation.tenant, observation.message].every(
             (value) => typeof value === 'string' && rowId.test(value),
-          ) &&
-          typeof observation.commissioningReceipt === 'string' &&
-          digest.test(observation.commissioningReceipt)
+          )
       : observation === undefined,
-    'select one bounded commissioned observation and the authenticated commissioning receipt',
+    'select one bounded retained history observation',
   );
   return {
     spaces,
@@ -159,8 +158,9 @@ function inspectTarget(kube, request, profile, spaces) {
       ) &&
       actual.bootstrap.initdb.secret?.name === desired.bootstrap.initdb.secret.name &&
       !actual.superuserSecret &&
-      actual.postgresql?.parameters?.max_connections === '64' &&
-      actual.postgresql.parameters.password_encryption === 'scram-sha-256' &&
+      Object.entries(desired.postgresql.parameters).every(
+        ([setting, value]) => actual.postgresql?.parameters?.[setting] === value,
+      ) &&
       isDeepStrictEqual(actual.postgresql.pg_hba, desired.postgresql.pg_hba) &&
       isDeepStrictEqual(
         actual.managed?.roles?.map((role) => ({
@@ -283,12 +283,13 @@ ${sql}`,
 
 const runtimeStats = `
 SELECT json_build_object('max', current_setting('max_connections')::integer,
-  'reserved', current_setting('reserved_connections')::integer +
-              current_setting('superuser_reserved_connections')::integer,
-  'connections', coalesce((SELECT json_object_agg(usename, total) FROM
-    (SELECT usename, count(*)::integer total FROM pg_stat_activity
-     WHERE datname = current_database() AND backend_type = 'client backend'
-       AND pid <> pg_backend_pid() GROUP BY usename) grouped), '{}'::json));`;
+  'reserved', current_setting('reserved_connections')::integer,
+  'superuser', current_setting('superuser_reserved_connections')::integer,
+  'connections', coalesce((SELECT json_object_agg(username, total) FROM
+    (SELECT coalesce(usename, '') AS username, count(*)::integer total
+     FROM pg_stat_activity WHERE backend_type IN ('client backend', 'walsender')
+       AND pid <> pg_backend_pid()
+     GROUP BY username) grouped), '{}'::json));`;
 
 function retentionSql({ tenant, message }) {
   return `
@@ -369,7 +370,12 @@ END $$;`,
         bindLogin(login, 'migrate', identity, sql);
       });
       check('role-operations-and-queue-handoffs', () => {
-        privileged(roleFixtureSql(inputs, fixture.sql, fixture.retention));
+        const sql = roleFixtureSql(inputs, fixture.sql, fixture.retention, identity);
+        requireCheck(
+          isDeepStrictEqual(inspectTarget(kube, request, profile, spaces), observed),
+          'target changed before the rollback fixture',
+        );
+        privileged(sql);
       });
     }
     check('exact-role-acls', () => privileged(verifyPrivileges(inputs)));
@@ -395,39 +401,60 @@ END $$;`,
       });
     }
     if (observation) {
-      receipt.retained = check('commissioned-observation-and-pool-sample', () => {
+      receipt.authenticatedCommissioning = {
+        outcome: 'unverified',
+        independentEvidenceRequired: true,
+      };
+      receipt.poolSample = check('connection-budget-sample', () => {
         const stats = JSON.parse(privileged(runtimeStats));
-        const { pools, remaining } = profile.connections;
+        const { pools, reserves, remaining } = profile.connections;
         requireCheck(
-          stats.max === 64 &&
-            Number.isSafeInteger(stats.reserved) &&
-            stats.reserved >= 3 &&
-            stats.reserved <= remaining,
-          'unexpected PostgreSQL connection ceiling or reserved slots',
+          stats.max ===
+            Number(profile.cluster.spec.postgresql.parameters.max_connections) &&
+            stats.reserved === reserves.reserved &&
+            stats.superuser === reserves.superuser &&
+            Object.values(stats.connections).every(
+              (count) => Number.isSafeInteger(count) && count >= 0,
+            ),
+          'unexpected PostgreSQL connection ceiling, reserves or sample counts',
         );
+        const productRoles = new Set(Object.keys(pools).map(roleName));
         const product = Object.fromEntries(
           Object.entries(pools).map(([command, ceiling]) => {
-            const role = `fleetiq_${command.replaceAll('-', '_')}`;
-            const count = stats.connections[role] ?? 0;
+            const count = stats.connections[roleName(command)] ?? 0;
             requireCheck(
-              Number.isSafeInteger(count) && count >= 0 && count <= ceiling,
+              count <= ceiling,
               'a product role exceeded its connection budget',
             );
             return [command, count];
           }),
         );
+        const nonproduct = Object.entries(stats.connections)
+          .filter(([name]) => !productRoles.has(name))
+          .reduce((sum, [, count]) => sum + count, 0);
+        requireCheck(
+          nonproduct <= remaining,
+          'nonproduct connections exceeded the candidate allowance',
+        );
+        return {
+          maximum: stats.max,
+          reserves,
+          product,
+          nonproduct,
+          nonproductAllowance: remaining,
+        };
+      });
+      receipt.retained = check('retained-history-observation', () => {
         const rows = JSON.parse(
           bindLogin(login, runtimeCommands[0], identity, retentionSql(observation)),
         );
         requireCheck(
-          rows?.length > 0 && rows.length <= 16,
-          'require a bounded commissioned observation',
+          Array.isArray(rows) && rows.length > 0 && rows.length <= 16,
+          'require a bounded retained history observation',
         );
-        receipt.poolSample = { maximum: stats.max, reserved: stats.reserved, product };
         return {
-          commissioningReceipt: observation.commissioningReceipt,
           rows: rows.length,
-          fingerprint: sha256(JSON.stringify(rows)),
+          fingerprint: sha256(JSON.stringify({ observation, rows })),
         };
       });
     }

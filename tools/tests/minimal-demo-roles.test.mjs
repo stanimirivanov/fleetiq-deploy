@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { qualifyMinimalDemoRoles } from '../manifests/minimal-demo-roles-probe.mjs';
+import { manifestTools, toolsLock } from '../manifests/toolchain.mjs';
 import { root, run } from '../process.mjs';
 
 const runProfile = (phase, ...flags) =>
@@ -110,6 +113,67 @@ test('installation rendering isolates each database credential and retains withd
   assert.deepEqual(after.spec.bootstrap, cluster.spec.bootstrap);
 });
 
+test('native Helm refuses aliased role names, credentials and mixed phases', () => {
+  const { cluster } = runProfile('runtime');
+  const tools = manifestTools();
+  const directory = mkdtempSync(join(tmpdir(), 'fleetiq-roles-test-'));
+  const valuesFile = join(directory, 'values.json');
+  const args = [
+    'template',
+    'fleetiq',
+    resolve(root, 'charts/fleetiq-data'),
+    '--namespace',
+    cluster.metadata.namespace,
+    '--kube-version',
+    toolsLock.kubernetes,
+    '--values',
+    valuesFile,
+  ];
+  const values = {
+    profile: 'minimal-demo-install',
+    image: cluster.spec.imageName,
+    owner: { role: 'fleetiq_migrator', passwordSecret: 'fleetiq-db-migrator' },
+    storage: { className: 'local-retained', size: '4Gi' },
+    resources: cluster.spec.resources,
+    runtime: null,
+    network: null,
+    managedRoles: cluster.spec.managed.roles,
+  };
+  try {
+    for (const flags of [[], ['--skip-schema-validation']]) {
+      writeFileSync(valuesFile, JSON.stringify(values));
+      tools.helm([...args, ...flags]);
+      for (const change of [
+        ({ managedRoles }) => {
+          managedRoles[0].name = managedRoles[1].name;
+        },
+        ({ managedRoles }) => {
+          managedRoles[0].passwordSecret.name = 'fleetiq-db-migrator';
+        },
+        ({ managedRoles }) => {
+          managedRoles[0].passwordSecret.name = managedRoles[1].passwordSecret.name;
+        },
+        ({ managedRoles }) => {
+          const owned = managedRoles.find(({ name }) => name === 'fleetiq_migrator');
+          owned.login = true;
+          delete owned.disablePassword;
+          owned.passwordSecret = { name: 'fleetiq-db-migrator' };
+        },
+        ({ owner }) => {
+          owner.passwordSecret = 'fleetiq-db-serve';
+        },
+      ]) {
+        const invalid = structuredClone(values);
+        change(invalid);
+        writeFileSync(valuesFile, JSON.stringify(invalid));
+        assert.throws(() => tools.helm([...args, ...flags]));
+      }
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('data Job route requires the exact provider attempt and runtime ServiceAccount', () => {
   const attempt = 'demo-launch-0123456789ab0123456789ab';
   const { policies, candidate } = runProfile('installation', attempt);
@@ -145,8 +209,8 @@ const objectUid = (digit) =>
   `${digit.repeat(8)}-${digit.repeat(4)}-${digit.repeat(4)}-${digit.repeat(4)}-${digit.repeat(12)}`;
 const ready = [{ type: 'Ready', status: 'True' }];
 
-function reviewedRuntime() {
-  const profile = runProfile('runtime');
+function reviewedTarget(phase = 'runtime') {
+  const profile = runProfile(phase);
   const namespace = 'qual-fleet-data';
   const primary = 'fleetiq-db-1';
   const volumeName = 'pv-fleetiq-db-1';
@@ -285,7 +349,7 @@ function reviewedRuntime() {
 }
 
 test('installed probe verifies the reviewed amd64 image before asking for the SQL witness', () => {
-  const { profile, request, objects, kube } = reviewedRuntime();
+  const { profile, request, objects, kube } = reviewedTarget();
   const admin = () => {
     throw new Error('private SQL failure');
   };
@@ -305,7 +369,7 @@ test('installed probe verifies the reviewed amd64 image before asking for the SQ
 });
 
 test('installed probe refuses a changed candidate or unknown target or request fields before external calls', () => {
-  const { profile, request } = reviewedRuntime();
+  const { profile, request } = reviewedTarget();
   const kube = () =>
     assert.fail('A rejected private request must never contact a target');
   for (const candidate of [
@@ -322,4 +386,102 @@ test('installed probe refuses a changed candidate or unknown target or request f
       assert.AssertionError,
     );
   }
+});
+
+test('restart evidence scopes its claims to the selected history rows and exact connection sample', () => {
+  const { profile, request, kube } = reviewedTarget();
+  const stats = {
+    max: 64,
+    reserved: 0,
+    superuser: 3,
+    connections: { fleetiq_serve: 10, postgres: 2, other: 24 },
+  };
+  const identity = JSON.stringify({
+    databaseOid: '1000',
+    startedMicros: '2000',
+    primary: true,
+  });
+  const retained = [{ tenant_id: 'tenant-1', message_id: 'message-1' }];
+  const options = {
+    profile,
+    kube,
+    source: { commit: 'reviewed' },
+    inputs: { inventory: { migrations: [] }, contract: { commands: {} } },
+    admin: (_pod, sql) => {
+      if (sql.includes("json_build_object('max'")) return JSON.stringify(stats);
+      if (sql.includes('pg_postmaster_start_time')) return identity;
+      if (sql.includes('SELECT count(*) FROM identity.platform_bootstrap')) return '1';
+      return '';
+    },
+    login: (_command, sql) =>
+      `${identity}\n${sql.includes('history.asset_property_changes') ? JSON.stringify(retained) : '1'}`,
+    rejectCleartext: () => true,
+  };
+  const observation = { tenant: 'tenant-1', message: 'message-1' };
+  const before = { ...request, stage: 'before-restart', observation };
+  const passes = qualifyMinimalDemoRoles(before, options);
+  assert.equal(passes.outcome, 'passed', passes.reason);
+  assert.deepEqual(passes.authenticatedCommissioning, {
+    outcome: 'unverified',
+    independentEvidenceRequired: true,
+  });
+  assert.deepEqual(Object.keys(passes.retained).sort(), ['fingerprint', 'rows']);
+  assert.equal(passes.poolSample.nonproduct, 26);
+  assert.equal(passes.poolSample.nonproductAllowance, 26);
+  assert.equal(passes.poolSample.product.serve, 10);
+  assert.deepEqual(passes.poolSample.reserves, { reserved: 0, superuser: 3 });
+  assert.throws(
+    () =>
+      qualifyMinimalDemoRoles(
+        {
+          ...before,
+          observation: { ...observation, commissioningReceipt: digest('a') },
+        },
+        options,
+      ),
+    assert.AssertionError,
+  );
+  stats.connections.other++;
+  assert.match(
+    qualifyMinimalDemoRoles(before, options).reason,
+    /nonproduct connections/u,
+  );
+  stats.connections.other--;
+  stats.reserved++;
+  stats.superuser--;
+  assert.match(qualifyMinimalDemoRoles(before, options).reason, /reserves/u);
+});
+
+test('grant probe rechecks the selected primary before opening the rollback fixture session', () => {
+  const { profile, request, objects, kube } = reviewedTarget('installation');
+  const identity = JSON.stringify({
+    databaseOid: '1000',
+    startedMicros: '2000',
+    primary: true,
+  });
+  let adminCalls = 0;
+  const receipt = qualifyMinimalDemoRoles(
+    { ...request, stage: 'grant' },
+    {
+      profile,
+      kube,
+      inputs: { inventory: { migrations: [] }, contract: { commands: {} } },
+      fixture: { sql: 'SELECT 1;', retention: ['SELECT 1', 'SELECT 1'] },
+      admin: () => {
+        adminCalls++;
+        return identity;
+      },
+      login: (_command, sql) => {
+        if (sql.includes('REVOKE CONNECT')) {
+          objects['pod/fleetiq-db-1'].metadata.uid = objectUid('5');
+        }
+        return identity;
+      },
+    },
+  );
+  assert.equal(adminCalls, 1);
+  assert.deepEqual(receipt.checks.slice(-2), [
+    { name: 'apply-exact-role-grants', outcome: 'passed' },
+    { name: 'role-operations-and-queue-handoffs', outcome: 'failed' },
+  ]);
 });

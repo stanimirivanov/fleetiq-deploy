@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict';
-import { lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
+import {
+  lstatSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -33,22 +41,36 @@ function privateFile(path, maxBytes = 128 * 1024) {
 }
 
 function readSource() {
+  const chart = 'charts/fleetiq-data';
+  const chartFiles = readdirSync(resolve(root, chart), {
+    recursive: true,
+    withFileTypes: true,
+  })
+    .filter((entry) => !entry.isDirectory())
+    .map((entry) => resolve(entry.parentPath, entry.name).slice(root.length));
   const files = [
-    'charts/fleetiq-data/templates/cluster.yaml',
-    'charts/fleetiq-data/templates/network.yaml',
-    'charts/fleetiq-data/values.schema.json',
-    'charts/fleetiq-data/values.yaml',
+    ...chartFiles,
+    'charts/fleetiq-runtime/qualified-edge.json',
     'environments/minimal-demo-candidate/backend.json',
     'environments/minimal-demo-candidate/data.yaml',
+    'local/artifacts.lock.json',
+    'package.json',
+    'pnpm-lock.yaml',
+    'tools/git-diagnostics.mjs',
     'tools/manifests/minimal-demo-data.mjs',
     'tools/manifests/minimal-demo-network.mjs',
     'tools/manifests/minimal-demo-roles-probe-cli.mjs',
     'tools/manifests/minimal-demo-roles-probe.mjs',
     'tools/manifests/minimal-demo-roles-render.mjs',
     'tools/manifests/minimal-demo-roles.mjs',
+    'tools/manifests/render.mjs',
+    'tools/manifests/toolchain.mjs',
     'tools/manifests/tools.lock.json',
+    'tools/pnpm-launchers.mjs',
+    'tools/policy.mjs',
     'tools/process.mjs',
-  ];
+    'tools/qualified-edge.mjs',
+  ].sort();
   return {
     commit: run('git', ['rev-parse', 'HEAD'], { timeout: 4_000 }),
     fingerprint: sha256(
@@ -124,10 +146,11 @@ function main() {
   assert.equal(request.target.name, values['confirm-target']);
   assert.equal(request.stage, values['confirm-stage']);
   assert.equal(request.candidate, values['confirm-candidate']);
-  const config = privateFile(values.kubeconfig, 1024 * 1024);
-  const ca = privateFile(values.ca);
-  const passfile = privateFile(values.passfile);
-  assert.equal(sha256(readFileSync(ca)), request.caDigest);
+  const configBytes = readFileSync(privateFile(values.kubeconfig, 1024 * 1024));
+  const caBytes = readFileSync(privateFile(values.ca));
+  const passfileBytes = readFileSync(privateFile(values.passfile));
+  assert.equal(sha256(caBytes), request.caDigest);
+  const source = readSource();
   const inputs = loadGrantInputs(
     readFileSync(privateFile(values.grants)),
     readFileSync(privateFile(values.inventory)),
@@ -142,7 +165,6 @@ function main() {
   assert.equal(Boolean(values.platform), request.stage === 'grant');
   const fixture =
     request.stage === 'grant' ? producerFixture(values.platform, inputs) : undefined;
-  const source = readSource();
   const { clientVersion } = JSON.parse(
     run('kubectl', ['version', '--client', '-o', 'json'], { timeout: 4_000 }),
   );
@@ -150,6 +172,10 @@ function main() {
   const psqlVersion = run('psql', ['--version'], { timeout: 4_000 });
   assert.match(psqlVersion, /^psql \(PostgreSQL\) 18\.[0-9]+(?: .*)?$/u);
   const cache = mkdtempSync(join(tmpdir(), 'fleetiq-minimal-data-'));
+  const config = join(cache, 'kubeconfig');
+  const ca = join(cache, 'ca.crt');
+  const passfile = join(cache, 'pgpass');
+  const context = `kind-${request.target.name}`;
   const started = performance.now();
   const deadline = (limit) => {
     const remaining = Math.floor(240_000 - (performance.now() - started));
@@ -163,7 +189,7 @@ function main() {
         '--kubeconfig',
         config,
         '--context',
-        `kind-${request.target.name}`,
+        context,
         '--cache-dir',
         cache,
         '--request-timeout=8s',
@@ -189,14 +215,26 @@ function main() {
   };
   let receipt;
   try {
-    const [endpoint, insecure, proxy, tlsName, caData, caFile] = kube([
-      'config',
-      'view',
-      '--minify',
-      '-o',
-      'jsonpath={.clusters[0].cluster.server}{"|"}{.clusters[0].cluster.insecure-skip-tls-verify}{"|"}{.clusters[0].cluster.proxy-url}{"|"}{.clusters[0].cluster.tls-server-name}{"|"}{.clusters[0].cluster.certificate-authority-data}{"|"}{.clusters[0].cluster.certificate-authority}',
-    ]).split('|');
-    const server = new URL(endpoint);
+    writeFileSync(config, configBytes, { mode: 0o600, flag: 'wx' });
+    writeFileSync(ca, caBytes, { mode: 0o600, flag: 'wx' });
+    writeFileSync(passfile, passfileBytes, { mode: 0o600, flag: 'wx' });
+    const selected = JSON.parse(
+      kube(['config', 'view', '--minify', '-o', 'json'], { limit: 9_000 }),
+    );
+    assert.equal(selected.clusters?.length, 1);
+    assert.equal(selected.contexts?.length, 1);
+    assert.equal(selected.users?.length, 1);
+    assert.deepEqual(
+      [
+        selected.contexts[0].name,
+        selected.contexts[0].context.cluster,
+        selected.contexts[0].context.user,
+      ],
+      [context, selected.clusters[0].name, selected.users[0].name],
+    );
+    const cluster = selected.clusters[0].cluster;
+    const user = selected.users[0].user;
+    const server = new URL(cluster.server);
     assert(
       server.protocol === 'https:' &&
         server.hostname === '127.0.0.1' &&
@@ -206,13 +244,22 @@ function main() {
         !server.password &&
         !server.search &&
         !server.hash &&
-        (!insecure || insecure === 'false') &&
-        !proxy &&
-        !tlsName &&
-        caData &&
-        !caFile,
+        Object.keys(cluster).every((key) =>
+          ['server', 'certificate-authority-data'].includes(key),
+        ) &&
+        typeof cluster['certificate-authority-data'] === 'string' &&
+        cluster['certificate-authority-data'].length > 0,
       'require the private loopback kind API with embedded CA verification',
     );
+    const userFields = Object.keys(user).sort().join();
+    assert(
+      ['client-certificate-data,client-key-data', 'token'].includes(userFields) &&
+        Object.values(user).every(
+          (value) => typeof value === 'string' && value.length > 0,
+        ),
+      'require embedded Kubernetes client authentication',
+    );
+    let authorizedPod;
     receipt = qualifyMinimalDemoRoles(request, {
       profile,
       inputs,
@@ -221,18 +268,21 @@ function main() {
       fixture,
       previous,
       admin: (pod, sql) => {
-        assert.equal(
-          kube([
-            '--namespace',
-            spaces.data,
-            'auth',
-            'can-i',
-            'create',
-            `pods/${pod}`,
-            '--subresource=exec',
-          ]),
-          'yes',
-        );
+        if (authorizedPod !== pod) {
+          assert.equal(
+            kube([
+              '--namespace',
+              spaces.data,
+              'auth',
+              'can-i',
+              'create',
+              `pods/${pod}`,
+              '--subresource=exec',
+            ]),
+            'yes',
+          );
+          authorizedPod = pod;
+        }
         return kube(
           [
             '--namespace',
@@ -284,7 +334,6 @@ function main() {
       },
     });
     assert.deepEqual(readSource(), source);
-    assert.equal(sha256(readFileSync(ca)), request.caDigest);
     if (fixture) receipt.producerFixture = fixture.fingerprint;
   } catch {
     receipt ??= {
