@@ -17,7 +17,7 @@ export class CommandFailure extends Error {
   }
 }
 
-function execute(program, args, options = {}) {
+function execute(program, args, { acceptedExitCodes = [0], ...options } = {}) {
   const result = spawnSync(program, args, {
     cwd: root,
     encoding: 'utf8',
@@ -27,7 +27,7 @@ function execute(program, args, options = {}) {
     shell: false,
     ...options,
   });
-  if (result.error || result.status !== 0) {
+  if (result.error || !acceptedExitCodes.includes(result.status)) {
     // Child stderr may contain private configuration; never attach it to evidence.
     const phase =
       program === 'docker'
@@ -51,7 +51,11 @@ export function run(program, args, options = {}) {
  */
 export function capture(program, args, options = {}) {
   const result = execute(program, args, options);
-  return { stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+  return {
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+    exitCode: result.status,
+  };
 }
 /** Select only a launcher that actually reports the repository's exact pnpm pin. */
 export function pinnedPnpm({ environment = process.env, execute = run } = {}) {

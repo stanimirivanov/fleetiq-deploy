@@ -46,6 +46,16 @@ export function validateBackendSelection(selection) {
   assert.match(grantContract.migrationHead.sha384, /^[a-f0-9]{96}$/u);
   return selection;
 }
+export function selectedMinimalDemoBackend() {
+  return validateBackendSelection(JSON.parse(readFileSync(selectionPath, 'utf8')));
+}
+
+export const databaseConnectionSettings = {
+  max_connections: '64',
+  reserved_connections: '0',
+  superuser_reserved_connections: '3',
+};
+
 const residentPools = {
   serve: 10,
   'ingest-tcp': 8,
@@ -64,15 +74,18 @@ const recurringPools = {
   'expire-history-once': 1,
 };
 
-function connectionBudget(maximum) {
-  assert.equal(maximum, '64', 'Require the approved PostgreSQL connection setting');
+function connectionBudget(parameters) {
+  const { password_encryption, ...connections } = parameters;
+  assert.deepEqual(connections, databaseConnectionSettings);
+  const { max_connections, reserved_connections, superuser_reserved_connections } =
+    databaseConnectionSettings;
 
   const normal = Object.values(residentPools).reduce((sum, limit) => sum + limit, 0);
   const archivePool = 2;
   const withArchive = normal + archivePool;
   const recurringOperation = Math.max(...Object.values(recurringPools));
   const conservativeCeiling = withArchive + recurringOperation;
-  const remaining = Number(maximum) - conservativeCeiling;
+  const remaining = Number(max_connections) - conservativeCeiling;
   assert(remaining >= 26, 'Preserve the approved nonproduct connection allowance');
 
   return {
@@ -84,15 +97,17 @@ function connectionBudget(maximum) {
     recurringOperation,
     conservativeCeiling,
     remaining,
+    reserves: {
+      reserved: Number(reserved_connections),
+      superuser: Number(superuser_reserved_connections),
+    },
     installation: { migrate: 1, bootstrap: 10 },
   };
 }
 
 export function checkMinimalDemoData(tools, consumer) {
   const namespace = demoNamespaces(consumer).data;
-  const backendSelection = validateBackendSelection(
-    JSON.parse(readFileSync(selectionPath, 'utf8')),
-  );
+  const backendSelection = selectedMinimalDemoBackend();
   const args = [
     resolve(root, 'charts/fleetiq-data'),
     '--namespace',
@@ -134,7 +149,10 @@ export function checkMinimalDemoData(tools, consumer) {
       },
     },
     postgresql: {
-      parameters: { password_encryption: 'scram-sha-256', max_connections: '64' },
+      parameters: {
+        password_encryption: 'scram-sha-256',
+        ...databaseConnectionSettings,
+      },
       pg_hba: ['hostssl all all all scram-sha-256'],
     },
   });
@@ -144,7 +162,7 @@ export function checkMinimalDemoData(tools, consumer) {
     cluster,
     fingerprint: `sha256:${digest(JSON.stringify(cluster))}`,
     backendSelection,
-    connections: connectionBudget(cluster.spec.postgresql.parameters.max_connections),
+    connections: connectionBudget(cluster.spec.postgresql.parameters),
     schemas,
     execution: 'not-performed',
   };

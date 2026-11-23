@@ -29,7 +29,12 @@ test('minimal-demo data renders only the retained offline Cluster under the sele
     storageClass: 'local-retained',
     size: '4Gi',
   });
-  assert.equal(cluster.spec.postgresql.parameters.max_connections, '64');
+  assert.deepEqual(cluster.spec.postgresql.parameters, {
+    password_encryption: 'scram-sha-256',
+    max_connections: '64',
+    reserved_connections: '0',
+    superuser_reserved_connections: '3',
+  });
   assert.equal(cluster.metadata.annotations['helm.sh/resource-policy'], 'keep');
   assert.equal(
     cluster.metadata.annotations['argocd.argoproj.io/sync-options'],
@@ -44,6 +49,7 @@ test('connection budget counts normal roles, archive and recurring operations se
   assert.equal(connections.recurringOperation, 2);
   assert.equal(connections.conservativeCeiling, 38);
   assert.equal(connections.remaining, 26);
+  assert.deepEqual(connections.reserves, { reserved: 0, superuser: 3 });
   assert.deepEqual(connections.installation, { migrate: 1, bootstrap: 10 });
   assert.equal(connections.producer, 'c0d71a56dad0596d3c6a6b866e4338d25b597af2');
 });

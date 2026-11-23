@@ -26,7 +26,9 @@ and [provider delegation](https://github.com/stanimirivanov/k8s-infrastructure/b
 
 The pinned producer's resident pool ceilings total 34, with another two for the
 archive worker. The conservative budget adds two for one recurring operation.
-That sum of 38 leaves 26 of the configured 64 for nonproduct uses. Run at
+That sum of 38 leaves 26 of the configured 64 for nonproduct uses. The
+candidate configures zero regular reserved slots and three superuser-reserved
+slots. Run at
 most one administrative operation at a time and fence both the simulator and
 the archive worker for its duration. Check the individual pools in the render
 receipt and account for actual PostgreSQL reserved slots, controller and health
@@ -48,17 +50,8 @@ for the replay-to-semantic and semantic-to-projection writes that occur with the
 caller’s privileges. [Publication run](https://github.com/stanimirivanov/fleetiq-platform/actions/runs/45174819423),
 [platform grant contract](https://github.com/stanimirivanov/fleetiq-platform/blob/c0d71a56dad0596d3c6a6b866e4338d25b597af2/docs/operations/postgres-runtime-grants.md)
 
-This selection is an input to M10-PR22. The offline PostgreSQL fixture retains
-its placeholder database image and Secret. The legacy Compose source lock and
-protected environment selections each have their own review and rollout path.
-
-The installed gate remains pending under [#96](https://github.com/stanimirivanov/fleetiq-deploy/issues/96).
-It needs a reviewed installable selection and separate execution authorization for
-one positively identified disposable target. Collect the exact candidate, image,
-Cluster and claim identities, effective memory and connection settings, role and
-ledger checks, live pool peaks, and authenticated commissioning evidence. For
-retention, verify a bounded commissioned observation before and after the
-authorized restart and compare the claim and volume identities. Preserve
-the installed data and sanitized evidence if any check fails. A failed schema
-mutation requires reviewed recovery before product writers restart. [Installation
-acceptance](https://github.com/stanimirivanov/fleetiq-deploy/issues/89#issuecomment-7071307181)
+Use the [scoped roles and installed probe](minimal-demo-database-roles.md) to
+render the installation phases and collect target-bound database evidence.
+The offline PostgreSQL fixture retains its placeholder image and Secret.
+Legacy Compose source locks and protected environment selections each have
+their own review and rollout path.

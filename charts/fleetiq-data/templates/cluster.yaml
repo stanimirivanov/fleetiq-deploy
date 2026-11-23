@@ -1,4 +1,5 @@
 {{- $candidate := eq .Values.profile "minimal-demo-candidate" -}}
+{{- $minimal := eq .Values.profile "minimal-demo-install" -}}
 {{- if $candidate -}}
 {{- /* Enforce the offline-only selection even with --skip-schema-validation. */ -}}
 {{- $expected := dict
@@ -14,10 +15,59 @@
 {{- fail "Use the exact reviewed offline minimal-demo-candidate values" -}}
 {{- end -}}
 {{- end -}}
-{{- if and (not $candidate) (eq .Values.owner.role .Values.runtime.role) }}
+{{- if $minimal -}}
+{{- if or (hasKey .Values "runtime") (hasKey .Values "network") -}}
+{{- fail "Minimal-demo installation requires separate runtime and network composition" -}}
+{{- end -}}
+{{- /* Validate named roles here too: schema uniqueness compares whole objects. */ -}}
+{{- $owner := dict "role" "fleetiq_migrator" "passwordSecret" "fleetiq-db-migrator" -}}
+{{- if ne (mustToJson .Values.owner) (mustToJson $owner) -}}
+{{- fail "Use the exact minimal-demo migration owner and Secret" -}}
+{{- end -}}
+{{- $roles := dict
+  "fleetiq_migrator" "fleetiq-db-migrator"
+  "fleetiq_bootstrap_platform_operator" "fleetiq-db-bootstrap-platform-operator"
+  "fleetiq_serve" "fleetiq-db-serve"
+  "fleetiq_ingest_tcp" "fleetiq-db-ingest-tcp"
+  "fleetiq_replay_worker" "fleetiq-db-replay-worker"
+  "fleetiq_semantic_worker" "fleetiq-db-semantic-worker"
+  "fleetiq_project_current" "fleetiq-db-project-current"
+  "fleetiq_analytics_worker" "fleetiq-db-analytics-worker"
+  "fleetiq_notification_worker" "fleetiq-db-notification-worker"
+  "fleetiq_archive_worker" "fleetiq-db-archive-worker" -}}
+{{- $seen := dict -}}
+{{- $enabled := list -}}
+{{- range .Values.managedRoles -}}
+{{- $name := .name -}}
+{{- if or (not (hasKey $roles $name)) (hasKey $seen $name) -}}
+{{- fail "Use each exact minimal-demo database role once" -}}
+{{- end -}}
+{{- $_ := set $seen $name true -}}
+{{- $expected := dict "name" $name "ensure" "present" "login" .login
+  "superuser" false "createdb" false "createrole" false "replication" false
+  "bypassrls" false "inherit" false "inRoles" (list) "connectionLimit" -1 -}}
+{{- if eq .login true -}}
+{{- $_ := set $expected "passwordSecret" (dict "name" (get $roles $name)) -}}
+{{- $enabled = append $enabled $name -}}
+{{- else if eq .login false -}}
+{{- $_ := set $expected "disablePassword" true -}}
+{{- end -}}
+{{- if ne (mustToJson .) (mustToJson $expected) -}}
+{{- fail "Use the exact restricted credentials and attributes for each minimal-demo database role" -}}
+{{- end -}}
+{{- end -}}
+{{- $runtime := without (keys $roles) "fleetiq_migrator" "fleetiq_bootstrap_platform_operator" | sortAlpha -}}
+{{- if or (ne (len $seen) (len $roles))
+  (not (or (deepEqual $enabled (list "fleetiq_migrator"))
+    (deepEqual $enabled (list "fleetiq_bootstrap_platform_operator"))
+    (eq (mustToJson (sortAlpha $enabled)) (mustToJson $runtime)))) -}}
+{{- fail "Select exactly one minimal-demo database credential phase" -}}
+{{- end -}}
+{{- end -}}
+{{- if and (not (or $candidate $minimal)) (eq .Values.owner.role .Values.runtime.role) }}
 {{- fail "Migration owner and runtime role must be distinct" }}
 {{- end }}
-{{- if and (not $candidate) (eq .Values.owner.passwordSecret .Values.runtime.passwordSecret) }}
+{{- if and (not (or $candidate $minimal)) (eq .Values.owner.passwordSecret .Values.runtime.passwordSecret) }}
 {{- fail "Migration owner and runtime password Secrets must be distinct" }}
 {{- end }}
 apiVersion: postgresql.cnpg.io/v1
@@ -42,7 +92,10 @@ spec:
       database: {{ .Values.database | quote }}
       owner: {{ .Values.owner.role | quote }}
       secret: { name: {{ .Values.owner.passwordSecret | quote }} }
-  {{- if not $candidate }}
+  {{- if $minimal }}
+  managed:
+    roles: {{ toJson .Values.managedRoles }}
+  {{- else if not $candidate }}
   managed:
     roles:
       - name: {{ .Values.runtime.role | quote }}
@@ -60,8 +113,16 @@ spec:
   postgresql:
     parameters:
       password_encryption: scram-sha-256
-      {{- if $candidate }}
+      {{- if or $candidate $minimal }}
       max_connections: "64"
+      reserved_connections: "0"
+      superuser_reserved_connections: "3"
       {{- end }}
     pg_hba:
+      {{- if $minimal }}
+      - hostnossl all all all reject
+      - hostssl fleetiq all all scram-sha-256
+      - host all all all reject
+      {{- else }}
       - hostssl all all all scram-sha-256
+      {{- end }}

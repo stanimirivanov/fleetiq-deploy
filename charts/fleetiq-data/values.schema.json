@@ -16,7 +16,7 @@
   "properties": {
     "profile": {
       "type": "string",
-      "enum": ["local", "nonlocal", "minimal-demo-candidate"]
+      "enum": ["local", "nonlocal", "minimal-demo-candidate", "minimal-demo-install"]
     },
     "clusterName": {
       "type": "string",
@@ -144,6 +144,73 @@
         }
       }
     },
+    "managedRoles": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "ensure",
+          "login",
+          "superuser",
+          "createdb",
+          "createrole",
+          "replication",
+          "bypassrls",
+          "inherit",
+          "inRoles",
+          "connectionLimit"
+        ],
+        "properties": {
+          "name": {
+            "enum": [
+              "fleetiq_migrator",
+              "fleetiq_bootstrap_platform_operator",
+              "fleetiq_serve",
+              "fleetiq_ingest_tcp",
+              "fleetiq_replay_worker",
+              "fleetiq_semantic_worker",
+              "fleetiq_project_current",
+              "fleetiq_analytics_worker",
+              "fleetiq_notification_worker",
+              "fleetiq_archive_worker"
+            ]
+          },
+          "ensure": { "const": "present" },
+          "login": { "type": "boolean" },
+          "superuser": { "const": false },
+          "createdb": { "const": false },
+          "createrole": { "const": false },
+          "replication": { "const": false },
+          "bypassrls": { "const": false },
+          "inherit": { "const": false },
+          "inRoles": { "const": [] },
+          "connectionLimit": { "const": -1 },
+          "disablePassword": { "const": true },
+          "passwordSecret": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string", "pattern": "^fleetiq-db-[a-z-]+$" }
+            }
+          }
+        },
+        "if": { "properties": { "login": { "const": true } } },
+        "then": {
+          "required": ["passwordSecret"],
+          "not": { "required": ["disablePassword"] }
+        },
+        "else": {
+          "required": ["disablePassword"],
+          "not": { "required": ["passwordSecret"] }
+        }
+      }
+    },
     "network": {
       "type": "object",
       "additionalProperties": false,
@@ -267,7 +334,36 @@
         }
       },
       "else": {
-        "required": ["runtime", "network"]
+        "if": { "properties": { "profile": { "const": "minimal-demo-install" } } },
+        "then": {
+          "required": ["managedRoles"],
+          "not": {
+            "anyOf": [{ "required": ["runtime"] }, { "required": ["network"] }]
+          },
+          "properties": {
+            "clusterName": { "const": "fleetiq-db" },
+            "image": { "pattern": "^ghcr\\.io/cloudnative-pg/postgresql:18\\.[0-9]+-" },
+            "instances": { "const": 1 },
+            "database": { "const": "fleetiq" },
+            "owner": {
+              "const": {
+                "role": "fleetiq_migrator",
+                "passwordSecret": "fleetiq-db-migrator"
+              }
+            },
+            "storage": { "const": { "className": "local-retained", "size": "4Gi" } },
+            "resources": {
+              "const": {
+                "requests": { "cpu": "200m", "memory": "256Mi" },
+                "limits": { "cpu": "1", "memory": "768Mi" }
+              }
+            }
+          }
+        },
+        "else": {
+          "required": ["runtime", "network"],
+          "not": { "required": ["managedRoles"] }
+        }
       }
     },
     {
