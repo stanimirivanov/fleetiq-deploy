@@ -19,6 +19,8 @@ Helm owns workload parameters. Kustomize composes namespace policy without
 patching Helm-owned fields. There are no controllers, CRDs, Argo Applications,
 cluster RBAC, generated Secrets, migration hooks or bootstrap SQL in these packages.
 The same chart sources support later local and non-local selections.
+For the separate minimal-demo namespace, private TCP and support-network composition,
+see [minimal-demo private networking](minimal-demo-network.md).
 
 ## Offline qualification
 

@@ -55,6 +55,20 @@
       "sha256": "9546ed313e622ea84a0ab1ec7ef7e683f05acfbfe97beb746f0b5be6407691df"
     },
     {
+      "kind": "ConfigMap",
+      "apiVersion": "v1",
+      "file": "configmap_v1.json",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/93153a1458e24e93f386c50f9980d584fcba574b/v1.35.0-standalone-strict/configmap-v1.json",
+      "sha256": "e0eaddebd677c08aa092b2da2264d86ac4fc34eed112b9fac2945b3f00c1e9b1"
+    },
+    {
+      "kind": "Pod",
+      "apiVersion": "v1",
+      "file": "pod_v1.json",
+      "url": "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/93153a1458e24e93f386c50f9980d584fcba574b/v1.35.0-standalone-strict/pod-v1.json",
+      "sha256": "ab3eec94c85e6b166a62312ddb919fb747a53d1f5701a77befb17419361b52b0"
+    },
+    {
       "kind": "ServiceAccount",
       "apiVersion": "v1",
       "file": "serviceaccount_v1.json",
