@@ -1,6 +1,4 @@
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   bootstrap,
   databaseIdentities,
@@ -14,11 +12,12 @@ const identifierPattern = /^[a-z_][a-z_0-9]{0,62}$/u;
 const configure = `SET LOCAL statement_timeout = '8s'; SET LOCAL lock_timeout = '2s';
 SET LOCAL search_path = pg_catalog, public;`;
 
-function ownerAndDrain(owner) {
+function ownerAndDrain(owner, databaseOid) {
   return `
 SELECT pg_stat_clear_snapshot();
 DO $$ BEGIN
   IF current_database() <> '${databaseName}' OR pg_is_in_recovery()
+      ${databaseOid ? `OR (SELECT oid FROM pg_database WHERE datname = current_database()) <> ${databaseOid}::oid` : ''}
       OR session_user <> '${owner}' OR current_user <> session_user
       OR NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = current_database() AND datdba = session_user::regrole)
       OR EXISTS (
@@ -42,8 +41,12 @@ DO $$ BEGIN
 END $$;`;
 }
 
-export function databaseSql(operation, workloads, { owner, legacy }) {
+export function databaseSql(operation, workloads, { owner, legacy, databaseOid }) {
   databaseIdentities(workloads);
+  if (databaseOid !== undefined)
+    assert(
+      Number.isInteger(databaseOid) && databaseOid > 0 && databaseOid <= 4_294_967_295,
+    );
   const roles = [
     ...databaseIdentities(runtimeCommands).map(({ name }) => name),
     databaseRole(bootstrap),
@@ -57,6 +60,13 @@ export function databaseSql(operation, workloads, { owner, legacy }) {
   const selected = [...workloads, bootstrap].map(databaseRole);
   const selectedRoles = `ARRAY[${selected.map((name) => `'${name}'`).join(', ')}]::name[]`;
   const requiredRoles = requireScopedRoles(selected);
+  const confirmTarget = databaseOid
+    ? `DO $$ BEGIN
+  IF (SELECT oid FROM pg_database WHERE datname = current_database()) <> ${databaseOid}::oid THEN
+    RAISE EXCEPTION 'The database identity differs from the reviewed target';
+  END IF;
+END $$;`
+    : '';
   const checkGrants = `SELECT pg_temp.fleetiq_verify_runtime_grants(${selectedRoles});
 DO $$ BEGIN
 ${requiredRoles}
@@ -70,7 +80,7 @@ END $$;`;
 BEGIN;
 ${configure}
 SELECT pg_advisory_xact_lock(120, 1);
-${ownerAndDrain(owner)}
+${ownerAndDrain(owner, databaseOid)}
 SELECT pg_temp.fleetiq_check_ledger(true);
 DO $$ BEGIN
 ${requiredRoles}
@@ -86,7 +96,7 @@ BEGIN
 END $$;
 GRANT CONNECT ON DATABASE ${databaseName} TO ${exporter};
 ${fenceCheck(owner)}
-${ownerAndDrain(owner)}
+${ownerAndDrain(owner, databaseOid)}
 COMMIT;`;
   if (operation === 'inspect')
     return `BEGIN TRANSACTION READ ONLY;
@@ -122,6 +132,7 @@ COMMIT;`;
     return `
 BEGIN TRANSACTION READ ONLY;
 ${configure}
+${confirmTarget}
 SELECT pg_temp.fleetiq_check_ledger(false);
 ${checkGrants}
 COMMIT;`;
@@ -134,7 +145,7 @@ COMMIT;`;
 BEGIN;
 ${configure}
 SELECT pg_advisory_xact_lock(120, 1);
-${ownerAndDrain(owner)}
+${ownerAndDrain(owner, databaseOid)}
 ${fenceCheck(owner)}
 SELECT pg_temp.fleetiq_check_ledger(false);
 DO $$ BEGIN
@@ -142,7 +153,7 @@ ${requiredRoles}
 END $$;
 SELECT pg_temp.fleetiq_apply_runtime_grants(${selectedRoles});
 ${checkGrants}
-${ownerAndDrain(owner)}
+${ownerAndDrain(owner, databaseOid)}
 COMMIT;`;
 }
 
@@ -163,9 +174,4 @@ function requireScopedRoles(names) {
     )
   THEN RAISE EXCEPTION 'Scoped identities, memberships or ownership differ';
   END IF;`;
-}
-
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [operation, owner, legacy, ...workloads] = process.argv.slice(2);
-  console.log(databaseSql(operation, workloads, { owner, legacy }));
 }

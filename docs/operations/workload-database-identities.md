@@ -18,9 +18,8 @@ workloadDatabase:
   workloads: ["serve --check-schema", ingest-tcp, replay-worker]
 ```
 
-The credential operator provisions, rotates and retires the Secrets. Run
-`node tools/manifests/workload-database.mjs 'serve --check-schema' ingest-tcp replay-worker`
-to list the references. In the data namespace create one
+The credential operator provisions, rotates and retires the Secrets. Use the
+references in the reviewed data and workload manifests. In the data namespace create one
 `kubernetes.io/basic-auth` Secret per selected role, with `username` matching
 the role and a unique password. Create one corresponding URL Secret per
 workload in its namespace, with key `url`. Use the CNPG read/write endpoint,
@@ -52,79 +51,54 @@ The file defines session-local functions for the image's migration inventory
 and command privileges. Deployment supplies the operator-specific role names,
 maintenance fence, exporter grant, and credential retirement checks.
 
-## Cutover
+## Retained installation upgrade
 
-1. Stage the new workload Secrets and public CA before maintenance. Save the
-   release selections, check the recovery point, and acquire the installation's
-   release lock. Keep migration and bootstrap URL Secrets accessible only in
-   the authorized operations context. On a fresh database, start with the
-   temporary owner Secret for CNPG initdb.
-2. Put the runtime and worker deployment owners in maintenance. Wait for old
-   Pods, operations Jobs, external clients and old pools to drain. Configure the
-   data chart with `workloadDatabase.maintenance: true` and
-   `workloadDatabase.migrationLogin: true`. Wait for CNPG to reconcile and
-   reload admission on all relevant instances. Prove a new runtime connection
-   is rejected and the migration owner can connect over verified TLS. Suspend
-   other administrative activity and prevent owner credential use outside this
-   operation. CNPG's fixed local/replication rules still serve the operator.
-3. Render and execute `fence` as the migration owner against the primary. The
-   database connection grant for the exporter is installed in the same
-   transaction as the revocation of PUBLIC and legacy admission. A connected
-   foreign session or prepared transaction blocks the change. Investigate any
-   unexpected direct CONNECT grant and establish its owner before proceeding.
-4. Execute the pinned image's `migrate` with its owner-only URL injected by
-   the credential operator. Wait for the command to close all sessions. Execute
-   `grant` as the owner, then execute `verify`. Keep maintenance active.
-   The grant transaction checks the complete ledger and exact producer grants,
-   including the trigger handoffs and the absence of access to additional user
-   schemas. Require an application-database metrics scrape after CONNECT changes.
-5. For initial operator bootstrap only, turn off `migrationLogin` and turn on
-   `bootstrapLogin` while leaving maintenance on. Reconcile the role state
-   and prove owner rejection and bootstrap-only admission. Run the producer's
-   `bootstrap-platform-operator --check-schema` with the temporary bootstrap
-   URL and the approved operator identity. Keep the existing bootstrap state
-   during a single-role upgrade.
-6. Turn off both temporary login flags, keeping maintenance in place. Verify the
-   temporary processes and sessions have drained, then withdraw their URL and
-   password Secrets. Remove the migration owner's initdb Secret after initdb
-   completes to prevent CNPG's application-password refresh from restoring it
-   after a primary restart. The reference stays in the retained Cluster spec.
-   Verify both roles are withdrawn after CNPG reconciliation. Keep schema
-   ownership with the migration owner.
-7. Apply the new client Secret references before lifting maintenance. Verify API
-   readiness and authorized reads/writes, TCP acceptance, replay claim and
-   completion, and checked ledger reads. Observe each workload's PostgreSQL
-   login and confirm the legacy role has no remaining clients or sessions.
-   Set `retireLegacy: true`, confirm it is disabled, and withdraw the old
-   Secrets.
+### Prepare the reviewed release
 
-## Commands and interrupted upgrades
+The release preparer renders an immutable SQL ConfigMap and versioned
+WorkflowTemplate with `tools/releases/workload-database-workflow.mjs`. Inputs
+come from the reviewed release selection and the verified producer SQL artifact.
+The selection records the release digest, backend and PostgreSQL client image
+digests, SQL SHA-256, workflow namespace, read/write service DNS name, live
+database OID, owner and legacy names, selected workloads, and the names of the
+migration password Secret and database CA ConfigMap. Review the rendered
+objects with the phase manifests. The workflow controller owner registers the
+versioned template name with its existing namespace admission. Stage the
+workflow and immutable SQL ConfigMap under the approved template authority.
 
-Generate SQL on a trusted workstation. The arguments are operation, current
-database owner, current legacy role, and the same complete selected workload set.
-Use an independently selected connection with private authentication or approved
-local peer access. SQL contains role names and public ledger identities.
+The credential operator stages the named password Secret with key `password`
+and the public CA ConfigMap with key `ca.crt` in the workflow namespace. The
+migration connection and psql operations use the same selected
+username, service and verified CA. Give the workflow namespace only the
+database route approved for this operation. The provider's existing
+`release-executor` identity needs no extra API mutation privileges.
 
-```bash
-node tools/manifests/workload-database-sql.mjs inspect fleetiq_migrator fleetiq_runtime \
-  'serve --check-schema' ingest-tcp replay-worker > inspected-ledger.sql
-psql -X --no-password --set=ON_ERROR_STOP=1 \
-  --file="$VERIFIED_RUNTIME_GRANTS_SQL" --file=inspected-ledger.sql
-```
+### Operate the upgrade
 
-Use both files in that order and in the same psql session for `fence`, `grant`
-and `verify`. Credential withdrawal checks only need the rendered operation.
-Use `withdrawn` and then `retired` through the operator's administrative
-connection to the primary. These checks validate password absence without
-returning passwords or role verifiers.
+1. Review the recovery point and acquire the installation release lock. Have
+   the credential operator stage the workload identities. Activate the
+   reviewed maintenance phase through Argo CD. Observe writer and Job drain,
+   CNPG reconciliation and rejection of new runtime connections. Keep the
+   temporary migration login available for the approved workflow.
+2. Submit the reviewed template and release digest as the provider's suspended
+   release request. The independent approver verifies the observed maintenance
+   phase and starts the request. The workflow takes its namespace lock and runs
+   fence, migrate, grant and verify in order. It validates the request digest
+   and checks the database OID and owner before changing grants. View the
+   workflow's step outcomes in Argo. Keep the runtime fenced on failure.
+3. After success, retain the workflow UID, template, release digest and step
+   outcomes with the phase receipts. Check the CNPG application-database
+   metrics scrape. Through reviewed desired state, withdraw the temporary
+   credentials and switch clients to the scoped logins. Verify the selected
+   workloads and confirm the legacy role has no remaining clients or sessions
+   before the credential operator retires it. Observe the credential retirement
+   and keep schema ownership with the migration owner.
 
-After an interruption, re-establish maintenance admission and identify the
-current primary. Recheck the observed role state and run `inspect` for a
-verified migration prefix. Run `verify` to test the complete ledger and effective
-grants. If both match, the grant transaction committed and the operator can
-resume with credential reconciliation. If only a verified prefix exists,
-re-establish the fence and resume the identical image's migration. If the
-complete migration committed but grants did not, recheck the fence and run
-`grant`. An unexpected grant or ledger mismatch needs investigation before any
-retry. Keep maintenance in place while the result is uncertain. Restore only
-through the reviewed recovery procedure.
+An interrupted request is retained as evidence. Wait for its Pods to
+terminate, confirm the same target and maintenance phase, and submit the
+same template and release digest for fresh independent approval. The fence
+checks the successful migration prefix and verifies that no other writer is
+connected. The pinned migration command validates the committed ledger and
+runs pending migrations. Grant application is transactional, and verification
+checks the complete ledger and effective grants before writers return. Use a
+reviewed recovery procedure if the database identity, ledger or ACL check fails.

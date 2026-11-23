@@ -1,6 +1,4 @@
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 export const bootstrap = 'bootstrap-platform-operator --check-schema';
 export const runtimeCommands = [
@@ -42,18 +40,4 @@ export function workloadDatabaseEnv(workloads, command) {
     name: 'DATABASE_URL',
     valueFrom: { secretKeyRef: { name: identity.urlSecret, key: 'url' } },
   };
-}
-
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const identities = databaseIdentities(process.argv.slice(2));
-  console.log(
-    JSON.stringify(
-      {
-        workloadDatabase: { workloads: identities.map(({ command }) => command) },
-        identities,
-      },
-      null,
-      2,
-    ),
-  );
 }
