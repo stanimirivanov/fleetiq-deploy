@@ -42,6 +42,7 @@ test('reviewed release creates a native sequential database workflow with one fi
     );
   }
   const migration = workflow.spec.templates.find(({ name }) => name === 'migrate');
+  assert.deepEqual(migration.container.command, ['/usr/local/bin/fleetiq-server']);
   const url = new URL(
     migration.container.env.find(({ name }) => name === 'DATABASE_URL').value,
   );

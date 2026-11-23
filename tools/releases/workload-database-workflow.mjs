@@ -186,6 +186,8 @@ DO $$ BEGIN RAISE EXCEPTION 'Request digest does not match the reviewed workflow
             name: 'migrate',
             container: {
               image: backendImage,
+              // Argo can run an already staged image without a registry entrypoint lookup.
+              command: ['/usr/local/bin/fleetiq-server'],
               args: ['migrate'],
               env: [{ name: 'DATABASE_URL', value: url }, password],
               volumeMounts: [ca],
