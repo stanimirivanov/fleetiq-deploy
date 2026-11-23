@@ -4,7 +4,7 @@ Render the candidate offline with the deployment's pinned Node, pnpm and
 manifest tools. Use the consumer from the [private network composition](minimal-demo-network.md).
 The approved budget sets a 256 MiB request, a 768 MiB limit, 64 connections and a
 4 GiB claim on the provider's retained StorageClass. These are qualification
-targets. [Approved resource ledger](https://github.com/stanimirivanov/fleetiq-deploy/blob/75b65e1f7dab5b04e3c3e586797ff7cce15970b3/docs/capacity/minimal-demo-candidate-ledger.md)
+targets. [Approved resource ledger](https://github.com/stanimirivanov/fleetiq-deploy/blob/75b65e1f7dab9b04e3c3e586797ff7cce15970b3/docs/capacity/minimal-demo-candidate-ledger.md)
 
 ```sh
 pnpm install --frozen-lockfile
@@ -14,20 +14,23 @@ umask 077
 pnpm --silent minimal-demo:data:render qual-fleet > /private/data-candidate.json
 ```
 
-The JSON records the schema result, exact candidate Cluster fingerprint, platform
-pin and calculated pool budget. `execution: not-performed` identifies offline
-evidence. The Cluster contains a synthetic image and a placeholder migration
+The explicit renderer records the Cluster, schema result, fingerprint, platform pin
+and calculated pool budget. The default manifest receipt records resource and
+schema counts, the fingerprint and execution state. `execution: not-performed`
+identifies offline evidence. The Cluster contains a synthetic image and a placeholder migration
 Secret reference. Keep this output for review and use the supported release flow
 when an installable selection is available. The candidate has no managed runtime
 logins or legacy chart network policies. The data namespace, PostgreSQL network
 routes and retained StorageClass come from [private networking](minimal-demo-network.md)
-and [provider delegation](https://github.com/stanimirivanov/k8s-infrastructure/blob/b2da14318ea78634e0e478502420f28e0746ed8e/docs/minimal-delegation.md).
+and [provider delegation](https://github.com/stanimirivanov/k8s-infrastructure/blob/0d92be31e9c6a538bb9c2e69175deec2ec2f5089/docs/minimal-delegation.md).
 
 The pinned producer's resident pool ceilings total 34, with another two for the
-archive worker. Reserving two for one recurring operation yields 38, leaving 26
-of the configured 64 for nonproduct uses. Check the individual pools in the
-render receipt. The managed maintenance phase must keep operations serialized
-and account for actual PostgreSQL reserved slots, controller and health traffic.
+archive worker. The conservative budget adds two for one recurring operation.
+That sum of 38 leaves 26 of the configured 64 for nonproduct uses. Run at
+most one administrative operation at a time and fence both the simulator and
+the archive worker for its duration. Check the individual pools in the render
+receipt and account for actual PostgreSQL reserved slots, controller and health
+traffic during managed maintenance.
 Initial checked bootstrap inherits SQLx's 10-connection ceiling, and migration
 has a ceiling of one. Run these installation operations serially with product
 writers fenced. [Serving pool](https://github.com/stanimirivanov/fleetiq-platform/blob/a40217ae14c467ec91de163e46ced68590731f6b/crates/server/src/runtime.rs#L52),

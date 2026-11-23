@@ -250,10 +250,18 @@
             "const": "registry.invalid/candidate/postgresql:18.4-system-trixie@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
           },
           "instances": { "const": 1 },
+          "storage": { "const": { "className": "local-retained", "size": "4Gi" } },
+          "database": { "const": "fleetiq" },
           "owner": {
             "const": {
               "role": "fleetiq_migrator",
               "passwordSecret": "offline-candidate-migration-owner"
+            }
+          },
+          "resources": {
+            "const": {
+              "requests": { "cpu": "200m", "memory": "256Mi" },
+              "limits": { "cpu": "1", "memory": "768Mi" }
             }
           }
         }
