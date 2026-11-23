@@ -11,14 +11,12 @@
     "storage",
     "database",
     "owner",
-    "runtime",
-    "resources",
-    "network"
+    "resources"
   ],
   "properties": {
     "profile": {
       "type": "string",
-      "enum": ["local", "nonlocal"]
+      "enum": ["local", "nonlocal", "minimal-demo-candidate"]
     },
     "clusterName": {
       "type": "string",
@@ -236,6 +234,34 @@
     }
   },
   "allOf": [
+    {
+      "if": {
+        "properties": {
+          "profile": { "const": "minimal-demo-candidate" }
+        }
+      },
+      "then": {
+        "not": {
+          "anyOf": [{ "required": ["runtime"] }, { "required": ["network"] }]
+        },
+        "properties": {
+          "clusterName": { "const": "fleetiq-db" },
+          "image": {
+            "const": "registry.invalid/candidate/postgresql:18.4-system-trixie@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "instances": { "const": 1 },
+          "owner": {
+            "const": {
+              "role": "fleetiq_migrator",
+              "passwordSecret": "offline-candidate-migration-owner"
+            }
+          }
+        }
+      },
+      "else": {
+        "required": ["runtime", "network"]
+      }
+    },
     {
       "if": {
         "properties": {

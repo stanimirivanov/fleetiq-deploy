@@ -25,3 +25,6 @@ Upstream references: [Helm chart/schema validation](https://helm.sh/docs/topics/
 [CRD schema catalogue](https://github.com/datreeio/CRDs-catalog),
 [CNPG bootstrap](https://cloudnative-pg.io/docs/devel/bootstrap/), and
 [Gateway TLS](https://gateway-api.sigs.k8s.io/guides/user-guides/tls/).
+
+The [minimal-demo data candidate](../../docs/operations/minimal-demo-data.md)
+includes a native Cluster render and source-pinned pool budget in the offline checks.
