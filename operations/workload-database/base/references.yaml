@@ -1,0 +1,17 @@
+nameReference:
+  - kind: ConfigMap
+    version: v1
+    fieldSpecs:
+      - group: argoproj.io
+        kind: WorkflowTemplate
+        path: spec/volumes/configMap/name
+      - group: argoproj.io
+        kind: WorkflowTemplate
+        path: spec/templates/container/envFrom/configMapRef/name
+      - group: argoproj.io
+        kind: WorkflowTemplate
+        path: spec/templates/container/env/valueFrom/configMapKeyRef/name
+images:
+  - group: argoproj.io
+    kind: WorkflowTemplate
+    path: spec/templates/container/image

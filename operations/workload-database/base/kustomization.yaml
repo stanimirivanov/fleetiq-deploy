@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - workflow.yaml
+generatorOptions:
+  immutable: true
+configMapGenerator:
+  - name: workload-database-sql
+    files:
+      - sql/context.sql
+      - sql/fence.sql
+      - sql/grant.sql
+      - sql/policy.sql
+      - sql/verification.sql
+      - sql/verify.sql
+configurations:
+  - references.yaml

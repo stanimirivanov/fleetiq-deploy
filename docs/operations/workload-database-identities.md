@@ -44,30 +44,36 @@ testing authentication. Ordinary chart values keep the existing single-role
 path. This workflow targets PostgreSQL 18, the `fleetiq` application database,
 and CNPG 1.30.1 with the dedicated `cnpg_metrics_exporter` role.
 
-Select the backend image by digest. Obtain `runtime-grants.sql` from the
-successful platform publication for that exact image and verify the enclosing
-artifact digest and its image publication record before opening it with psql.
-The file defines session-local functions for the image's migration inventory
-and command privileges. Deployment supplies the operator-specific role names,
-maintenance fence, exporter grant, and credential retirement checks.
+Select the published backend image by digest and its verified migration
+inventory through the existing release review. The deployment-owned SQL is
+under `operations/workload-database/base/sql/`. Qualify its reviewed Git
+revision and the exact backend digest together.
 
 ## Retained installation upgrade
 
 ### Prepare the reviewed release
 
-The release preparer renders an immutable SQL ConfigMap and versioned
-WorkflowTemplate with `tools/releases/workload-database-workflow.mjs`. Inputs
-come from the reviewed release selection and the verified producer SQL artifact.
-The selection records the release digest, backend and PostgreSQL client image
-digests, SQL SHA-256, workflow namespace, read/write service DNS name, live
-database OID, owner and legacy names, selected workloads, and the names of the
-migration password Secret and database CA ConfigMap. Review the rendered
-objects with the phase manifests. The workflow controller owner registers the
-versioned template name with its existing namespace admission. Stage the
-workflow and immutable SQL ConfigMap under the approved template authority.
+Copy `operations/workload-database/` from the reviewed deployment revision
+into release staging. Replace the synthetic inputs in its `example/` overlay
+with the reviewed backend and PostgreSQL client digests, verified
+`inventory.json`, and a `reviewed-upgrade.env` containing the CNPG read/write
+service DNS, live database OID, migration owner, legacy role, selected workload
+commands, and release digest. Use the release digest as the basis for a unique
+`nameSuffix`. The release request digest binds the backend digest, deployment
+SQL revision and these reviewed selections. Keep the rendered manifest and
+the overlay with the release evidence.
 
-The credential operator stages the named password Secret with key `password`
-and the public CA ConfigMap with key `ca.crt` in the workflow namespace. The
+```bash
+kustomize build operations/workload-database/example
+```
+
+This renders two immutable, content-named ConfigMaps and a versioned
+WorkflowTemplate. The workflow controller owner registers that template name
+with its existing namespace admission. Stage the three resources under the
+approved template authority.
+
+The credential operator stages `workload-database-owner` with key `password`
+and `workload-database-ca` with key `ca.crt` in the workflow namespace. The
 migration connection and psql operations use the same selected
 username, service and verified CA. Give the workflow namespace only the
 database route approved for this operation. The provider's existing
