@@ -1,12 +1,8 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   bootstrap,
-  commands,
-  contractDigest,
   databaseIdentities,
   databaseRole,
   runtimeCommands,
@@ -14,89 +10,9 @@ import {
 
 const databaseName = 'fleetiq';
 const exporter = 'cnpg_metrics_exporter';
-const inventory = readFileSync(
-  new URL('../../contracts/postgresql/migrations.v1.json', import.meta.url),
-);
-assert.equal(
-  contractDigest,
-  'd84aac89be4cc42f185c441355cfb3a504dc77e6eeb43086751161b4e3b21821',
-);
-assert.equal(
-  createHash('sha256').update(inventory).digest('hex'),
-  '67772e214e26fdc892b65b1636acd721d14ca1291bb49f1c209c9ffba8f64927',
-);
-const { migrations } = JSON.parse(inventory);
-
-const identifier = '[a-z_][a-z_0-9]*';
-const relation = `${identifier}\\.${identifier}`;
-const identifierPattern = new RegExp(`^${identifier}$`, 'u');
-const relationPattern = new RegExp(`^${relation}$`, 'u');
-const routinePattern = new RegExp(`^${relation}\\((?:[a-z]+(?:,[a-z]+)*)?\\)$`, 'u');
-
-function names(items, pattern) {
-  return items
-    .map((item) => {
-      assert.match(item, pattern);
-      return item;
-    })
-    .join(', ');
-}
-
-export function ledgerCheck({ prefix = false } = {}) {
-  const expected = migrations
-    .map(({ version, checksum }) => `(${version}, '${checksum}')`)
-    .join(',');
-  return `
-DO $$ BEGIN
-  IF current_database() <> '${databaseName}'
-      OR current_setting('server_version_num')::integer / 10000 <> 18
-      OR pg_is_in_recovery() THEN
-    RAISE EXCEPTION 'Expected the PostgreSQL 18 FleetIQ primary';
-  END IF;
-  IF to_regclass('public._sqlx_migrations') IS NULL THEN
-    ${prefix ? 'RETURN;' : "RAISE EXCEPTION 'FleetIQ migration ledger missing';"}
-  END IF;
-  IF EXISTS (
-    SELECT 1 FROM public._sqlx_migrations a
-    LEFT JOIN (VALUES ${expected}) e(version, checksum) USING (version)
-    WHERE a.success IS DISTINCT FROM true OR encode(a.checksum, 'hex') IS DISTINCT FROM e.checksum
-  ) OR EXISTS (
-    SELECT 1 FROM (VALUES ${expected}) e(version, checksum)
-    WHERE ${prefix ? 'e.version <= (SELECT max(version) FROM public._sqlx_migrations) AND' : ''}
-          NOT EXISTS (SELECT FROM public._sqlx_migrations a WHERE a.version = e.version)
-  ) THEN
-    RAISE EXCEPTION 'FleetIQ migration ledger differs';
-  END IF;
-END $$;`;
-}
-
-const productSchemas = 'analytics, history, identity, ingestion, metadata, projection';
+const identifierPattern = /^[a-z_][a-z_0-9]{0,62}$/u;
 const configure = `SET LOCAL statement_timeout = '8s'; SET LOCAL lock_timeout = '2s';
 SET LOCAL search_path = pg_catalog, public;`;
-
-function privileges(command, grants) {
-  const role = databaseRole(command);
-  const acl = [
-    `GRANT CONNECT ON DATABASE ${databaseName} TO ${role};`,
-    `GRANT USAGE ON SCHEMA ${names(grants.schemas, identifierPattern)} TO ${role};`,
-    `GRANT SELECT ON TABLE public._sqlx_migrations TO ${role};`,
-  ];
-  for (const action of ['select', 'insert', 'update', 'delete']) {
-    if (grants[action]?.length)
-      acl.push(
-        `GRANT ${action.toUpperCase()} ON TABLE ${names(grants[action], relationPattern)} TO ${role};`,
-      );
-  }
-  for (const [table, columns] of Object.entries(grants.updateColumns ?? {}))
-    acl.push(
-      `GRANT UPDATE (${names(columns, identifierPattern)}) ON TABLE ${names([table], relationPattern)} TO ${role};`,
-    );
-  if (grants.execute?.length)
-    acl.push(
-      `GRANT EXECUTE ON FUNCTION ${names(grants.execute, routinePattern)} TO ${role};`,
-    );
-  return acl.join('\n');
-}
 
 function ownerAndDrain(owner) {
   return `
@@ -138,19 +54,24 @@ export function databaseSql(operation, workloads, { owner, legacy }) {
     roles.length + 4,
     'Database identities must differ',
   );
-  const inputs = {
-    commands: Object.fromEntries(
-      [...workloads, bootstrap].map((command) => [command, commands[command]]),
-    ),
-  };
-  const requiredRoles = requireScopedRoles(Object.keys(inputs.commands));
+  const selected = [...workloads, bootstrap].map(databaseRole);
+  const selectedRoles = `ARRAY[${selected.map((name) => `'${name}'`).join(', ')}]::name[]`;
+  const requiredRoles = requireScopedRoles(selected);
+  const checkGrants = `SELECT pg_temp.fleetiq_verify_runtime_grants(${selectedRoles});
+DO $$ BEGIN
+${requiredRoles}
+  IF has_database_privilege('${legacy}', current_database(), 'CONNECT')
+      OR NOT has_database_privilege('${exporter}', current_database(), 'CONNECT') THEN
+    RAISE EXCEPTION 'Legacy or monitoring database admission differs';
+  END IF;
+END $$;`;
   if (operation === 'fence')
     return `
 BEGIN;
 ${configure}
 SELECT pg_advisory_xact_lock(120, 1);
 ${ownerAndDrain(owner)}
-${ledgerCheck({ prefix: true })}
+SELECT pg_temp.fleetiq_check_ledger(true);
 DO $$ BEGIN
 ${requiredRoles}
 END $$;
@@ -170,7 +91,7 @@ COMMIT;`;
   if (operation === 'inspect')
     return `BEGIN TRANSACTION READ ONLY;
 ${configure}
-${ledgerCheck({ prefix: true })}
+SELECT pg_temp.fleetiq_check_ledger(true);
 DO $$ DECLARE head bigint;
 BEGIN
   IF to_regclass('public._sqlx_migrations') IS NOT NULL THEN
@@ -201,8 +122,8 @@ COMMIT;`;
     return `
 BEGIN TRANSACTION READ ONLY;
 ${configure}
-${ledgerCheck()}
-${verifyPrivileges(inputs, legacy)}
+SELECT pg_temp.fleetiq_check_ledger(false);
+${checkGrants}
 COMMIT;`;
   assert.equal(
     operation,
@@ -215,32 +136,23 @@ ${configure}
 SELECT pg_advisory_xact_lock(120, 1);
 ${ownerAndDrain(owner)}
 ${fenceCheck(owner)}
-${ledgerCheck()}
+SELECT pg_temp.fleetiq_check_ledger(false);
 DO $$ BEGIN
 ${requiredRoles}
 END $$;
-REVOKE CREATE ON SCHEMA public FROM PUBLIC;
-REVOKE EXECUTE ON ALL ROUTINES IN SCHEMA ${productSchemas} FROM PUBLIC;
-ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
-${Object.entries(inputs.commands)
-  .map(([command, grants]) => privileges(command, grants))
-  .join('\n')}
-${verifyPrivileges(inputs, legacy)}
+SELECT pg_temp.fleetiq_apply_runtime_grants(${selectedRoles});
+${checkGrants}
 ${ownerAndDrain(owner)}
 COMMIT;`;
 }
 
-function roleValues(commands) {
-  return commands.map((command) => `'${databaseRole(command)}'`).join(', ');
-}
-
-function requireScopedRoles(commands) {
-  const roles = roleValues(commands);
+function requireScopedRoles(names) {
+  const roles = names.map((name) => `'${name}'`).join(', ');
   return `
   IF EXISTS (
     SELECT 1 FROM pg_roles
     WHERE rolname IN (${roles}) AND (rolsuper OR rolinherit OR rolcreaterole OR rolcreatedb OR rolreplication OR rolbypassrls)
-  ) OR (SELECT count(*) FROM pg_roles WHERE rolname IN (${roles})) <> ${commands.length}
+  ) OR (SELECT count(*) FROM pg_roles WHERE rolname IN (${roles})) <> ${names.length}
     OR EXISTS (
       SELECT 1 FROM pg_auth_members m JOIN pg_roles r ON r.oid IN (m.member, m.roleid)
       WHERE r.rolname IN (${roles})
@@ -251,87 +163,6 @@ function requireScopedRoles(commands) {
     )
   THEN RAISE EXCEPTION 'Scoped identities, memberships or ownership differ';
   END IF;`;
-}
-
-function expectedPrivileges(contract) {
-  const values = [];
-  for (const [command, grants] of Object.entries(contract.commands)) {
-    const role = databaseRole(command);
-    const add = (type, object, privilege) =>
-      values.push(`('${role}', '${type}', '${object}', '${privilege}', false)`);
-    add('database', databaseName, 'CONNECT');
-    add('relation', 'public._sqlx_migrations', 'SELECT');
-    for (const schema of grants.schemas) add('schema', schema, 'USAGE');
-    for (const privilege of ['select', 'insert', 'update', 'delete'])
-      for (const name of grants[privilege] ?? [])
-        add('relation', name, privilege.toUpperCase());
-    for (const [table, columns] of Object.entries(grants.updateColumns ?? {}))
-      for (const column of columns) add('column', `${table}.${column}`, 'UPDATE');
-    for (const routine of grants.execute ?? []) add('function', routine, 'EXECUTE');
-  }
-  values.push("('PUBLIC', 'schema', 'public', 'USAGE', false)");
-  return values.join(',\n');
-}
-
-function verifyPrivileges(inputs, legacy) {
-  const selected = Object.keys(inputs.commands);
-  const roles = roleValues(selected);
-  const schemas =
-    "'analytics', 'history', 'identity', 'ingestion', 'metadata', 'projection', 'public'";
-  return `
-DO $$ BEGIN
-${requireScopedRoles(selected)}
-  IF EXISTS (
-    SELECT FROM pg_roles r
-     WHERE r.rolname IN (${roleValues(runtimeCommands)}) AND r.rolname NOT IN (${roles})
-       AND (r.rolcanlogin OR has_database_privilege(r.oid, current_database(), 'CONNECT')
-         OR EXISTS (SELECT FROM pg_auth_members m WHERE m.roleid = r.oid))
-  ) THEN RAISE EXCEPTION 'An unselected database identity still has authority'; END IF;
-  IF has_database_privilege('${legacy}', current_database(), 'CONNECT')
-      OR NOT has_database_privilege('${exporter}', current_database(), 'CONNECT') THEN
-    RAISE EXCEPTION 'Legacy or monitoring database admission differs';
-  END IF;
-  IF EXISTS (
-    SELECT FROM pg_namespace n CROSS JOIN pg_roles r
-    WHERE n.nspname NOT IN (${schemas}, 'information_schema')
-      AND left(n.nspname, 3) <> 'pg_'
-      AND r.rolname IN (${roles})
-      AND (has_schema_privilege(r.oid, n.oid, 'USAGE')
-        OR has_schema_privilege(r.oid, n.oid, 'CREATE'))
-  ) THEN RAISE EXCEPTION 'Unintended access to an additional user schema'; END IF;
-  IF EXISTS (
-    WITH acl(kind, object, grantee, privilege, grantable) AS (
-      SELECT 'database', d.datname::text, x.grantee, x.privilege_type, x.is_grantable
-        FROM pg_database d, LATERAL aclexplode(coalesce(d.datacl, acldefault('d', d.datdba))) x
-       WHERE d.datname = current_database()
-      UNION ALL
-      SELECT 'schema', n.nspname, x.grantee, x.privilege_type, x.is_grantable
-        FROM pg_namespace n, LATERAL aclexplode(coalesce(n.nspacl, acldefault('n', n.nspowner))) x
-       WHERE n.nspname IN (${schemas})
-      UNION ALL
-      SELECT 'relation', n.nspname || '.' || c.relname, x.grantee, x.privilege_type, x.is_grantable
-        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace,
-             LATERAL aclexplode(c.relacl) x WHERE n.nspname IN (${schemas})
-      UNION ALL
-      SELECT 'column', n.nspname || '.' || c.relname || '.' || a.attname, x.grantee, x.privilege_type, x.is_grantable
-        FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid JOIN pg_namespace n ON n.oid = c.relnamespace,
-             LATERAL aclexplode(a.attacl) x WHERE n.nspname IN (${schemas})
-      UNION ALL
-      SELECT 'function', n.nspname || '.' || p.proname || '(' || replace(oidvectortypes(p.proargtypes), ', ', ',') || ')',
-             x.grantee, x.privilege_type, x.is_grantable
-        FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace,
-             LATERAL aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) x
-       WHERE n.nspname IN (${schemas})
-    ), observed AS (
-      SELECT coalesce(r.rolname::text, 'PUBLIC'), a.kind, a.object, a.privilege, a.grantable
-        FROM acl a LEFT JOIN pg_roles r ON a.grantee = r.oid
-       WHERE a.grantee = 0 OR r.rolname IN (${roles})
-    ), expected AS (VALUES ${expectedPrivileges(inputs)})
-    (SELECT * FROM expected EXCEPT SELECT * FROM observed)
-      UNION ALL
-    (SELECT * FROM observed EXCEPT SELECT * FROM expected)
-  ) THEN RAISE EXCEPTION 'FleetIQ object grants differ from the producer contract'; END IF;
-END $$;`;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

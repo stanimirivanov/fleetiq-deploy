@@ -104,6 +104,14 @@
       "sha256": "b58695a447c9be7cc5e49faeba0280ec13a34a7b067ce26ed9f8d616717df960"
     },
     {
+      "kind": "DatabaseRole",
+      "apiVersion": "postgresql.cnpg.io/v1",
+      "file": "databaserole_v1.json",
+      "url": "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v1.30.1/config/crd/bases/postgresql.cnpg.io_databaseroles.yaml",
+      "crdSha256": "d12999000af48ac2f7725bfd45136232edc03ea39aad8476710ae51fa860280a",
+      "sha256": "16093b8f0ad59d08fb562369fe7f9897d9c9558a79d49f0420155451d3326ee1"
+    },
+    {
       "kind": "Gateway",
       "apiVersion": "gateway.networking.k8s.io/v1",
       "file": "gateway_v1.json",

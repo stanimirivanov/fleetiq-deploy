@@ -33,13 +33,14 @@ export function checkWorkloadDatabase(tools) {
     { workloads: runtimeCommands, retireLegacy: true },
     true,
   );
-  const cluster = resources.find(({ kind }) => kind === 'Cluster');
-  cluster.spec.managed.roles.find(
-    ({ name }) => name === 'fleetiq_replay_worker',
-  ).createdb = true;
+  const replay = resources.find(
+    ({ kind, spec }) =>
+      kind === 'DatabaseRole' && spec.name === 'fleetiq_replay_worker',
+  );
+  replay.spec.createdb = true;
   assert.throws(
     () => manifestPolicy(resources, context),
-    /fleetiq_replay_worker: createdb/u,
+    /DatabaseRole fleetiq_replay_worker/u,
   );
   assert.throws(() => render({ workloads }, true), /helm (?:lint|template)/u);
   assert.throws(

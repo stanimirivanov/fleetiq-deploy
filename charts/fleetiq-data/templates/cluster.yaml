@@ -53,31 +53,7 @@ spec:
       {{- $roles := dict }}
       {{- $_ := set $roles .Values.owner.role (dict "login" (default false $scoped.migrationLogin) "secret" .Values.owner.passwordSecret) }}
       {{- $_ := set $roles .Values.runtime.role (dict "login" (not $scoped.retireLegacy) "secret" .Values.runtime.passwordSecret) }}
-      {{- $bootstrap := "fleetiq_bootstrap_platform_operator" }}
-      {{- if hasKey $roles $bootstrap }}
-      {{- fail "Bootstrap role collides with an existing role" }}
-      {{- end }}
-      {{- $_ := set $roles $bootstrap (dict "login" (default false $scoped.bootstrapLogin) "secret" "fleetiq-db-bootstrap-platform-operator") }}
-      {{- $known := list "serve --check-schema" "ingest-tcp" "replay-worker" "semantic-worker" "project-current" "analytics-worker" "notification-worker" "archive-worker" }}
-      {{- range $command := $scoped.workloads }}
-      {{- if not (has $command $known) }}
-      {{- fail "Unknown scoped runtime workload" }}
-      {{- end }}
-      {{- end }}
-      {{- range $command := $known }}
-      {{- $suffix := first (splitList " " $command) }}
-      {{- $name := printf "fleetiq_%s" (replace "-" "_" $suffix) }}
-      {{- if hasKey $roles $name }}
-      {{- fail "A workload role collides with an existing role" }}
-      {{- end }}
-      {{- $_ := set $roles $name (dict "login" (has $command $scoped.workloads) "secret" (printf "fleetiq-db-%s" $suffix)) }}
-      {{- end }}
-      {{- $secrets := dict }}
       {{- range $name, $role := $roles }}
-      {{- if hasKey $secrets $role.secret }}
-      {{- fail "Managed database password Secret names must be distinct" }}
-      {{- end }}
-      {{- $_ := set $secrets $role.secret true }}
       - name: {{ $name | quote }}
         ensure: present
         login: {{ $role.login }}

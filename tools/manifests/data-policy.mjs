@@ -8,7 +8,7 @@ import {
 } from './workload-database.mjs';
 
 function scopedRoles(initdb, selection) {
-  const { workloads, migrationLogin, bootstrapLogin, retireLegacy } = selection;
+  const { migrationLogin, retireLegacy } = selection;
   const role = (name, secret, login) => [
     name,
     login
@@ -20,15 +20,26 @@ function scopedRoles(initdb, selection) {
     secret: 'fleet-database-runtime',
   };
   return Object.fromEntries([
-    role(initdb.owner, initdb.secret.name, migrationLogin),
+    role(initdb.owner, initdb.secret.name, Boolean(migrationLogin)),
     role(legacy.name, legacy.secret, !retireLegacy),
+  ]);
+}
+
+function workloadRoles(selection) {
+  const role = (name, secret, login) => [
+    name,
+    login
+      ? { login: true, passwordSecret: { name: secret } }
+      : { login: false, disablePassword: true },
+  ];
+  return Object.fromEntries([
     role(
       databaseRole(bootstrap),
       'fleetiq-db-bootstrap-platform-operator',
-      bootstrapLogin,
+      Boolean(selection.bootstrapLogin),
     ),
     ...databaseIdentities(runtimeCommands).map(({ name, passwordSecret, command }) =>
-      role(name, passwordSecret, workloads.includes(command)),
+      role(name, passwordSecret, selection.workloads.includes(command)),
     ),
   ]);
 }
@@ -122,4 +133,40 @@ export function dataPolicy(
     !spec.externalClusters && !spec.backup,
     'Recovery/backup acceptance belongs to D07',
   );
+}
+
+/** Validate the native CNPG objects and remove them from the ordinary resource inventory. */
+export function checkDatabaseRoles(resources, selection) {
+  if (!selection) return resources;
+  const cluster = resources.find(({ kind }) => kind === 'Cluster');
+  const roles = resources.filter(({ kind }) => kind === 'DatabaseRole');
+  const expected = Object.entries(workloadRoles(selection));
+  assert.equal(roles.length, expected.length);
+  for (const [name, auth] of expected) {
+    const role = roles.find(({ spec }) => spec.name === name);
+    assert.deepEqual(
+      role,
+      {
+        apiVersion: 'postgresql.cnpg.io/v1',
+        kind: 'DatabaseRole',
+        metadata: {
+          namespace: cluster.metadata.namespace,
+          name: `${cluster.metadata.name}-${name.replaceAll('_', '-')}`,
+          annotations: {
+            'helm.sh/resource-policy': 'keep',
+            'argocd.argoproj.io/sync-options': 'Prune=false,Delete=false',
+          },
+        },
+        spec: {
+          cluster: { name: cluster.metadata.name },
+          name,
+          databaseRoleReclaimPolicy: 'retain',
+          inherit: false,
+          ...auth,
+        },
+      },
+      `Invalid DatabaseRole ${name}`,
+    );
+  }
+  return resources.filter(({ kind }) => kind !== 'DatabaseRole');
 }

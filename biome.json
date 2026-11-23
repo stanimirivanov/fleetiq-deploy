@@ -7,12 +7,6 @@
     "indentStyle": "space",
     "lineWidth": 88
   },
-  "overrides": [
-    {
-      "includes": ["contracts/postgresql/runtime-grants.v1.json"],
-      "json": { "formatter": { "expand": "always" } }
-    }
-  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "single"

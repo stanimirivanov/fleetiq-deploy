@@ -1,20 +1,18 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const contractUrl = new URL(
-  '../../contracts/postgresql/runtime-grants.v1.json',
-  import.meta.url,
-);
-const contractBytes = readFileSync(contractUrl);
-export const contractDigest = createHash('sha256').update(contractBytes).digest('hex');
-export const { commands } = JSON.parse(contractBytes);
 export const bootstrap = 'bootstrap-platform-operator --check-schema';
-export const runtimeCommands = Object.keys(commands).filter(
-  (command) => command !== bootstrap,
-);
+export const runtimeCommands = [
+  'serve --check-schema',
+  'ingest-tcp',
+  'replay-worker',
+  'semantic-worker',
+  'project-current',
+  'analytics-worker',
+  'notification-worker',
+  'archive-worker',
+];
 
 export function databaseRole(command) {
   return `fleetiq_${command.split(' ')[0].replaceAll('-', '_')}`;
@@ -48,26 +46,11 @@ export function workloadDatabaseEnv(workloads, command) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const identities = databaseIdentities(process.argv.slice(2));
-  const managedRoles = identities.map(({ name, passwordSecret }) => ({
-    name,
-    ensure: 'present',
-    login: true,
-    inherit: false,
-    superuser: false,
-    createdb: false,
-    createrole: false,
-    replication: false,
-    bypassrls: false,
-    inRoles: [],
-    passwordSecret: { name: passwordSecret },
-  }));
   console.log(
     JSON.stringify(
       {
-        contractDigest,
         workloadDatabase: { workloads: identities.map(({ command }) => command) },
         identities,
-        managedRoles,
       },
       null,
       2,

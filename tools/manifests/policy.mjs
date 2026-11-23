@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { analyticsPolicy } from './analytics-policy.mjs';
 import { budgetPolicy } from './budget-policy.mjs';
-import { dataPolicy } from './data-policy.mjs';
+import { checkDatabaseRoles, dataPolicy } from './data-policy.mjs';
 import { networkPolicy } from './network-policy.mjs';
 import { workloadPolicy } from './workload-policy.mjs';
 
@@ -40,6 +40,7 @@ export function manifestPolicy(
   resources,
   context = { maintenance: false, nonlocal: false },
 ) {
+  resources = checkDatabaseRoles(resources, context.workloadDatabase);
   if (context.analytics) resources = analyticsPolicy(resources, context);
   // Trusted selection inputs, never expectations inferred from rendered workloads.
   const applicationNamespace = context.applicationNamespace ?? 'fleetiq-local';

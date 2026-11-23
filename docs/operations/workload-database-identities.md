@@ -30,22 +30,27 @@ selects the per-command URL for the API and any packaged analytics workers.
 TCP ingestion and replay packaging consumes the corresponding references in
 [#97](https://github.com/stanimirivanov/fleetiq-deploy/issues/97).
 
-The data chart reconciles the selected logins under CNPG. Unselected roles have
-`NOLOGIN` and no password. For a selection change, repeat the maintenance
-cutover with the desired set. The fence removes admission for previously selected
-roles and verification rejects any unselected role that can still log in,
-connect or be assumed by another role. Ordinary values without
-`workloadDatabase` keep the existing single-role path. The data chart still
-uses its declared initdb owner and accepts the existing legacy role names.
-Run the installation with PostgreSQL 18 and a CNPG release with the dedicated
-`cnpg_metrics_exporter` role. The retained database is named `fleetiq`.
+CloudNativePG reconciles the workload and bootstrap logins through standalone
+`DatabaseRole` resources. The Cluster continues to manage the migration owner
+and the legacy login. Unselected roles have `NOLOGIN` and no password. Converge
+those declarations before running the cutover. For deselection, keep the role
+manifest and disable its login. The retain policy preserves the PostgreSQL role
+if its Kubernetes object is accidentally removed.
 
-The reviewed producer revision is
-`c0d71a56dad0596d3c6a6b866e4338d25b597af2`. Use published backend digest
-`sha256:628ad77776211aab854e179feaceb700257c64c1286f9129807c308efc3901a1`.
-The SQL renderer checks the SHA-256 of both published contracts under
-`contracts/postgresql`. Updating one requires reconciling both against the
-new image and requalifying command operations and trigger handoffs.
+The current protected local Argo data project permits Cluster resources and
+network policies. Stage the new `DatabaseRole` objects through the separately
+authorized data operator. Keep that opt-in authority outside the ordinary Argo
+project. Verify the operator's `DatabaseRole` reconciliation status before
+testing authentication. Ordinary chart values keep the existing single-role
+path. This workflow targets PostgreSQL 18, the `fleetiq` application database,
+and CNPG 1.30.1 with the dedicated `cnpg_metrics_exporter` role.
+
+Select the backend image by digest. Obtain `runtime-grants.sql` from the
+successful platform publication for that exact image and verify the enclosing
+artifact digest and its image publication record before opening it with psql.
+The file defines session-local functions for the image's migration inventory
+and command privileges. Deployment supplies the operator-specific role names,
+maintenance fence, exporter grant, and credential retirement checks.
 
 ## Cutover
 
@@ -103,10 +108,12 @@ local peer access. SQL contains role names and public ledger identities.
 ```bash
 node tools/manifests/workload-database-sql.mjs inspect fleetiq_migrator fleetiq_runtime \
   'serve --check-schema' ingest-tcp replay-worker > inspected-ledger.sql
-psql -X --no-password --set=ON_ERROR_STOP=1 --file=inspected-ledger.sql
+psql -X --no-password --set=ON_ERROR_STOP=1 \
+  --file="$VERIFIED_RUNTIME_GRANTS_SQL" --file=inspected-ledger.sql
 ```
 
-Use the same invocation with `fence`, `grant` or `verify` as appropriate.
+Use both files in that order and in the same psql session for `fence`, `grant`
+and `verify`. Credential withdrawal checks only need the rendered operation.
 Use `withdrawn` and then `retired` through the operator's administrative
 connection to the primary. These checks validate password absence without
 returning passwords or role verifiers.

@@ -11,6 +11,7 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
+import { parse } from 'yaml';
 import { run } from '../process.mjs';
 import {
   cacheDirectory,
@@ -72,7 +73,18 @@ try {
   plainDirectory(schemas);
   for (const schema of toolsLock.schemas) {
     const pending = join(schemas, `${schema.file}.pending`);
-    await writeFile(pending, await download(schema.url, schema.sha256), { flag: 'wx' });
+    const source = await download(schema.url, schema.crdSha256 ?? schema.sha256);
+    const bytes = schema.crdSha256
+      ? Buffer.from(
+          JSON.stringify(
+            parse(source.toString('utf8')).spec.versions.find(
+              ({ name }) => name === 'v1',
+            ).schema.openAPIV3Schema,
+          ),
+        )
+      : source;
+    assert.equal(sha256(bytes), schema.sha256);
+    await writeFile(pending, bytes, { flag: 'wx' });
     await rename(pending, join(schemas, schema.file));
   }
   manifestTools();
