@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { qualifiedEdge } from '../qualified-edge.mjs';
 import { digestImage, resources } from './resource-policy.mjs';
+import { workloadDatabaseEnv } from './workload-database.mjs';
 
 const secretReference = (entry) => {
   assert(
@@ -18,7 +19,7 @@ const secretReference = (entry) => {
 /** Check application restrictions and producer interfaces rather than YAML text. */
 export function workloadPolicy(
   resource,
-  { maintenance, nonlocal, providerLocal = false, oidcIssuer },
+  { maintenance, nonlocal, providerLocal = false, oidcIssuer, workloadDatabase },
 ) {
   assert.deepEqual(
     resource.spec.strategy,
@@ -109,6 +110,12 @@ export function workloadPolicy(
       providerLocal ? 'https://fleet.local.test:18443' : 'https://fleet.local.test',
     );
     secretReference(env.DATABASE_URL);
+    if (workloadDatabase)
+      assert.deepEqual(
+        env.DATABASE_URL,
+        workloadDatabaseEnv(workloadDatabase.workloads, 'serve --check-schema'),
+      );
+
     secretReference(env.FLEETIQ_OIDC_CLIENT_SECRET);
     assert.equal(
       env.FLEETIQ_OIDC_ISSUER.value,

@@ -77,7 +77,7 @@ spec:
           env:
             - name: DATABASE_URL
               valueFrom:
-                secretKeyRef: {{ toJson $.Values.backend.databaseSecret }}
+                secretKeyRef: {{ include "fleetiq.databaseSecret" (dict "values" $.Values "command" $component) }}
             {{- if eq $component "notification-worker" }}
             - { name: FLEETIQ_ALERTMANAGER_URL, value: {{ printf "http://%s-alertmanager:9093/api/v2/alerts" $.Release.Name | quote }} }
             {{- end }}

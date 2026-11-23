@@ -15,3 +15,11 @@ test('a three-workload installation requires only its selected credentials', () 
   assert.equal(new Set(identities.map(({ urlSecret }) => urlSecret)).size, 3);
   assert.throws(() => databaseIdentities(['migrate']));
 });
+
+test('rejects duplicate and installation-only workload selections', () => {
+  assert.throws(() => databaseIdentities(['ingest-tcp', 'ingest-tcp']), /Duplicate/);
+  assert.throws(() =>
+    databaseIdentities(['bootstrap-platform-operator --check-schema']),
+  );
+  assert.throws(() => databaseIdentities([]));
+});

@@ -1,0 +1,301 @@
+{
+  "format": "fleetiq-migrations.v1",
+  "checksum_algorithm": "sha384",
+  "migrations": [
+    {
+      "version": "1",
+      "description": "metadata foundation",
+      "checksum": "1da27dd257f6b1e26eca83afdb4c48f0f3fbe62bddb04bb6829ffeaa9da3162befb0b6c36a4e0dd56aad70e8dd80c6f7"
+    },
+    {
+      "version": "2",
+      "description": "semantic definition persistence",
+      "checksum": "9bee56893284bad335eb83148549f61f2e9ee5cba92f9abfd9d65895952f452dc6ce4498f1dcc66ac9a63cc58523f78e"
+    },
+    {
+      "version": "3",
+      "description": "asset relationship persistence",
+      "checksum": "e283a467b127090d0111ffac46e83e8003620a4a2d3dde28c6475e5fafe1bf6c6bd1a2d55607f1b4f97a2d95f564c346"
+    },
+    {
+      "version": "4",
+      "description": "device endpoint persistence",
+      "checksum": "00cb6b57e57dfede8816d55b682dd4caeece3bd9e0fc4b88e10cb21cb131686ba322ca220d3ee7a22c8332a4b16db01c"
+    },
+    {
+      "version": "5",
+      "description": "signal binding persistence",
+      "checksum": "5dd07594a58f658a1665aa34d6849a9f7cf5931b36401f9296d25b38d3021cb1d846a4c4cc7e13afc5b691fd6f416716"
+    },
+    {
+      "version": "6",
+      "description": "accepted message log",
+      "checksum": "1ef2e3627298a3f50c5ad945dd10813b7b0b335d100719619e168fc0b76c4a7f3b1c6ea9b93d232a4e270e29f6a0f5c8"
+    },
+    {
+      "version": "7",
+      "description": "decoded observation log",
+      "checksum": "3d001431b8376ca589eed6e9b549b42ddf4dda874483517a51c2fd39c09b554f75158f83219b5274be02bcdc0e68fe87"
+    },
+    {
+      "version": "8",
+      "description": "protocol package catalog",
+      "checksum": "e5acbe0cb1ce10f27cd0530d41ea056d639ade2985869bc9d9e2de32d3de70cbd4eee6f6737d9c2e31ec124aa2528db5"
+    },
+    {
+      "version": "9",
+      "description": "identity and tenant authorization",
+      "checksum": "2643ee4729514cc5f58c676cb09a6c32287f6a5f1cb396d5e35e8a866e37e506d98b0a95f10c00ea72b71aec0a948659"
+    },
+    {
+      "version": "10",
+      "description": "tenant access change audit",
+      "checksum": "0e8b9d7f6779b728bcc09facc8c3adea90480aad5307fb73f4f6d938db88e6c49ba03970c513559f165e0b83a6e166ad"
+    },
+    {
+      "version": "11",
+      "description": "external actor identity mapping",
+      "checksum": "7140ed48ca47a9fcf7c2bbc94db2e38a6ce6f3d2fc4919f419f1bb54a6a9436ea2be0dbad022690c497caea43650a8a4"
+    },
+    {
+      "version": "12",
+      "description": "tenant access audit query",
+      "checksum": "4983d3df05b8cb731f5a87884b4b16380ff85ea11c569d9c4f4cbc26e397e05084baea4551acb2cc34ebe8a218e6de6e"
+    },
+    {
+      "version": "13",
+      "description": "platform authorization",
+      "checksum": "023ff0836828320b3b2688e01a110bf4bdeb7b18875660c55594fc47dce355b58d23f5973703711530b447e7ed96cde7"
+    },
+    {
+      "version": "14",
+      "description": "tenant provisioning",
+      "checksum": "410a236497f1cf4db070f748441081ec910c65d48c78b6f81a41623f8dff9201e04303b1a92ed74a3c69d76452279626"
+    },
+    {
+      "version": "15",
+      "description": "platform bootstrap",
+      "checksum": "d1fa091d224a12bed387c88b320495d52cad55ff11d2545635051a7a6a0ce02b3a287c6dbd9a8d6dc6a5461d4fbd55a3"
+    },
+    {
+      "version": "16",
+      "description": "actor provisioning",
+      "checksum": "0d478626ea70e31cd3088d9f909317e2dd255d3d960df0c3755dfc3fee3e79b6a506619b0da5045f16b470f920749344"
+    },
+    {
+      "version": "17",
+      "description": "platform access administration",
+      "checksum": "95858f8eda32b556590fca4a3180d0c3d5b84e81ddd6ca790c4fbc4bf1628c52f65a930459c400a9421ebf6d13e3aa57"
+    },
+    {
+      "version": "18",
+      "description": "platform access audit query",
+      "checksum": "8d0bb633920b3467b792e35481828b5b0ce957cf1e2182559c18380b47aadc308c02877789fcb04bb21294d52c61cbab"
+    },
+    {
+      "version": "19",
+      "description": "external identity administration",
+      "checksum": "ecc96fe5f96f1aa0e7266656f5c0ff0c083da0c09ab72a46a89f534d00cec3111b147b1a3d9d246042083533360d96c8"
+    },
+    {
+      "version": "20",
+      "description": "external identity audit query",
+      "checksum": "371d4e61ac8f44cf394f749c4b56187abd570a7f6dae721f23bd98e3970a80c866cf69d73e67b7fbbd0a92f16eda5bc7"
+    },
+    {
+      "version": "21",
+      "description": "actor lifecycle administration",
+      "checksum": "4e2fb2aaf7e5fda8bb9186e8e4b36c3da7f17e8572e2926e8a550c3e2b81f93894d59e62e3483fdeaf8412c6424c329b"
+    },
+    {
+      "version": "22",
+      "description": "actor lifecycle audit query",
+      "checksum": "e441674eb0e858b6d8efa78c6aee2521f3e72f2a53fb0c9a999d12e47efebaa6baf335e58e6b2d717d66ac54cc6cb37a"
+    },
+    {
+      "version": "23",
+      "description": "tenant lifecycle administration",
+      "checksum": "d8945f6726c0ae576f7898d52454e09143ef46b9d2535b8f9bc9743183cbd3a9db77c2d52c4edd703f86f887a8ec84f4"
+    },
+    {
+      "version": "24",
+      "description": "tenant lifecycle audit query",
+      "checksum": "0aff54e46a70034a3780e69c60a419878115532f0899d97197a875978771838c319bc730f342df7c7aea30330e2a7b3c"
+    },
+    {
+      "version": "25",
+      "description": "external identity catalog query",
+      "checksum": "cf3d4156eafa48818db32c587150702ad610cc7ecf583980f7c3a212f83e3c62eedb02de799f79768e860c3f7f4ad1d5"
+    },
+    {
+      "version": "26",
+      "description": "signal binding target snapshot index",
+      "checksum": "53b484f438ca7a6daa78b6d978106d27bed8dcc4dcbf72890a236ec5de38f1feab8e209c8de403a8dffd7e82695c4abe"
+    },
+    {
+      "version": "27",
+      "description": "semantic property history",
+      "checksum": "d01ff7bebb4553de1aa40dc403f5a97212ea5c2c6e32dedecf74d1d4726110fd7ce9ffd8e2cdcd184debe8202848989b"
+    },
+    {
+      "version": "28",
+      "description": "browser operator sessions",
+      "checksum": "314487e93895fa3d4deb42f87cd4160a39089805522bcccdf7bbfd5b596cd5f3f669070badf5fa30538161aa9d7ed8df"
+    },
+    {
+      "version": "29",
+      "description": "metadata registration records",
+      "checksum": "fae98e08f2a45b6b81c3e1f2fee95012e3e60f12b0b482b5e73b5ee8d3ff190da041db4b0caa324f31402e7a03b25392"
+    },
+    {
+      "version": "30",
+      "description": "metadata revision records",
+      "checksum": "a86a2e60e221ea944f5b19e0a93be717e832c40c8c1ebee9278f5e1275c7b852e502a57c60f59e8becc264d531ee7874"
+    },
+    {
+      "version": "31",
+      "description": "protocol artifacts and admission",
+      "checksum": "838e0b345ab497153cb07fa5d74403539386581b25c84929e381cafb5b647589cc3d6abc6735654375ace58ad4e6c8a5"
+    },
+    {
+      "version": "32",
+      "description": "protocol device routes",
+      "checksum": "b4d7d620ce804cfdcbf4b8b5272d582248a592c1afd13d388dc85011a1e5c73630d10dbedf1d1ab8a5e4ce4ad48afea0"
+    },
+    {
+      "version": "33",
+      "description": "durable protocol replay",
+      "checksum": "cb55d33ca87ab6ae89e8b9bfb88d4825ed7c4644fa10c2a6a07f14461bad061e01fe3e8c7b29dbe0f2d68bd5cf697051"
+    },
+    {
+      "version": "34",
+      "description": "ingestion diagnostics index",
+      "checksum": "4e871fec26ecc9a2a861b3b14caab632bb72060003f99ce127535b8531f6487885b67dc649f1f9ed8b3b2f523d574f52"
+    },
+    {
+      "version": "35",
+      "description": "durable semantic work",
+      "checksum": "931e28b59fe4f56333396ad18b0d5889b8c0a21d4a9398bc677d325180210978257dc43c0115f261b5046eacb92b01dd"
+    },
+    {
+      "version": "36",
+      "description": "property history queries",
+      "checksum": "047a361293b3e900359e4b71dba6cb28950284c5110c9972143e5d8897d88d8ecd82bed79e12838763b03e827b659006"
+    },
+    {
+      "version": "37",
+      "description": "current property projection",
+      "checksum": "a69de54edfc4cc08e16014fcb765e24e4557657b6457bc01c5e2203a12fe4dcc5074c98668b3417dad24066b2b0458c5"
+    },
+    {
+      "version": "38",
+      "description": "calculator definitions",
+      "checksum": "668436da3c5c448a63d10de163c00e6093edf089a5f401285f1bc5b430cc1c0af0d171a0151e60598ffb9cf968f71240"
+    },
+    {
+      "version": "39",
+      "description": "calculator evaluations",
+      "checksum": "778e9d336d3e0b4221740c3417ab04d17d4990e82e1542f640daf5aad4bf0a5a51dc53c719be26340977f12bbbe36212"
+    },
+    {
+      "version": "40",
+      "description": "calculator preparation",
+      "checksum": "3809d65b9c20c5a7aceced94dec0e5ab0ff7a36962ae9b55e7662d7b39dce033fa884dc3e4117e6808224313fd7caf68"
+    },
+    {
+      "version": "41",
+      "description": "calculator scheduling",
+      "checksum": "b554f7e2b338522d492aef05e99cc9b0b8b58eb0d9c8f932ec838cfe6c9bf907785f7734148928442675fcb772244999"
+    },
+    {
+      "version": "42",
+      "description": "mad calculator",
+      "checksum": "2c0a80edb783f36fcde1f06641e3e5e2fbd0d009f2d6e132b005826470bf88a223d54796454d7e8622d38d9545a214bc"
+    },
+    {
+      "version": "43",
+      "description": "calculator configuration",
+      "checksum": "20a0e58f35efb6bec8b870a29e90dc0bfd610ac115720978ccb4ab8ef053475c9a7518bdacff49be5d6eee802be523ac"
+    },
+    {
+      "version": "44",
+      "description": "calculator evidence reads",
+      "checksum": "7001ccc4c65d29016d2e95967fa7667821233fc370996f68872f3416bcd1237221a4589af2d63cc01c1efa0b007735e6"
+    },
+    {
+      "version": "45",
+      "description": "alert rule configuration",
+      "checksum": "8db6762f1178014fc3bfa219511c9f8ddf0e570df729d61e9d69e83d5ab28e968994031d117566a23080e4449ae4c536"
+    },
+    {
+      "version": "46",
+      "description": "alert lifecycle",
+      "checksum": "c44d64119d85c9273903d78a3b76eaf39a239b296f2217248588baeb1a83f6c52430ce389b4a06bdeea693973c4cf6eb"
+    },
+    {
+      "version": "47",
+      "description": "alert queue reads",
+      "checksum": "a867d273b65b52826d390267107b45abfb6fe76225dbe87a22438385fd06585750239d197656010b3c0dd5d77c5ceab9"
+    },
+    {
+      "version": "48",
+      "description": "alert acknowledgement",
+      "checksum": "28278303704873678cce12d7987503001db47b226acaf88368d2d8ed2bef0f206ed72d0a52896fbe54b0b1f03e604219"
+    },
+    {
+      "version": "49",
+      "description": "alert notification delivery",
+      "checksum": "74fbc144b5bd1f4b0b9b0fcefe15b9e991a83462d9436d31cddf5a8aea335c7668405be9a2bb835fb4f80d649074c94d"
+    },
+    {
+      "version": "50",
+      "description": "operational read",
+      "checksum": "f04abb13d44c88e2a3e8e6ae9647b7014e6e0ade61c0389cd832450b82371783542d80df5907483a44da680e7facc8ed"
+    },
+    {
+      "version": "51",
+      "description": "audited work recovery",
+      "checksum": "733acef3bd46c319cb50cc0751cd64978edcde08a05213c114d74bd93a021b1427c0810cfaf3cd009f8d930f4e7c0a4f"
+    },
+    {
+      "version": "52",
+      "description": "lifecycle policy",
+      "checksum": "f4f8bdb110d22ff6d35996f54cdb06d5c36d27f137e2c04002b1c41564f247a774d4d73f139afc3c81e68532e4560c9e"
+    },
+    {
+      "version": "53",
+      "description": "history work budgets",
+      "checksum": "eb6fdb5dd6a8a6d9c6a4d0d0d46b1476e7a158ac305f598c62d5c421812be7ba9e82c27381b7ecde79717674f9019a9a"
+    },
+    {
+      "version": "54",
+      "description": "archive manifests",
+      "checksum": "54f2d685e0c5588b112ef3c2f8ac385fa8364b562db39244b889402a07b14fbde623c88728ff868644625ede31d8dd15"
+    },
+    {
+      "version": "55",
+      "description": "archive restore",
+      "checksum": "66407a8c7a854dad927c837eb6682353ed678fa2401b6bb57bc62e6d394acf9d41062381f4f84ef0a3f40404e990b147"
+    },
+    {
+      "version": "56",
+      "description": "verified hot retention",
+      "checksum": "f0455eed8af8c4fef7a1523041750e270a455eb8c2b8e1910f3d35cff629dcc51e254310c2f47ec98e029f0382b8240a"
+    },
+    {
+      "version": "57",
+      "description": "numeric summaries",
+      "checksum": "8c689584bc334adb4d3f973747c047cc0536a9aace211691a753aa14fca07e1687873b8eec8ebdbfab14bbf7a6b7d49b"
+    },
+    {
+      "version": "58",
+      "description": "bounded historical exports",
+      "checksum": "86fde5e2f8352a8327fb36e04b5a9acf11f515addeb30f48a43839a094ee1d5a89593ce758337eda2b61f9ab494d1f42"
+    },
+    {
+      "version": "59",
+      "description": "runtime row lock privileges",
+      "checksum": "5a15322f1602ef8795034e781a638a33d96d855234757318f613c6d409ea3e86853ebf49cf081e78d6cf135c23135ae1"
+    }
+  ]
+}
