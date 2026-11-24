@@ -115,7 +115,7 @@ async function browserEvidence(page, expect, evaluation) {
   ).toBeVisible();
 }
 
-async function recover(page, expect, candidate) {
+export async function recover(page, expect, candidate) {
   await page.goto(
     'https://fleet.test:8443/operations?tenant=tenant-a&kind=notification',
   );
@@ -134,21 +134,22 @@ async function recover(page, expect, candidate) {
     page.getByRole('button', { name: 'Confirm retry' }).click(),
   ]);
   assert.equal(response.status(), 200);
-  const receipt = await response.json();
+  // The UI consumes the receipt. A document change can evict Chromium's copy.
+  const { pathname, search } = new URL(response.url());
+  const requestId = decodeURIComponent(pathname.slice(`${recovery}/commands/`.length));
+  assert(requestId.length > 0 && search === '');
   const body = { operation: 'retry', ...candidate };
   assert.deepEqual(response.request().postDataJSON(), body);
   const generation = String(BigInt(candidate.expected_generation) + 1n);
   await expect(
     page.getByText(new RegExp(`Recorded generation ${generation} by operator-a`, 'u')),
   ).toBeVisible();
-  assert.deepEqual(
-    await put(
-      page,
-      `${recovery}/commands/${encodeURIComponent(receipt.request_id)}`,
-      body,
-    ),
-    receipt,
-  );
+  // Reuse the browser's exact command identity and payload to read its stored receipt.
+  const receipt = await put(page, pathname, body, 200);
+  assert.equal(receipt.request_id, requestId);
+  assert.equal(receipt.generation, generation);
+  assert.equal(receipt.actor_id, 'operator-a');
+  assert.match(receipt.recorded_at_ms, /^-?(0|[1-9][0-9]*)$/u);
 }
 
 export async function qualifyAnalyticsAlerts({
