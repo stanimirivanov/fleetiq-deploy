@@ -3,6 +3,7 @@ import { isIP } from 'node:net';
 import { lock } from '../policy.mjs';
 import { budgetPolicy } from './budget-policy.mjs';
 import { resources as resourceLimits } from './resource-policy.mjs';
+import { workloadDatabaseEnv } from './workload-database.mjs';
 
 const components = ['analytics-worker', 'notification-worker', 'alertmanager'];
 const peer = (name) => ({
@@ -112,7 +113,9 @@ export function analyticsPolicy(items, context) {
         'No invented worker HTTP health',
       );
       assert.deepEqual(container.env, [
-        backend.containers[0].env.find((entry) => entry.name === 'DATABASE_URL'),
+        context.workloadDatabase
+          ? workloadDatabaseEnv(context.workloadDatabase.workloads, name)
+          : backend.containers[0].env.find((entry) => entry.name === 'DATABASE_URL'),
         ...(name === 'notification-worker'
           ? [
               {

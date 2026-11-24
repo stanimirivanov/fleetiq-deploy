@@ -19,3 +19,15 @@
 {{- end -}}
 {{- $port -}}
 {{- end -}}
+
+{{- define "fleetiq.databaseSecret" -}}
+{{- $settings := .values.backend.databaseSecret -}}
+{{- with .values.workloadDatabase -}}
+{{- if not (has $.command .workloads) -}}
+{{- fail (printf "Packaged workload %s needs a selected database identity" $.command) -}}
+{{- end -}}
+{{- $suffix := first (splitList " " $.command) -}}
+{{- $settings = dict "name" (printf "fleetiq-db-%s-url" $suffix) "key" "url" -}}
+{{- end -}}
+{{- toJson $settings -}}
+{{- end -}}

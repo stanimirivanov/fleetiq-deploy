@@ -20,6 +20,10 @@
 {{- if and (not $candidate) (eq .Values.owner.passwordSecret .Values.runtime.passwordSecret) }}
 {{- fail "Migration owner and runtime password Secrets must be distinct" }}
 {{- end }}
+{{- $scoped := .Values.workloadDatabase }}
+{{- if and $scoped (or (ne .Values.database "fleetiq") (and $scoped.migrationLogin $scoped.bootstrapLogin) (and (or $scoped.migrationLogin $scoped.bootstrapLogin) (not $scoped.maintenance))) }}
+{{- fail "Scoped database provisioning requires database fleetiq, exclusive temporary identities, and maintenance for migration login" }}
+{{- end }}
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -45,6 +49,28 @@ spec:
   {{- if not $candidate }}
   managed:
     roles:
+      {{- if $scoped }}
+      {{- $roles := dict }}
+      {{- $_ := set $roles .Values.owner.role (dict "login" (default false $scoped.migrationLogin) "secret" .Values.owner.passwordSecret) }}
+      {{- $_ := set $roles .Values.runtime.role (dict "login" (not $scoped.retireLegacy) "secret" .Values.runtime.passwordSecret) }}
+      {{- range $name, $role := $roles }}
+      - name: {{ $name | quote }}
+        ensure: present
+        login: {{ $role.login }}
+        superuser: false
+        createdb: false
+        createrole: false
+        replication: false
+        bypassrls: false
+        inherit: false
+        inRoles: []
+        {{- if $role.login }}
+        passwordSecret: { name: {{ $role.secret | quote }} }
+        {{- else }}
+        disablePassword: true
+        {{- end }}
+      {{- end }}
+      {{- else }}
       - name: {{ .Values.runtime.role | quote }}
         ensure: present
         login: true
@@ -56,6 +82,7 @@ spec:
         inherit: false
         inRoles: []
         passwordSecret: { name: {{ .Values.runtime.passwordSecret | quote }} }
+      {{- end }}
   {{- end }}
   postgresql:
     parameters:
@@ -64,4 +91,13 @@ spec:
       max_connections: "64"
       {{- end }}
     pg_hba:
+      {{- if and $scoped $scoped.maintenance }}
+      {{- if $scoped.migrationLogin }}
+      - {{ printf "hostssl fleetiq %s all scram-sha-256" .Values.owner.role | quote }}
+      {{- else if $scoped.bootstrapLogin }}
+      - hostssl fleetiq fleetiq_bootstrap_platform_operator all scram-sha-256
+      {{- end }}
+      - host all all all reject
+      {{- else }}
       - hostssl all all all scram-sha-256
+      {{- end }}

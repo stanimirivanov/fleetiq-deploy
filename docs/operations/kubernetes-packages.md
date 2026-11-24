@@ -82,6 +82,7 @@ grants after explicit migration, as required by the upstream runtime contract;
 this chart does not grant those privileges or run application migrations.
 The backend's connection-URL Secret lives in the runtime namespace; reference the
 same runtime login without copying the migration credential into that namespace.
+For an explicit per-workload cutover, see [workload-selected PostgreSQL identities](workload-database-identities.md).
 
 The Cluster has Helm keep and Argo Prune=false,Delete=false annotations. Namespace
 deletion is also disabled for ordinary Argo reconciliation. These are deletion

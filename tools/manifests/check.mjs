@@ -6,6 +6,7 @@ import { checkMinimalDemo } from './minimal-demo-render.mjs';
 import { manifestPolicy } from './policy.mjs';
 import { fixtureStates, renderFixture, validateSchemas } from './render.mjs';
 import { manifestTools, toolsLock } from './toolchain.mjs';
+import { checkWorkloadDatabase } from './workload-database-check.mjs';
 
 /** All registered positive states must validate with real tools and local schemas. */
 export function checkManifests() {
@@ -33,6 +34,7 @@ export function checkManifests() {
       Object.entries(toolsLock.tools).map(([name, tool]) => [name, tool.version]),
     ),
     states: measurements,
+    workloadDatabase: checkWorkloadDatabase(tools),
     activation: 'not-performed',
   };
 }

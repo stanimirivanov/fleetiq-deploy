@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fleetiq-releases
+nameSuffix: -cccccccccccccccc
+resources:
+  - ../base
+generatorOptions:
+  immutable: true
+configMapGenerator:
+  - name: workload-database-inputs
+    envs:
+      - reviewed-upgrade.env
+  - name: workload-database-sql
+    behavior: merge
+    files:
+      - inventory.json
+images:
+  - name: invalid.invalid/fleetiq-migrate
+    newName: ghcr.io/stanimirivanov/fleetiq-platform
+    digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  - name: invalid.invalid/psql
+    newName: ghcr.io/cloudnative-pg/postgresql
+    digest: sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb

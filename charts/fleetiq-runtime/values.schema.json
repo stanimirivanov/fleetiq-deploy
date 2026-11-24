@@ -15,6 +15,33 @@
     "analytics"
   ],
   "properties": {
+    "workloadDatabase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workloads"],
+      "properties": {
+        "workloads": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "analytics-worker",
+              "archive-worker",
+              "ingest-tcp",
+              "notification-worker",
+              "project-current",
+              "replay-worker",
+              "semantic-worker",
+              "serve --check-schema"
+            ]
+          },
+          "contains": {
+            "const": "serve --check-schema"
+          }
+        }
+      }
+    },
     "profile": {
       "type": "string",
       "enum": ["local", "nonlocal"]
@@ -109,9 +136,8 @@
           "properties": {
             "name": {
               "type": "string",
-              "minLength": 1,
               "maxLength": 63,
-              "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+              "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?)?$"
             },
             "key": {
               "type": "string",
@@ -461,6 +487,18 @@
     }
   },
   "allOf": [
+    {
+      "if": { "not": { "required": ["workloadDatabase"] } },
+      "then": {
+        "properties": {
+          "backend": {
+            "properties": {
+              "databaseSecret": { "properties": { "name": { "minLength": 1 } } }
+            }
+          }
+        }
+      }
+    },
     {
       "if": {
         "properties": {

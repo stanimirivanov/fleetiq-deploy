@@ -70,7 +70,7 @@ spec:
             - { name: FLEETIQ_BIND_ADDRESS, value: '0.0.0.0:8080' }
             - name: DATABASE_URL
               valueFrom:
-                secretKeyRef: {{ toJson $settings.databaseSecret }}
+                secretKeyRef: {{ include "fleetiq.databaseSecret" (dict "values" $.Values "command" "serve --check-schema") }}
             - { name: FLEETIQ_BROWSER_ORIGIN, value: {{ printf "https://%s" (include "fleetiq.browserAuthority" $) | quote }} }
             - { name: FLEETIQ_OIDC_ISSUER, value: {{ $settings.oidc.issuer | quote }} }
             - { name: FLEETIQ_OIDC_CLIENT_ID, value: {{ $settings.oidc.clientId | quote }} }

@@ -1,0 +1,50 @@
+{{- with .Values.workloadDatabase -}}
+{{- $scoped := . -}}
+{{- $roles := dict -}}
+{{- $bootstrap := "fleetiq_bootstrap_platform_operator" }}
+{{- if or (eq $.Values.owner.role $bootstrap) (eq $.Values.runtime.role $bootstrap) }}
+{{- fail "Bootstrap role collides with an existing role" }}
+{{- end }}
+{{- $_ := set $roles $bootstrap (dict "login" (default false $scoped.bootstrapLogin) "secret" "fleetiq-db-bootstrap-platform-operator") }}
+{{- $known := list "serve --check-schema" "ingest-tcp" "replay-worker" "semantic-worker" "project-current" "analytics-worker" "notification-worker" "archive-worker" }}
+{{- range $command := $scoped.workloads }}
+{{- if not (has $command $known) }}
+{{- fail "Unknown scoped runtime workload" }}
+{{- end }}
+{{- end }}
+{{- range $command := $known }}
+{{- $suffix := first (splitList " " $command) }}
+{{- $name := printf "fleetiq_%s" (replace "-" "_" $suffix) }}
+{{- if or (eq $.Values.owner.role $name) (eq $.Values.runtime.role $name) }}
+{{- fail "A workload role collides with an existing role" }}
+{{- end }}
+{{- $_ := set $roles $name (dict "login" (has $command $scoped.workloads) "secret" (printf "fleetiq-db-%s" $suffix)) }}
+{{- end }}
+{{- $secrets := dict $.Values.owner.passwordSecret true $.Values.runtime.passwordSecret true -}}
+{{- range $name, $role := $roles }}
+{{- if hasKey $secrets $role.secret }}
+{{- fail "Managed database password Secret names must be distinct" }}
+{{- end }}
+{{- $_ := set $secrets $role.secret true }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  namespace: {{ $.Release.Namespace }}
+  name: {{ printf "%s-%s" $.Values.clusterName (replace "_" "-" $name) | quote }}
+  annotations:
+    helm.sh/resource-policy: keep
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  cluster: { name: {{ $.Values.clusterName | quote }} }
+  name: {{ $name | quote }}
+  databaseRoleReclaimPolicy: retain
+  login: {{ $role.login }}
+  inherit: false
+  {{- if $role.login }}
+  passwordSecret: { name: {{ $role.secret | quote }} }
+  {{- else }}
+  disablePassword: true
+  {{- end }}
+{{- end }}
+{{- end }}
