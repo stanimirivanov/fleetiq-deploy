@@ -87,8 +87,10 @@ For an explicit per-workload cutover, see [workload-selected PostgreSQL identiti
 The Cluster has Helm keep and Argo Prune=false,Delete=false annotations. Namespace
 deletion is also disabled for ordinary Argo reconciliation. These are deletion
 guards, not backups or protection from an authorized direct Kubernetes deletion.
-D06 must verify the selected StorageClass/PV reclaim behavior. Primary updates
-are supervised; operator approval/observed switchover belongs to later release work.
+D06 must verify the selected StorageClass/PV reclaim behavior. CNPG requires
+`unsupervised` primary updates for a single instance. Multi-instance clusters use
+`supervised` updates. Operator approval and observed switchover for supervised
+updates belong to later release work.
 Recovery and Barman/WAL backup configuration and acceptance belong to D07.
 
 ## Networks, maintenance and non-local limits
