@@ -58,7 +58,7 @@ export function dataPolicy(
   );
   assert.equal(spec.instances, nonlocal ? 3 : 1);
   assert.equal(spec.enableSuperuserAccess, false);
-  assert.equal(spec.primaryUpdateStrategy, 'supervised');
+  assert.equal(spec.primaryUpdateStrategy, nonlocal ? 'supervised' : 'unsupervised');
   assert(spec.storage.storageClass && /^[1-9]\d*Gi$/u.test(spec.storage.size));
   if (providerLocal) {
     assert.equal(spec.storage.storageClass, 'local-retained');

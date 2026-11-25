@@ -36,7 +36,7 @@ spec:
   imageName: {{ .Values.image | quote }}
   instances: {{ .Values.instances }}
   enableSuperuserAccess: false
-  primaryUpdateStrategy: supervised
+  primaryUpdateStrategy: {{ if eq (int .Values.instances) 1 }}unsupervised{{ else }}supervised{{ end }}
   storage:
     storageClass: {{ .Values.storage.className | quote }}
     size: {{ .Values.storage.size | quote }}
