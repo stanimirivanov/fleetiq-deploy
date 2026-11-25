@@ -44,10 +44,12 @@ testing authentication. Ordinary chart values keep the existing single-role
 path. This workflow targets PostgreSQL 18, the `fleetiq` application database,
 and CNPG 1.30.1 with the dedicated `cnpg_metrics_exporter` role.
 
-Select the published backend image by digest and its verified migration
-inventory through the existing release review. The deployment-owned SQL is
-under `operations/workload-database/base/sql/`. Qualify its reviewed Git
-revision and the exact backend digest together.
+Select the backend image from the successful protected platform publication's
+`publication.json`. Use the `migrations.json` from the same publication attempt
+and verify its SHA-256 against the receipt's `inventory.digest`. Use the
+[existing release verification and registry access procedure](release-packages.md#full-release-and-producer-verification).
+The deployment-owned SQL is under `operations/workload-database/base/sql/`.
+Qualify its reviewed Git revision and the exact backend digest together.
 
 ## Retained installation upgrade
 
@@ -55,10 +57,10 @@ revision and the exact backend digest together.
 
 Copy `operations/workload-database/` from the reviewed deployment revision
 into release staging. Replace the synthetic inputs in its `example/` overlay
-with the reviewed backend and PostgreSQL client digests, verified
-`inventory.json`, and a `reviewed-upgrade.env` containing the CNPG read/write
-service DNS, live database OID, migration owner, legacy role, selected workload
-commands, and release digest. Use the release digest as the basis for a unique
+with the reviewed backend and PostgreSQL client digests. Copy the verified
+`migrations.json` as `inventory.json`. Set the CNPG read/write service DNS,
+live database OID, migration owner, legacy role, selected workload commands,
+and release digest in `reviewed-upgrade.env`. Use the release digest as the basis for a unique
 `nameSuffix`. The release request digest binds the backend digest, deployment
 SQL revision and these reviewed selections. Keep the rendered manifest and
 the overlay with the release evidence.
@@ -93,8 +95,10 @@ database route approved for this operation. The provider's existing
    and checks the database OID and owner before changing grants. View the
    workflow's step outcomes in Argo. Keep the runtime fenced on failure.
 3. After success, retain the workflow UID, template, release digest and step
-   outcomes with the phase receipts. Check the CNPG application-database
-   metrics scrape. Through reviewed desired state, withdraw the temporary
+   outcomes with the phase receipts, along with the backend publication run
+   and attempt, backend digest, inventory digest and deployment SQL Git
+   revision. Check that CNPG can scrape metrics from the application database.
+   Through reviewed desired state, withdraw the temporary
    credentials and switch clients to the scoped logins. Verify the selected
    workloads and confirm the legacy role has no remaining clients or sessions
    before the credential operator retires it. Observe the credential retirement
