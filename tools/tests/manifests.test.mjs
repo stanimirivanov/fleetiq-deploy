@@ -83,6 +83,18 @@ test('real Helm, Kustomize and pinned schemas qualify the complete portable and 
   }
 });
 
+test('CNPG update strategy follows the rendered database instance count', () => {
+  for (const [rendered, instances, strategy] of [
+    [active, 1, 'unsupervised'],
+    [providerActive, 1, 'unsupervised'],
+    [renderFixture(tools, { nonlocal: true }), 3, 'supervised'],
+  ]) {
+    const { spec } = resource(rendered, 'Cluster', 'fleetiq-db');
+    assert.equal(spec.instances, instances);
+    assert.equal(spec.primaryUpdateStrategy, strategy);
+  }
+});
+
 test('public OIDC roots are optional; explicit additional trust stays mounted and scoped', () => {
   const rendered = renderFixture(tools, {
     runtime: { backend: { oidc: { additionalTrust: { name: '' } } } },

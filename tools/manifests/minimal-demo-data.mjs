@@ -120,7 +120,7 @@ export function checkMinimalDemoData(tools, consumer) {
       'registry.invalid/candidate/postgresql:18.4-system-trixie@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
     instances: 1,
     enableSuperuserAccess: false,
-    primaryUpdateStrategy: 'supervised',
+    primaryUpdateStrategy: 'unsupervised',
     storage: { storageClass: 'local-retained', size: '4Gi' },
     resources: {
       requests: { cpu: '200m', memory: '256Mi' },
