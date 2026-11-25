@@ -1,12 +1,12 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkWorkloadDatabase } from '../../harness/manifests/workload-database-check.mjs';
 import { checkBootstrap } from './bootstrap.mjs';
 import { checkMinimalDemoData } from './minimal-demo-data.mjs';
 import { checkMinimalDemo } from './minimal-demo-render.mjs';
 import { manifestPolicy } from './policy.mjs';
 import { fixtureStates, renderFixture, validateSchemas } from './render.mjs';
 import { manifestTools, toolsLock } from './toolchain.mjs';
-import { checkWorkloadDatabase } from './workload-database-check.mjs';
 
 /** All registered positive states must validate with real tools and local schemas. */
 export function checkManifests() {

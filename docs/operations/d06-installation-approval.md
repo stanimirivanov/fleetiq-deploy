@@ -33,7 +33,7 @@ Namespace quotas constrain admission; their sum is not reserved node capacity.
 
 Run `pnpm installation:check` before approval. It runs actual pinned Kustomize
 and strict schemas, then checks the complete six-object policy. The existing
-`pnpm manifests:check`, structural and package gates include the same sensor.
+`pnpm verify manifests`, structural and package gates include the same sensor.
 No controller, Secret, workload, migration or Argo resource is in the package.
 
 ## Prepared byte identities

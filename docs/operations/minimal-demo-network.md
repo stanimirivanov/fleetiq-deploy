@@ -72,7 +72,7 @@ launcher name from the provider and the actual reviewed private issuer address.
 ```sh
 pnpm install --frozen-lockfile
 pnpm manifests:install
-pnpm manifests:check
+pnpm verify manifests
 umask 077
 pnpm --silent minimal-demo:network:render /private/network-selection.json > /private/network.json
 ```

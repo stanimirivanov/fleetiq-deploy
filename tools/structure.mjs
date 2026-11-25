@@ -39,16 +39,13 @@ export function structure() {
   assert.equal(packageFile.packageManager, `pnpm@${lock.tools.pnpm}`);
   assert.equal(
     packageFile.scripts.test,
-    'node --test --test-concurrency=2 tools/tests/*.test.mjs',
+    'node --test --test-concurrency=2 tools/tests/*.test.mjs harness/tests/*.test.mjs',
   );
   assert.equal(
     packageFile.scripts['manifests:install'],
     'node tools/manifests/install.mjs',
   );
-  assert.equal(
-    packageFile.scripts['manifests:check'],
-    'node tools/verify.mjs manifests',
-  );
+  assert.equal(packageFile.scripts.verify, 'node tools/verify.mjs');
   const compose = sourceCompose();
   assert.deepEqual(Object.keys(compose.services).sort(), [
     'backend',

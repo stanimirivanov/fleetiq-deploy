@@ -14,5 +14,5 @@ Read [verification](../docs/development/verification.md).
   Acceptance requires all inventoried checks and unchanged source fingerprints.
 - The CI renderer is reviewed policy. Do not regenerate CI to conceal a failure.
 - Kubernetes package changes require the actual native manifest tools and pinned
-  local schemas; run pnpm manifests:install, pnpm manifests:check and pnpm check.
+  local schemas; run `pnpm manifests:install`, `pnpm verify manifests` and `pnpm check`.
   Do not substitute model-only tests, schema skips or live provider assumptions.

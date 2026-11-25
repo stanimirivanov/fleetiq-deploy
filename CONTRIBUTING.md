@@ -41,6 +41,8 @@ images first. The separate `pnpm qualify:product` group exercises real OIDC/TCP/
 None of these groups substitutes for another.
 `pnpm verify acceptance` runs both against already built artifacts.
 
+Use `pnpm verify manifests` for focused offline manifest qualification.
+
 [Verification](docs/development/verification.md) describes outcomes, evidence,
 adversarial fixtures and the limits of repository-owned checks.
 

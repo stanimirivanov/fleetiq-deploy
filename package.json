@@ -10,7 +10,7 @@
   "scripts": {
     "check": "node tools/verify.mjs structural",
     "verify": "node tools/verify.mjs",
-    "test": "node --test --test-concurrency=2 tools/tests/*.test.mjs",
+    "test": "node --test --test-concurrency=2 tools/tests/*.test.mjs harness/tests/*.test.mjs",
     "format": "biome format --write .",
     "style": "biome ci .",
     "local": "node tools/local.mjs",
@@ -20,7 +20,6 @@
     "minimal-demo:data:render": "node tools/manifests/minimal-demo-data.mjs",
     "minimal-demo:network:probe": "node tools/manifests/minimal-demo-probe-cli.mjs",
     "minimal-demo:network:render": "node tools/manifests/minimal-demo-render.mjs",
-    "manifests:check": "node tools/verify.mjs manifests",
     "releases:check": "node tools/releases/cli.mjs contracts",
     "releases:verify-artifacts": "node tools/releases/cli.mjs verify-artifacts",
     "packages:check": "node tools/verify.mjs packages",

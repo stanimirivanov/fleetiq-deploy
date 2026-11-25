@@ -9,7 +9,7 @@ targets. [Approved resource ledger](https://github.com/stanimirivanov/fleetiq-de
 ```sh
 pnpm install --frozen-lockfile
 pnpm manifests:install
-pnpm manifests:check
+pnpm verify manifests
 umask 077
 pnpm --silent minimal-demo:data:render qual-fleet > /private/data-candidate.json
 ```

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { databaseIdentities } from '../manifests/workload-database.mjs';
+import { databaseIdentities } from '../../tools/manifests/workload-database.mjs';
 
 test('a three-workload installation requires only its selected credentials', () => {
   const identities = databaseIdentities([
