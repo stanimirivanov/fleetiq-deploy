@@ -1,7 +1,8 @@
 # Offline manifest fitness
 
 The native tools and schema inputs in tools.lock.json are required prerequisites.
-Run pnpm manifests:install, then pnpm manifests:check or pnpm check.
+Run `pnpm manifests:install` and then `pnpm verify manifests`.
+The structural gate (`pnpm check`) includes this check.
 
 - Archive checksums come from official Helm, Kustomize and Kubeconform release
   records. Extracted executable hashes are also pinned and rechecked before use.

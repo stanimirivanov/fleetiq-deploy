@@ -27,7 +27,7 @@ see [minimal-demo private networking](minimal-demo-network.md).
 ```bash
 pnpm install --frozen-lockfile
 pnpm manifests:install
-pnpm manifests:check
+pnpm verify manifests
 pnpm check
 ```
 

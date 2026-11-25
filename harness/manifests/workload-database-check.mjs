@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { root } from '../process.mjs';
-import { manifestPolicy } from './policy.mjs';
-import { documents, renderFixture, validateSchemas } from './render.mjs';
-import { runtimeCommands } from './workload-database.mjs';
+import { manifestPolicy } from '../../tools/manifests/policy.mjs';
+import {
+  documents,
+  renderFixture,
+  validateSchemas,
+} from '../../tools/manifests/render.mjs';
+import { runtimeCommands } from '../../tools/manifests/workload-database.mjs';
+import { root } from '../../tools/process.mjs';
 
 function checkUpgradeWorkflow(tools) {
   const operation = resolve(root, 'operations/workload-database');

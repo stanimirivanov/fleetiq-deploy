@@ -10,4 +10,4 @@ Technical constraints for this scope; the repository root `AGENTS.md` owns workf
 - Maintenance scales every packaged application writer to zero. Data and retained
   namespaces are never implicitly pruned. This is not proof of observed drain.
 - Change templates, values schemas, real rendering tests and manifest policy together.
-  Run `pnpm manifests:install`, `pnpm manifests:check` and `pnpm check`.
+  Run `pnpm manifests:install`, `pnpm verify manifests` and `pnpm check`.

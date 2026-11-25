@@ -12,7 +12,7 @@ references. Never install the synthetic digests or documentation network address
 - Storage: `local-retained`, 2Gi, with 8Gi/four-claim namespace request accounting.
 - PostgreSQL: illustrative 18.4 tag plus a synthetic digest, not a selected artifact.
 
-`pnpm manifests:check` renders portable active/maintenance/nonlocal states and
+`pnpm verify manifests` renders portable active/maintenance/nonlocal states and
 provider-local active/maintenance states with real Helm, Kustomize and strict local
 schemas. `pnpm packages:check` also compares both chart modes after OCI read-back.
 Neither command grants activation authority or proves live network/persistence.

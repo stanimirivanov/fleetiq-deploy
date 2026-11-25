@@ -3,7 +3,8 @@
 ## TL;DR
 
 Run `pnpm check` and, after `pnpm local build`, `pnpm qualify` and `pnpm qualify:product`.
-Install pinned offline manifest prerequisites first with `pnpm manifests:install`.
+For focused offline manifest qualification, install the pinned prerequisites with
+`pnpm manifests:install` and run `pnpm verify manifests`.
 `pnpm installation:check` is the focused, offline D06 namespace/bootstrap gate;
 its sensor also runs inside the existing manifests check.
 A focused pass is not a complete acceptance pass. Missing prerequisites, failed
@@ -40,6 +41,21 @@ The secret sensor scans isolated worktree/index snapshots plus incoming Git
 history. CI supplies the event's ancestor base SHA; local checks scan all history
 when no base is supplied. Gitleaks ignore files and per-line allow directives
 cannot silently bypass scanning. Missing scanners fail closed.
+
+## Scoped workload database manifests
+
+The deployment maintainers own the
+[offline workload database sensor](../../harness/manifests/workload-database-check.mjs).
+Run `pnpm verify manifests` and inspect the `manifests` check in its
+`.verification/` receipt. On success, `workloadDatabase` records the selected
+workload and phase counts.
+
+If tools or schemas are missing or fail checksum verification, rerun
+`pnpm manifests:install`. For chart or role failures, check the selected
+workloads, maintenance phase, and role flags against the
+[identity contract](../operations/workload-database-identities.md). For workflow
+failures, check the rendered example against the checked-in SQL, immutable
+ConfigMaps, and reviewed step order in that same guide.
 
 ## Limits and review
 
