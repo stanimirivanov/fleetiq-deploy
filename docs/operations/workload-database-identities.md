@@ -60,10 +60,10 @@ into release staging. Replace the synthetic inputs in its `example/` overlay
 with the reviewed backend and PostgreSQL client digests. Copy the verified
 `migrations.json` as `inventory.json`. Set the CNPG read/write service DNS,
 live database OID, migration owner, legacy role, selected workload commands,
-and release digest in `reviewed-upgrade.env`. Use the release digest as the basis for a unique
-`nameSuffix`. The release request digest binds the backend digest, deployment
-SQL revision and these reviewed selections. Keep the rendered manifest and
-the overlay with the release evidence.
+and release digest in `reviewed-upgrade.env`. Use the release digest as the
+basis for a unique `nameSuffix`. The release request digest binds the backend
+digest, deployment SQL revision and these reviewed selections. Keep the rendered
+manifest and the overlay with the release evidence.
 
 ```bash
 kustomize build operations/workload-database/example
@@ -80,6 +80,10 @@ migration connection and psql operations use the same selected
 username, service and verified CA. Give the workflow namespace only the
 database route approved for this operation. The provider's existing
 `release-executor` identity needs no extra API mutation privileges.
+
+Before opening maintenance, verify that the `release-executor` Pods can pull
+both pinned images. For a private backend image, have the provider supply
+read-only registry access through its existing image-pull configuration.
 
 ### Operate the upgrade
 
