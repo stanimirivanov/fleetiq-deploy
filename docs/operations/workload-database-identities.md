@@ -116,3 +116,17 @@ connected. The pinned migration command validates the committed ledger and
 runs pending migrations. Grant application is transactional, and verification
 checks the complete ledger and effective grants before writers return. Use a
 reviewed recovery procedure if the database identity, ledger or ACL check fails.
+
+## Published backend qualification
+
+The first scoped upgrade pairs the backend at
+`ghcr.io/stanimirivanov/fleetiq-platform@sha256:11bebfe12129c95bc2c3854b482c388190b324264ba660921907816da68c22b0`
+with the deployment SQL at Git revision
+`d269d16a4d23169e34042a29cb594b66c08d6e22`. The 59-entry migration inventory
+has digest `sha256:67772e214e26fdc892b65b1636acd721d14ca1291bb49f1c209c9ffba8f64927`.
+[Protected backend publication, attempt 1](https://github.com/stanimirivanov/fleetiq-platform/actions/runs/45691686449/attempts/1)
+
+The disposable Kubernetes qualification covers the retained 58-to-59 upgrade
+with CNPG 1.30.1 and Argo Workflows 4.1.5. The demo environment still needs
+its own composition and installed acceptance before activation.
+[Minimal demo database settings](https://github.com/stanimirivanov/fleetiq-deploy/issues/96)
