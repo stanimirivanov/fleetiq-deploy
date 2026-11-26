@@ -1,5 +1,5 @@
 -- Run before launch and after terminal or uncertain execution. Keep the exact
--- scope, database identity and read-only observer service fixed across both reads.
+-- scope, database identity and read-only observer connection fixed across both reads.
 SET statement_timeout = '5s';
 SET lock_timeout = '2s';
 BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
@@ -7,6 +7,7 @@ BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
 SELECT (
   current_database() = 'fleetiq' AND NOT pg_is_in_recovery()
     AND (SELECT oid FROM pg_database WHERE datname = current_database()) = :'database_oid'::oid
+    AND (SELECT system_identifier::text FROM pg_catalog.pg_control_system()) = :'database_system_id'
     AND :'operation' IN ('migrate','bootstrap','rebuild','register','calculate','reclaim','summarize','expire')
     AND jsonb_typeof(:'scope'::jsonb) = 'object'
 )::integer AS valid,

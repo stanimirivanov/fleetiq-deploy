@@ -30,21 +30,24 @@ var (
 	revisionPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 	targetPattern   = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 	jobPattern      = regexp.MustCompile(`^[a-z][a-z0-9-]{0,48}[a-z0-9]$`)
-	servicePattern  = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+	pgHostPattern   = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.-]*$`)
+	pgUserPattern   = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]*$`)
+	systemIDPattern = regexp.MustCompile(`^[1-9][0-9]{0,19}$`)
 )
 
 type request struct {
-	Operation, Job, Consumer                             string
-	DeploymentRevision, ProviderRevision, Incarnation    string
-	ProviderCheckout, DockerContext, StateRoot           string
-	HTTPSPort                                            int
-	SelectionDigest, RuntimeImageID                      string
-	Server, NamespaceUID, ClusterUID                     string
-	ObserverKubeconfig, LauncherKubeconfig, ObserverUser string
-	PGServiceFile, PGPassFile, PGService                 string
-	DatabaseOID                                          uint32
-	Inputs                                               map[string]string
-	Scope                                                json.RawMessage
+	Operation, Job, Consumer                               string
+	DeploymentRevision, ProviderRevision, Incarnation      string
+	ProviderCheckout, DockerContext, StateRoot             string
+	HTTPSPort                                              int
+	SelectionDigest, RuntimeImageID                        string
+	Server, NamespaceUID, ClusterUID                       string
+	ObserverKubeconfig, LauncherKubeconfig, ObserverUser   string
+	PGHost, PGUser, PGRootCA, PGPassFile, DatabaseSystemID string
+	PGPort                                                 int
+	DatabaseOID                                            uint32
+	Inputs                                                 map[string]string
+	Scope                                                  json.RawMessage
 }
 
 type preview struct {
@@ -174,11 +177,13 @@ func (r request) validate() error {
 		!revisionPattern.MatchString(r.DeploymentRevision) || !revisionPattern.MatchString(r.ProviderRevision) ||
 		!digestPattern.MatchString(r.SelectionDigest) || !digestPattern.MatchString(r.RuntimeImageID) ||
 		r.NamespaceUID == "" || r.ClusterUID == "" || r.Incarnation == "" || r.ObserverUser == "" ||
-		r.DatabaseOID == 0 || !servicePattern.MatchString(r.PGService) || r.HTTPSPort <= 0 || r.HTTPSPort > 65535 {
+		r.DatabaseOID == 0 || !systemIDPattern.MatchString(r.DatabaseSystemID) ||
+		!pgHostPattern.MatchString(r.PGHost) || !pgUserPattern.MatchString(r.PGUser) ||
+		r.PGPort <= 0 || r.PGPort > 65535 || r.HTTPSPort <= 0 || r.HTTPSPort > 65535 {
 		return errors.New("incomplete reviewed request identities")
 	}
 	for _, path := range []string{r.ProviderCheckout, r.StateRoot, r.ObserverKubeconfig,
-		r.LauncherKubeconfig, r.PGServiceFile, r.PGPassFile} {
+		r.LauncherKubeconfig, r.PGRootCA, r.PGPassFile} {
 		if !filepath.IsAbs(path) {
 			return errors.New("request paths must be absolute")
 		}
@@ -204,14 +209,11 @@ func revision(dir, expected string, paths ...string) error {
 	return nil
 }
 
-func (r request) provider(action, operation string, execute bool) ([]byte, error) {
+func (r request) provider(action, operation string) ([]byte, error) {
 	args := []string{"run", "--locked", "--offline", "python", "-m", "scripts.minimal_delegation",
 		action, "--consumer", r.Consumer, "--docker-context", r.DockerContext,
 		"--state-root", r.StateRoot, "--https-port", strconv.Itoa(r.HTTPSPort), "--operation", operation}
-	if execute {
-		args = append(args, "--execute", "--confirm-target", r.target())
-	}
-	return command(r.ProviderCheckout, nil, nil, 250*time.Second, "uv", args...)
+	return local(r.ProviderCheckout, "uv", args...)
 }
 
 func splitRender(data []byte) (operation, input json.RawMessage, scope []byte, err error) {
@@ -304,13 +306,16 @@ func prepare(repo, dir string, r request) (string, error) {
 				return "", errors.New("observation scope differs from operation inputs")
 			}
 		}
+		if err := observationSelectors(r.Operation, fields); err != nil {
+			return "", err
+		}
 		scope = r.Scope
 	}
 	if err := store(dir, "operation.json", operation); err != nil {
 		return "", err
 	}
 	opPath := filepath.Join(dir, "operation.json")
-	result, err := r.provider("configure", opPath, false)
+	result, err := r.provider("configure", opPath)
 	var delegation providerReceipt
 	if err != nil || json.Unmarshal(result, &delegation) != nil ||
 		delegation.Name != r.target() || delegation.Execution != "not-performed" ||
@@ -319,7 +324,7 @@ func prepare(repo, dir string, r request) (string, error) {
 		delegation.Operation.Launcher != "demo-launch-"+delegation.Operation.Digest[7:31] {
 		return "", errors.New("provider preview does not match the request")
 	}
-	job, err := r.provider("job", opPath, false)
+	job, err := r.provider("job", opPath)
 	var selected jobInfo
 	if err != nil || json.Unmarshal(job, &selected) != nil || selected.Metadata.Name != r.Job ||
 		selected.Metadata.Namespace != r.namespace() ||
@@ -357,6 +362,34 @@ func prepare(repo, dir string, r request) (string, error) {
 	return fingerprint(stored), err
 }
 
+func observationSelectors(operation string, fields map[string]json.RawMessage) error {
+	value := func(field string) string {
+		var s string
+		_ = json.Unmarshal(fields[field], &s)
+		return s
+	}
+	switch operation {
+	case "bootstrap":
+		if !digestPattern.MatchString("sha256:" + value("identityDigest")) {
+			return errors.New("bootstrap scope requires the reviewed identity digest")
+		}
+	case "rebuild":
+		version := value("version")
+		if version == "" {
+			version = string(fields["version"])
+		}
+		parsed, err := strconv.ParseUint(version, 10, 32)
+		if value("asset") == "" || value("property") == "" || err != nil || parsed == 0 {
+			return errors.New("rebuild scope requires the reviewed winner selectors")
+		}
+	case "summarize":
+		if _, exists := fields["receiptRevision"]; exists {
+			return errors.New("summary receipt revision must be obtained from the observed Job")
+		}
+	}
+	return nil
+}
+
 func observers(repo string) ([]byte, []byte, error) {
 	sql, err := os.ReadFile(filepath.Join(repo, admin, "observe.sql"))
 	filter, next := os.ReadFile(filepath.Join(repo, admin, "job-receipt.jq"))
@@ -382,31 +415,19 @@ func load(repo, dir string) (preview, []byte, error) {
 	return p, raw, nil
 }
 
-func (p preview) grant(dir, approved string) error {
+func (p preview) verifyGrant(path string) error {
 	r := p.Request
-	if _, err := os.Lstat(filepath.Join(dir, "grant.json")); !os.IsNotExist(err) {
-		return errors.New("attempt already has a grant receipt; use submit or status")
+	if !filepath.IsAbs(path) {
+		return errors.New("an absolute --grant-receipt path is required")
 	}
-	if err := revision(r.ProviderCheckout, r.ProviderRevision, "scripts", "pyproject.toml", "uv.lock"); err != nil {
-		return err
+	data, err := snap(filepath.Dir(path), filepath.Base(path))
+	var grant providerReceipt
+	if err != nil || json.Unmarshal(data, &grant) != nil || grant.Outcome != "configured" ||
+		grant.Name != r.target() || grant.Context != "kind-"+r.target() ||
+		grant.Incarnation != r.Incarnation || grant.OperationDigest != p.OperationDigest {
+		return errors.New("provider's reviewed grant receipt required")
 	}
-	op := filepath.Join(dir, "operation.json")
-	raw, err := snap(dir, "operation.json")
-	var actual, reviewed bytes.Buffer
-	if err != nil || json.Compact(&actual, raw) != nil || json.Compact(&reviewed, p.Operation) != nil ||
-		!bytes.Equal(actual.Bytes(), reviewed.Bytes()) {
-		return errors.New("provider operation changed after review")
-	}
-	for _, step := range []struct{ action, outcome string }{{"configure", "configured"}, {"health", "observed"}} {
-		data, err := r.provider(step.action, op, true)
-		var live providerReceipt
-		if err != nil || json.Unmarshal(data, &live) != nil || live.Outcome != step.outcome ||
-			live.Name != r.target() || live.Context != "kind-"+r.target() ||
-			live.Incarnation != r.Incarnation || live.OperationDigest != p.OperationDigest {
-			return fmt.Errorf("provider %s did not prove the reviewed grant", step.action)
-		}
-	}
-	return saveJSON(dir, "grant.json", map[string]string{"plan": approved, "operation": p.OperationDigest})
+	return nil
 }
 
 func (r request) kube(launcher bool, input []byte, args ...string) ([]byte, error) {
@@ -501,6 +522,7 @@ func (p preview) observeTarget() error {
 		return err
 	}
 	for _, check := range []struct{ name, uid string }{
+		{"namespace/kube-system", r.Incarnation},
 		{"namespace/" + r.namespace(), r.NamespaceUID},
 		{"cluster.postgresql.cnpg.io/fleetiq-db", r.ClusterUID},
 	} {
@@ -520,11 +542,13 @@ func (p preview) observeTarget() error {
 
 func (p preview) readDatabase(repo string) ([]byte, error) {
 	r := p.Request
-	env := append(os.Environ(), "PGSERVICEFILE="+r.PGServiceFile, "PGPASSFILE="+r.PGPassFile,
-		"FLEETIQ_OBSERVATION_SCOPE="+string(p.Scope))
+	env := []string{"PATH=" + os.Getenv("PATH"), "PGPASSFILE=" + r.PGPassFile,
+		"PGSSLROOTCERT=" + r.PGRootCA, "PGSSLMODE=verify-full", "PGCONNECT_TIMEOUT=5",
+		"FLEETIQ_OBSERVATION_SCOPE=" + string(p.Scope)}
 	data, err := command(repo, nil, env, 30*time.Second, "psql", "-X", "-w", "-qAt", "-v", "ON_ERROR_STOP=1",
-		"--dbname", "service="+r.PGService+" sslmode=verify-full connect_timeout=5",
+		"--host", r.PGHost, "--port", strconv.Itoa(r.PGPort), "--username", r.PGUser, "--dbname", "fleetiq",
 		"-v", "operation="+r.Operation, "-v", "database_oid="+strconv.FormatUint(uint64(r.DatabaseOID), 10),
+		"-v", "database_system_id="+r.DatabaseSystemID,
 		"-c", `\getenv scope FLEETIQ_OBSERVATION_SCOPE`, "-f", filepath.Join(repo, admin, "observe.sql"))
 	if err != nil || !json.Valid(data) || !bytes.HasPrefix(bytes.TrimSpace(data), []byte("{")) {
 		return nil, errors.New("independent PostgreSQL observation failed")
@@ -543,15 +567,13 @@ func submitOnce(dir string, decision intent, create func() ([]byte, error)) erro
 	return store(dir, "submission.json", data)
 }
 
-func (p preview) submit(repo, dir, approved string) error {
+func (p preview) submit(repo, dir, approved, grantReceipt string) error {
 	r := p.Request
 	if _, err := os.Lstat(filepath.Join(dir, "intent.json")); !os.IsNotExist(err) {
 		return errors.New("attempt already started; use status")
 	}
-	data, err := snap(dir, "grant.json")
-	var grant map[string]string
-	if err != nil || json.Unmarshal(data, &grant) != nil || grant["plan"] != approved || grant["operation"] != p.OperationDigest {
-		return errors.New("reviewed provider grant receipt required")
+	if err := p.verifyGrant(grantReceipt); err != nil {
+		return err
 	}
 	account := "system:serviceaccount:" + r.Consumer + "-demo-operations:" + p.Launcher
 	if account == r.ObserverUser {
@@ -599,13 +621,14 @@ func main() {
 
 func cli(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: fleetiq-admin preview|grant|submit|status --attempt /private/path")
+		return errors.New("usage: fleetiq-admin preview|submit|status --attempt /private/path")
 	}
 	set := flag.NewFlagSet(args[0], flag.ContinueOnError)
 	repo := set.String("repo", ".", "reviewed deployment checkout")
 	dir := set.String("attempt", "", "private attempt directory")
 	req := set.String("request", "", "reviewed request JSON for preview")
-	digest := set.String("approved", "", "reviewed plan digest for grant or submit")
+	digest := set.String("approved", "", "reviewed plan digest for submit")
+	grant := set.String("grant-receipt", "", "provider grant receipt for submit")
 	if err := set.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -640,14 +663,11 @@ func cli(args []string) error {
 		return err
 	}
 	switch args[0] {
-	case "grant", "submit":
+	case "submit":
 		if err := requireApproval(raw, *digest); err != nil {
 			return err
 		}
-		if args[0] == "grant" {
-			return p.grant(*dir, *digest)
-		}
-		if err := p.submit(root, *dir, *digest); err != nil {
+		if err := p.submit(root, *dir, *digest, *grant); err != nil {
 			return err
 		}
 		fmt.Println("Submitted once. Use status to inspect the Job and its durable result.")

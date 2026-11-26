@@ -39,3 +39,25 @@ func TestApprovedDigestCoversEveryPlanByte(t *testing.T) {
 		t.Fatal("missing reviewed digest must be refused")
 	}
 }
+
+func TestProviderGrantMustNameTheApprovedIncarnation(t *testing.T) {
+	dir := t.TempDir()
+	p := preview{Request: request{Consumer: "qual-demo", Incarnation: "approved"}, OperationDigest: "exact-operation"}
+	stale := providerReceipt{
+		Name: "qual-demo-local", Context: "kind-qual-demo-local",
+		Incarnation: "replaced", OperationDigest: "exact-operation", Outcome: "configured",
+	}
+	if err := saveJSON(dir, "stale.json", stale); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.verifyGrant(filepath.Join(dir, "stale.json")); err == nil {
+		t.Fatal("stale grant accepted")
+	}
+	stale.Incarnation = "approved"
+	if err := saveJSON(dir, "approved.json", stale); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.verifyGrant(filepath.Join(dir, "approved.json")); err != nil {
+		t.Fatal(err)
+	}
+}

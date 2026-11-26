@@ -46,14 +46,14 @@ func (p preview) status(repo, dir, plan string) error {
 	}
 	job, err := get()
 	if err != nil {
-		return err
+		return p.recordUncertain(repo, dir, started, "job-read-failed")
 	}
 	if len(bytes.TrimSpace(job)) == 0 {
-		return errors.New("uncertain: the approved Job is not visible; preserve intent and escalate")
+		return p.recordUncertain(repo, dir, started, "job-not-visible")
 	}
 	var observed jobInfo
 	if json.Unmarshal(job, &observed) != nil || !p.matchesJob(observed) {
-		return errors.New("uncertain: observed Job differs from the exact reviewed attempt")
+		return p.recordUncertain(repo, dir, started, "job-identity-unverified")
 	}
 	expectedUID := ""
 	submission, err := snap(dir, "submission.json")
@@ -64,7 +64,7 @@ func (p preview) status(repo, dir, plan string) error {
 		var submitted jobInfo
 		if json.Unmarshal(submission, &submitted) != nil || !p.matchesJob(submitted) ||
 			submitted.Metadata.UID != observed.Metadata.UID {
-			return errors.New("uncertain: submission and observed Job UID disagree")
+			return p.recordUncertain(repo, dir, started, "submission-uid-disagrees")
 		}
 		expectedUID = submitted.Metadata.UID
 	}
@@ -83,11 +83,11 @@ func (p preview) status(repo, dir, plan string) error {
 	pods, err := r.kube(false, nil, "-n", r.namespace(), "get", "pods",
 		"-l", "batch.kubernetes.io/controller-uid="+observed.Metadata.UID, "-o", "json")
 	if err != nil {
-		return err
+		return p.recordUncertain(repo, dir, started, "pod-read-failed")
 	}
 	var list struct{ Items []podInfo }
 	if json.Unmarshal(pods, &list) != nil {
-		return errors.New("invalid Pod observation")
+		return p.recordUncertain(repo, dir, started, "pod-observation-invalid")
 	}
 	log, logPod := []byte{}, []byte("{}")
 	if len(list.Items) == 1 {
@@ -103,7 +103,7 @@ func (p preview) status(repo, dir, plan string) error {
 			if terminal := container.State.Terminated; terminal != nil {
 				if _, err := time.Parse(time.RFC3339Nano, terminal.StartedAt); err == nil {
 					log, err = r.kube(false, nil, "-n", r.namespace(), "logs", "pod/"+pod.Metadata.Name,
-						"-c", container.Name, "--since-time", terminal.StartedAt, "--timestamps", "--limit-bytes=4096")
+						"-c", container.Name, "--since-time", terminal.StartedAt, "--timestamps", "--limit-bytes=4097")
 					if err == nil {
 						logPod, err = r.kube(false, nil, "-n", r.namespace(), "get", "pod/"+pod.Metadata.Name, "-o", "json")
 					}
@@ -149,8 +149,61 @@ func (p preview) status(repo, dir, plan string) error {
 	if err := store(out, "after.json", after); err != nil {
 		return err
 	}
+	if err := p.observeSummaryRevision(repo, out, receipt); err != nil {
+		return err
+	}
 	fmt.Printf("Review execution and durable observations in %s before withdrawal or any new attempt.\n", out)
 	return nil
+}
+
+func (p preview) recordUncertain(repo, dir string, start intent, reason string) error {
+	out, err := os.MkdirTemp(dir, "observed-")
+	if err != nil {
+		return err
+	}
+	if err := saveJSON(out, "execution-receipt.json", map[string]string{
+		"execution": "uncertain", "reason": reason, "plan": start.Plan,
+		"name": p.Request.Job, "target": p.Request.target(), "operation": p.OperationDigest,
+	}); err != nil {
+		return err
+	}
+	if err := store(out, "before.json", start.Before); err != nil {
+		return err
+	}
+	after, err := p.readDatabase(repo)
+	if err != nil {
+		return fmt.Errorf("result uncertain; database read failed, preserved intent evidence in %s", out)
+	}
+	if err := store(out, "after.json", after); err != nil {
+		return err
+	}
+	return fmt.Errorf("result uncertain; review independent observations in %s and preserve the attempt", out)
+}
+
+func (p preview) observeSummaryRevision(repo, out string, receipt []byte) error {
+	if p.Request.Operation != "summarize" {
+		return nil
+	}
+	var execution struct {
+		Execution   string
+		Application struct{ Outcome, Revision string }
+	}
+	if json.Unmarshal(receipt, &execution) != nil ||
+		execution.Execution != "exited-zero" || execution.Application.Outcome != "summary-persisted" {
+		return nil
+	}
+	var scope map[string]json.RawMessage
+	if json.Unmarshal(p.Scope, &scope) != nil || scope == nil ||
+		!systemIDPattern.MatchString(execution.Application.Revision) {
+		return errors.New("summary revision evidence is invalid")
+	}
+	scope["receiptRevision"], _ = json.Marshal(execution.Application.Revision)
+	p.Scope, _ = json.Marshal(scope)
+	result, err := p.readDatabase(repo)
+	if err != nil {
+		return fmt.Errorf("summary revision uncertain; review the primary observation in %s", out)
+	}
+	return store(out, "summary-revision.json", result)
 }
 
 func (p preview) matchesJob(job jobInfo) bool {
