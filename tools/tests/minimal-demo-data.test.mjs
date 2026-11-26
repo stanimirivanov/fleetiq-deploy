@@ -401,6 +401,7 @@ for (const [mode, command, input, parameter, archive] of [
       const [config] = rendered;
       assert.equal(config.immutable, true);
       const input = config.data['input.json'];
+      assert.equal(rendered.at(-1).data['approved-inputs.json'], input);
       assert.equal(
         config.metadata.name,
         `qualification-operation-01-input.${digest(input).replace(/^(.{32})/u, '$1.')}`,
@@ -412,6 +413,21 @@ for (const [mode, command, input, parameter, archive] of [
     }
   });
 }
+
+test('summary observation inputs preserve both presence and absence of restore selectors', () => {
+  const [hot] = administration('summarize', summary);
+  const hotInputs = JSON.parse(hot.data['approved-inputs.json']);
+  assert.equal(Object.hasOwn(hotInputs, 'manifest'), false);
+  assert.equal(Object.hasOwn(hotInputs, 'generation'), false);
+  const [restored] = administration('summarize', {
+    ...summary,
+    manifest: '123',
+    generation: '2',
+  });
+  const restoredInputs = JSON.parse(restored.data['approved-inputs.json']);
+  assert.equal(restoredInputs.manifest, 123);
+  assert.equal(restoredInputs.generation, 2);
+});
 
 test('bootstrap requires the reviewed backend digest even without schema validation', () => {
   assert.throws(() => administration('bootstrap', {}, [], false));

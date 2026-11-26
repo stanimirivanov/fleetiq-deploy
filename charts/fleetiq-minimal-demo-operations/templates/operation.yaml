@@ -105,6 +105,7 @@ metadata:
   namespace: {{ $namespace }}
 data:
   # Offline carrier for the provider. Apply only the separate immutable input, if present.
+  approved-inputs.json: {{ mustToJson $input | quote }}
   operation.json: |
     {{- $container := dict
       "name" (ternary "bootstrap" "operation" (eq $operation "bootstrap"))

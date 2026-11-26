@@ -155,13 +155,13 @@ function fixture() {
     pods: { items: [pod] },
     logPod: structuredClone(pod),
     log: '2026-11-26T12:00:04.012345678Z history cleanup restores=0 exports=0 export_leases=0\n',
-    args: {
+    submission: { metadata: { uid } },
+    submissionIntent: {
       target: 'qual-fleet-local',
       namespace,
       name,
       incarnation: 'qualification-incarnation',
       launcher,
-      jobUID: uid,
       mode: 'expire',
       deployment: '4'.repeat(40),
       backend,
@@ -177,7 +177,15 @@ function observe(mutate = () => {}) {
   mutate(attempt);
   const directory = mkdtempSync(join(tmpdir(), 'fleetiq-admin-receipt-test-'));
   try {
-    const inputs = ['rendered', 'job', 'pods', 'logPod', 'log'].flatMap((key) => {
+    const inputs = [
+      'rendered',
+      'job',
+      'pods',
+      'logPod',
+      'log',
+      'submission',
+      'submissionIntent',
+    ].flatMap((key) => {
       const file = join(directory, key);
       const raw = key === 'log';
       writeFileSync(file, raw ? attempt[key] : JSON.stringify(attempt[key]), {
@@ -185,19 +193,7 @@ function observe(mutate = () => {}) {
       });
       return [raw ? '--rawfile' : '--slurpfile', key, file];
     });
-    return JSON.parse(
-      run('jq', [
-        '-n',
-        ...inputs,
-        ...Object.entries(attempt.args).flatMap(([key, value]) => [
-          '--arg',
-          key,
-          value,
-        ]),
-        '-f',
-        receipt,
-      ]),
-    );
+    return JSON.parse(run('jq', ['-n', ...inputs, '-f', receipt]));
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -214,24 +210,34 @@ test('an exact terminal job with a correlated zero marker reports execution only
   });
 });
 
+test('an observed Job retains its original UID when the submission response is lost', () => {
+  const observed = observe((attempt) => {
+    attempt.submission = null;
+  });
+  assert.equal(observed.execution, 'exited-zero');
+  assert.equal(observed.jobUID, uid);
+  assert.equal(observed.podUID, podUID);
+});
+
 for (const [finding, change] of [
   [
     'unrelated provider digest',
-    ({ args }) => {
-      args.operationDigest = `sha256:${'a'.repeat(64)}`;
+    ({ submissionIntent }) => {
+      submissionIntent.operationDigest = `sha256:${'a'.repeat(64)}`;
     },
   ],
   [
     'old same-name Job after uncertain submission',
-    ({ args, job }) => {
-      args.jobUID = '';
+    (attempt) => {
+      attempt.submission = null;
+      const { job } = attempt;
       job.metadata.creationTimestamp = '2026-11-26T11:59:59Z';
     },
   ],
   [
     'foreign container image',
-    ({ args }) => {
-      args.imageID = `sha256:${'a'.repeat(64)}`;
+    ({ submissionIntent }) => {
+      submissionIntent.imageID = `sha256:${'a'.repeat(64)}`;
     },
   ],
   [

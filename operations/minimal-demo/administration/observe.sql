@@ -4,12 +4,28 @@ SET statement_timeout = '5s';
 SET lock_timeout = '2s';
 BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
 
+WITH request AS (
+  SELECT :'scope'::jsonb AS scope, :'approved_inputs'::jsonb AS approved
+)
 SELECT (
   current_database() = 'fleetiq' AND NOT pg_is_in_recovery()
     AND (SELECT oid FROM pg_database WHERE datname = current_database()) = :'database_oid'::oid
     AND (SELECT system_identifier::text FROM pg_catalog.pg_control_system()) = :'database_system_id'
     AND :'operation' IN ('migrate','bootstrap','rebuild','register','calculate','reclaim','summarize','expire')
-    AND jsonb_typeof(:'scope'::jsonb) = 'object'
+    AND jsonb_typeof(scope) = 'object'
+    AND jsonb_typeof(approved) = 'object'
+    AND scope @> approved
+    AND CASE :'operation'
+      WHEN 'bootstrap' THEN coalesce(scope->>'identityDigest' ~ '^[0-9a-f]{64}$', false)
+      WHEN 'rebuild' THEN nullif(scope->>'asset', '') IS NOT NULL
+        AND nullif(scope->>'property', '') IS NOT NULL
+        AND coalesce(scope->>'version' ~ '^[1-9][0-9]{0,9}$', false)
+      WHEN 'summarize' THEN
+        (scope->'manifest') IS NOT DISTINCT FROM (approved->'manifest')
+        AND (scope->'generation') IS NOT DISTINCT FROM (approved->'generation')
+        AND (scope ? 'receiptSeries') = (scope ? 'receiptRevision')
+      ELSE true
+    END
 )::integer AS valid,
   :'operation' = 'migrate' AS migrate,
   :'operation' = 'bootstrap' AS bootstrap,
@@ -19,6 +35,7 @@ SELECT (
   :'operation' = 'reclaim' AS reclaim,
   :'operation' = 'summarize' AS summarize,
   :'operation' = 'expire' AS expire
+FROM request
 \gset
 \if :valid
 \else
@@ -110,6 +127,7 @@ SELECT (
     AND s.width_ms = (scope.v->>'resolution')::bigint
     AND s.manifest_id IS NOT DISTINCT FROM (scope.v->>'manifest')::bigint
     AND s.restore_generation IS NOT DISTINCT FROM (scope.v->>'generation')::bigint
+    AND (scope.v->>'receiptSeries' IS NULL OR s.series_id = (scope.v->>'receiptSeries')::bigint)
   LEFT JOIN history.numeric_summaries r ON (r.tenant_id, r.series_id) = (s.tenant_id, s.series_id)
     AND r.revision = coalesce((scope.v->>'receiptRevision')::bigint, s.revision);
 \elif :expire

@@ -87,6 +87,11 @@ def log_messages($start; $finish):
     else null end
   end;
 
+($submissionIntent[0] // {}) as {
+  $target, $incarnation, $namespace, $name, $launcher, $deployment, $backend,
+  $operationDigest, $mode, $imageID, $intentAt
+} |
+($submission[0].metadata.uid // "") as $jobUID |
 ($rendered[0] // {}) as $wanted |
 ($job[0] // {}) as $j | ($pods[0].items // []) as $p |
 ($p[0].status.containerStatuses[0] // {}) as $c |
@@ -103,7 +108,10 @@ def log_messages($start; $finish):
 {format: "fleetiq-demo-admin-job.v1", target: $target, incarnation: $incarnation,
  namespace: $namespace, name: $name, launcher: $launcher, deployment: $deployment,
  backend: $backend, providerOperation: $operationDigest, operation: $mode} |
-if (($rendered | length) != 1 or ($operationDigest | digest | not)
+if (($submissionIntent | length) != 1 or ($submission | length) > 1
+    or (all([$target, $incarnation, $namespace, $name, $launcher, $deployment,
+      $backend, $operationDigest, $mode, $imageID, $intentAt][]; type == "string") | not)
+    or ($rendered | length) != 1 or ($operationDigest | digest | not)
     or $launcher != ("demo-launch-" + $operationDigest[7:31])
     or ($imageID | digest | not)
     or ($backend | test("^ghcr[.]io/stanimirivanov/fleetiq-platform@sha256:[0-9a-f]{64}$") | not)
