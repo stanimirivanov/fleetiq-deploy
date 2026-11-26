@@ -29,7 +29,9 @@ target/tools/manifests/helm template qual-demo-rebuild charts/fleetiq-minimal-de
 
 Review the provider's offline `configure` preview and `job` render. The
 provider owner checks the live target, enables the exact grant, and captures
-a fresh `health` observation. Prepare the reviewed route and verify its
+a fresh `health` observation. Select `bootstrap-route` for bootstrap,
+`reclaim-route` for reclamation, or `administrative-route` for the others.
+Render it with the exact `attempt` from the provider preview. Verify its
 isolation. Fence the simulator and archive worker and observe their
 termination. For bootstrap, verify the full writer fence. The credential
 owner stages the exact login and URL Secret, and the data observer uses a
@@ -41,8 +43,11 @@ archive and trusted private storage.
 [Runtime grant boundary](https://github.com/stanimirivanov/fleetiq-platform/blob/c2135d3f77ef1150efbc7beeee8d160271822da7/docs/operations/postgres-runtime-grants.md)
 
 Give the operator one private attempt directory with the exact
-`provider-job.json`, its approved digest, the provider grant and health
-receipts, the backend and scope, and two named access paths. The short-lived
+`provider-job.json`, the provider grant and health receipts, the backend
+and scope, and two named access paths. Review a single checksum manifest
+`approved-files.sha256` covering the provider Job, rendered input carrier,
+probe scope and database identity in `observation-inputs.psql`, SQL, and
+receipt filter. Give the operator its approved digest. The short-lived
 launcher kubeconfig can create the exact Job. The observer can read target
 identity, the named Job and its Pods and logs. Verify that it cannot create
 or delete Jobs or exec into Pods. The Job runtime has no Kubernetes API
@@ -61,6 +66,8 @@ submission intent in UTC. Retain it before sending create.
   "target": "qual-demo-local",
   "incarnation": "OBSERVED_KUBE_SYSTEM_UID",
   "namespace": "qual-demo-data",
+  "namespaceUID": "OBSERVED_DATA_NAMESPACE_UID",
+  "cnpgUID": "OBSERVED_DATABASE_CLUSTER_UID",
   "name": "qual-demo-rebuild",
   "launcher": "demo-launch-PROVIDER_DIGEST_PREFIX",
   "deployment": "REVIEWED_DEPLOYMENT_COMMIT",
@@ -83,15 +90,23 @@ must pass, and the operator must see that the exact Job name is unused.
 Keep the Job manifest read-only in the attempt directory.
 
 ```text
+sha256sum /private/attempt/approved-files.sha256
+sha256sum --check --strict /private/attempt/approved-files.sha256
+```
+
+Compare the first output to the approved digest before using the manifest.
+
+```text
 kubectl --kubeconfig /private/launcher.kubeconfig --context kind-qual-demo-local --namespace qual-demo-data --request-timeout=10s create --dry-run=server -f /private/attempt/provider-job.json -o name
 ```
 
-Run one create using the launcher kubeconfig. Save its response as
-`submission.json`. Preserve the private error and leave the response file
-empty if the server's reply was lost.
+Run one create using the launcher kubeconfig after recording the intent.
+Keep the original output and error privately. Use only one valid Job
+object as `submission.json`. Preserve incomplete raw output separately.
+Use a zero-byte `submission.json` if there was no valid response.
 
 ```text
-kubectl --kubeconfig /private/launcher.kubeconfig --context kind-qual-demo-local --namespace qual-demo-data --request-timeout=10s create -f /private/attempt/provider-job.json -o json > /private/attempt/submission.json
+kubectl --kubeconfig /private/launcher.kubeconfig --context kind-qual-demo-local --namespace qual-demo-data --request-timeout=10s create -f /private/attempt/provider-job.json -o json > /private/attempt/submission.raw
 ```
 
 A timeout, disconnect or ambiguous error means the submission is uncertain.
@@ -99,8 +114,16 @@ Proceed directly to recovery with the observer account.
 
 ## Recover and record
 
-Read the named Job on the same target. This is the next action after any
-lost response. Check the returned namespace, name, attempt marker,
+After a lost response, use a fresh private observation directory, shown
+below as `observe-01`. Repeat the checksum, TLS endpoint and observer
+principal checks. Read the live target, data namespace and CNPG UIDs and
+compare them with the reviewed attempt before reading the Job.
+
+```text
+kubectl --kubeconfig /private/observer.kubeconfig --context kind-qual-demo-local --namespace qual-demo-data --request-timeout=10s get namespace/kube-system namespace/qual-demo-data cluster.postgresql.cnpg.io/fleetiq-db -o json > /private/attempt/observe-01/target.json
+```
+
+Read the named Job and check the returned namespace, name, attempt marker,
 creation time and reviewed envelope. Match the returned UID against a
 known submission UID when available. Use a bounded watch for completion,
 up to 375 seconds from submission, and read the exact Job at the deadline.
@@ -108,8 +131,16 @@ If the Job is missing, foreign, unreadable or still pending at the deadline,
 record the reason and retain the available database observations. Keep
 the attempt unresolved until independently reconciled.
 
+When the first read shows an active Job, wait only for the remaining
+deadline. The example shows the full budget. Capture the exact Job after
+either completion or timeout.
+
 ```text
-kubectl --kubeconfig /private/observer.kubeconfig --context kind-qual-demo-local --namespace qual-demo-data --request-timeout=10s get job/qual-demo-rebuild -o json > /private/attempt/job.json
+kubectl --kubeconfig /private/observer.kubeconfig --context kind-qual-demo-local --namespace qual-demo-data wait --for=condition=Complete --timeout=375s job/qual-demo-rebuild
+```
+
+```text
+kubectl --kubeconfig /private/observer.kubeconfig --context kind-qual-demo-local --namespace qual-demo-data --request-timeout=10s get job/qual-demo-rebuild -o json > /private/attempt/observe-01/job.json
 ```
 
 Collect Pods by `batch.kubernetes.io/controller-uid` equal to the observed
@@ -122,7 +153,13 @@ observed objects against the approved manifest and emits execution
 evidence. These observations use the observer credential throughout.
 
 ```text
-jq -n --slurpfile submissionIntent /private/attempt/submission-intent.json --slurpfile submission /private/attempt/submission.json --slurpfile rendered /private/attempt/provider-job.json --slurpfile job /private/attempt/job.json --slurpfile pods /private/attempt/pods.json --slurpfile logPod /private/attempt/log-pod.json --rawfile log /private/attempt/container.log -f operations/minimal-demo/administration/job-receipt.jq > /private/attempt/execution-receipt.json
+kubectl --kubeconfig /private/observer.kubeconfig --context kind-qual-demo-local --namespace qual-demo-data --request-timeout=10s get pods -l batch.kubernetes.io/controller-uid=OBSERVED_JOB_UID -o json > /private/attempt/observe-01/pods.json
+kubectl --kubeconfig /private/observer.kubeconfig --context kind-qual-demo-local --namespace qual-demo-data --request-timeout=10s logs pod/OBSERVED_POD_NAME -c REVIEWED_CONTAINER --since-time=CONTAINER_START_UTC --timestamps --limit-bytes=4097 > /private/attempt/observe-01/container.log
+kubectl --kubeconfig /private/observer.kubeconfig --context kind-qual-demo-local --namespace qual-demo-data --request-timeout=10s get pod/OBSERVED_POD_NAME -o json > /private/attempt/observe-01/log-pod.json
+```
+
+```text
+jq -n --slurpfile submissionIntent /private/attempt/submission-intent.json --slurpfile submission /private/attempt/submission.json --slurpfile rendered /private/attempt/provider-job.json --slurpfile observedTarget /private/attempt/observe-01/target.json --slurpfile job /private/attempt/observe-01/job.json --slurpfile pods /private/attempt/observe-01/pods.json --slurpfile logPod /private/attempt/observe-01/log-pod.json --rawfile log /private/attempt/observe-01/container.log -f operations/minimal-demo/administration/job-receipt.jq > /private/attempt/observe-01/execution-receipt.json
 ```
 
 The observer uses the same reviewed host, CA, service, and private psql input

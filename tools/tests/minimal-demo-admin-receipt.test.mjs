@@ -155,10 +155,22 @@ function fixture() {
     pods: { items: [pod] },
     logPod: structuredClone(pod),
     log: '2026-11-26T12:00:04.012345678Z history cleanup restores=0 exports=0 export_leases=0\n',
-    submission: { metadata: { uid } },
+    submission: job,
+    observedTarget: {
+      items: [
+        {
+          kind: 'Namespace',
+          metadata: { name: 'kube-system', uid: 'qualification-incarnation' },
+        },
+        { kind: 'Namespace', metadata: { name: namespace, uid: 'data-namespace-uid' } },
+        { kind: 'Cluster', metadata: { name: 'fleetiq-db', uid: 'cnpg-cluster-uid' } },
+      ],
+    },
     submissionIntent: {
       target: 'qual-fleet-local',
       namespace,
+      namespaceUID: 'data-namespace-uid',
+      cnpgUID: 'cnpg-cluster-uid',
       name,
       incarnation: 'qualification-incarnation',
       launcher,
@@ -185,12 +197,17 @@ function observe(mutate = () => {}) {
       'log',
       'submission',
       'submissionIntent',
+      'observedTarget',
     ].flatMap((key) => {
       const file = join(directory, key);
       const raw = key === 'log';
-      writeFileSync(file, raw ? attempt[key] : JSON.stringify(attempt[key]), {
-        mode: 0o600,
-      });
+      writeFileSync(
+        file,
+        raw ? attempt[key] : attempt[key] == null ? '' : JSON.stringify(attempt[key]),
+        {
+          mode: 0o600,
+        },
+      );
       return [raw ? '--rawfile' : '--slurpfile', key, file];
     });
     return JSON.parse(run('jq', ['-n', ...inputs, '-f', receipt]));
@@ -220,6 +237,24 @@ test('an observed Job retains its original UID when the submission response is l
 });
 
 for (const [finding, change] of [
+  [
+    'recovery against a replacement incarnation',
+    ({ observedTarget }) => {
+      observedTarget.items[0].metadata.uid = 'replacement';
+    },
+  ],
+  [
+    'an incomplete intent',
+    (attempt) => {
+      attempt.submissionIntent = { mode: 'expire' };
+    },
+  ],
+  [
+    'an unknown successful-looking submit response',
+    (attempt) => {
+      attempt.submission = {};
+    },
+  ],
   [
     'unrelated provider digest',
     ({ submissionIntent }) => {

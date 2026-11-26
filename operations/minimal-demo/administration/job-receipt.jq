@@ -87,11 +87,17 @@ def log_messages($start; $finish):
     else null end
   end;
 
+def observed_uid($kind; $name; $uid):
+  any($observedTarget[0].items[]?;
+    .kind == $kind and .metadata.name == $name and .metadata.uid == $uid
+    and .metadata.deletionTimestamp == null);
+
 ($submissionIntent[0] // {}) as {
-  $target, $incarnation, $namespace, $name, $launcher, $deployment, $backend,
-  $operationDigest, $mode, $imageID, $intentAt
+  $target, $incarnation, $namespace, $namespaceUID, $cnpgUID, $name, $launcher,
+  $deployment, $backend, $operationDigest, $mode, $imageID, $intentAt
 } |
-($submission[0].metadata.uid // "") as $jobUID |
+($submission[0] // {}) as $submitted |
+($submitted.metadata.uid // "") as $jobUID |
 ($rendered[0] // {}) as $wanted |
 ($job[0] // {}) as $j | ($pods[0].items // []) as $p |
 ($p[0].status.containerStatuses[0] // {}) as $c |
@@ -101,21 +107,22 @@ def log_messages($start; $finish):
 ($p[0].metadata.creationTimestamp | timestamp) as $podCreated |
 ($c.state.terminated.startedAt | timestamp) as $started |
 ($c.state.terminated.finishedAt | timestamp) as $finished |
-($target + "-worker") as $node |
-($launcher | sub("^demo-launch-"; "demo-run-")) as $account |
+($target | tostring + "-worker") as $node |
+($launcher | tostring | sub("^demo-launch-"; "demo-run-")) as $account |
 ({(attempt): $launcher}) as $labels |
 ($wanted.spec.template.spec // {}) as $reviewedPod |
 {format: "fleetiq-demo-admin-job.v1", target: $target, incarnation: $incarnation,
  namespace: $namespace, name: $name, launcher: $launcher, deployment: $deployment,
  backend: $backend, providerOperation: $operationDigest, operation: $mode} |
 if (($submissionIntent | length) != 1 or ($submission | length) > 1
-    or (all([$target, $incarnation, $namespace, $name, $launcher, $deployment,
+    or (all([$target, $incarnation, $namespace, $namespaceUID, $cnpgUID, $name, $launcher, $deployment,
       $backend, $operationDigest, $mode, $imageID, $intentAt][]; type == "string") | not)
     or ($rendered | length) != 1 or ($operationDigest | digest | not)
     or $launcher != ("demo-launch-" + $operationDigest[7:31])
     or ($imageID | digest | not)
     or ($backend | test("^ghcr[.]io/stanimirivanov/fleetiq-platform@sha256:[0-9a-f]{64}$") | not)
-    or $incarnation == "" or ($deployment | test("^[0-9a-f]{40}$") | not)
+    or $incarnation == "" or $namespaceUID == "" or $cnpgUID == ""
+    or ($deployment | test("^[0-9a-f]{40}$") | not)
     or ($target | test("^[a-z][a-z0-9]*(-[a-z0-9]+)*-local$") | not)
     or $namespace != ($target | sub("-local$"; "-data"))
     or $wanted.apiVersion != "batch/v1" or $wanted.kind != "Job"
@@ -134,6 +141,15 @@ if (($submissionIntent | length) != 1 or ($submission | length) > 1
     or args($mode) == null or $reviewedPod.containers[0].args != args($mode)
     or $reviewedPod.containers[0].image != $backend or $reviewedPod.containers[0].imagePullPolicy != "Never") then
    . + {execution: "uncertain", reason: "reviewed-expectation-unverified"}
+elif (($observedTarget | length) != 1
+    or (observed_uid("Namespace"; "kube-system"; $incarnation) | not)
+    or (observed_uid("Namespace"; $namespace; $namespaceUID) | not)
+    or (observed_uid("Cluster"; "fleetiq-db"; $cnpgUID) | not)) then
+   . + {execution: "uncertain", reason: "target-identity-unverified"}
+elif (($submission | length) == 1 and ($submitted.apiVersion != "batch/v1" or $submitted.kind != "Job"
+    or $submitted.metadata.namespace != $namespace or $submitted.metadata.name != $name
+    or $submitted.metadata.labels != $labels or $jobUID == "")) then
+   . + {execution: "uncertain", reason: "submission-identity-unverified"}
 elif (($job | length) != 1 or $j.apiVersion != "batch/v1" or $j.kind != "Job"
       or $j.metadata.namespace != $namespace or $j.metadata.name != $name
       or ($j.metadata.uid // "") == "" or ($jobUID != "" and $j.metadata.uid != $jobUID)
