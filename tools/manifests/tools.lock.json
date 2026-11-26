@@ -112,6 +112,14 @@
       "sha256": "16093b8f0ad59d08fb562369fe7f9897d9c9558a79d49f0420155451d3326ee1"
     },
     {
+      "kind": "WorkflowTemplate",
+      "apiVersion": "argoproj.io/v1alpha1",
+      "file": "workflowtemplate_v1alpha1.json",
+      "url": "https://raw.githubusercontent.com/argoproj/argo-workflows/v4.1.5/manifests/base/crds/full/argoproj.io_workflowtemplates.yaml",
+      "crdSha256": "e932631a04a0f3a226b2ca8c68d43214c071c5d8aa6961b23298b81cbea3d9a5",
+      "sha256": "fa15d7480b2df4e7f1bfbb5196e4da6a81dd409c41a2ee7fbf5f580a64ded918"
+    },
+    {
       "kind": "Gateway",
       "apiVersion": "gateway.networking.k8s.io/v1",
       "file": "gateway_v1.json",

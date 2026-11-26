@@ -6,9 +6,19 @@
   "properties": {
     "operation": { "enum": ["bootstrap", "bootstrap-route", "migration-route"] },
     "attempt": { "type": "string", "pattern": "^demo-launch-[a-f0-9]{24}$" },
+    "workflowName": {
+      "type": "string",
+      "maxLength": 63,
+      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+    },
     "backend": { "type": "string", "minLength": 1 }
   },
   "allOf": [
+    {
+      "if": { "properties": { "operation": { "const": "migration-route" } } },
+      "then": { "required": ["workflowName"] },
+      "else": { "not": { "required": ["workflowName"] } }
+    },
     {
       "if": { "properties": { "operation": { "const": "bootstrap" } } },
       "then": { "required": ["backend"] },

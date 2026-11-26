@@ -132,19 +132,30 @@ printf '%s  %s\n' "$(jq -er '.migrationInventory.digest | sub("^sha256:"; "")' "
     "invalid.invalid/psql=$POSTGRES"
   "$KUSTOMIZE" build . > "$PRIVATE/db-workflow.yaml"
 )
-"$HELM" template fleetiq "$DEMO_OPERATIONS" --namespace "$DATA" \
-  --kube-version 1.35.0 --set operation=migration-route > "$PRIVATE/db-migration-route.yaml"
 ```
 
 3. Stage the two immutable ConfigMaps and reviewed WorkflowTemplate. Register
-   that exact template name through the provider's allowlist. Stage the rendered
-   migration routes. Resume the approved provider Argo phase, submit the
-   suspended Workflow bound to `RELEASE_DIGEST`, and have the independent approver
-   release its suspension. Confirm the exact request, template and target.
-   Wait at most 900 seconds for the workflow's `Succeeded`, `Failed` or `Error`
-   outcome. Require all four steps to succeed and verify the exporter can still
-   scrape. Preserve Workflow and Pod UIDs, step outcomes, publication and SQL
-   identities and effective resource bounds. [Provider submission and approval](https://github.com/stanimirivanov/k8s-infrastructure/blob/main/docs/delegated-argo.md#submission-approval-and-identity)
+   that exact template name through the provider's allowlist. Choose a fresh
+   `WORKFLOW_NAME` and submit a suspended Workflow with that explicit name, the
+   reviewed template, and `RELEASE_DIGEST` through the approved release identity.
+   Confirm the submitted object and retain its UID. Render the route for that
+   exact name, review both policies in the same attempt, and have the authorized
+   network operator install both before independent approval. Confirm the live
+   selectors match the workflow name, executor account, maintenance component,
+   and release namespace. On a retry choose a fresh name and review fresh routes.
+
+```bash
+"$HELM" template fleetiq "$DEMO_OPERATIONS" --namespace "$DATA" \
+  --kube-version 1.35.0 --set operation=migration-route \
+  --set-string "workflowName=$WORKFLOW_NAME" > "$PRIVATE/db-migration-route.yaml"
+```
+
+   Release suspension only after confirming the exact request, template and
+   target. Wait at most 900 seconds for `Succeeded`, `Failed` or `Error`.
+   Require all four steps to succeed and verify the exporter can still scrape.
+   Preserve Workflow and Pod UIDs, step outcomes, publication and SQL identities
+   and effective resource bounds. [Provider submission and approval](https://github.com/stanimirivanov/k8s-infrastructure/blob/main/docs/delegated-argo.md#submission-approval-and-identity)
+
 4. Remove the temporary migration route after the workflow Pods terminate.
    Reconcile the bootstrap render, verify the owner is NOLOGIN, and have the
    credential operator retire the exact migration password Secrets. Preserve the
@@ -179,7 +190,7 @@ budget. [Provider operation approval](https://github.com/stanimirivanov/k8s-infr
 
 ```bash
 "$HELM" template fleetiq "$DEMO_OPERATIONS" --namespace "$DATA" \
-  --kube-version 1.35.0 --set "operation=bootstrap-route,attempt=$LAUNCHER" \
+  --kube-version 1.35.0 --set operation=bootstrap-route --set-string "attempt=$LAUNCHER" \
   > "$PRIVATE/db-bootstrap-route.yaml"
 ```
 
@@ -198,41 +209,198 @@ approved Argo lifecycle permits it.
 
 ## Runtime and retained restart qualification
 
-Run on the separately authorized target using the same primary service, its
-public CA and a bounded client owned by the credential operator. For each
-selected runtime identity, configure a mode-0600 private libpq service and
-password file with `sslmode=verify-full`, `connect_timeout=5`, and the
-matching role. Set `PGSERVICEFILE` to that file and `PGSERVICE` to its service
-name. Use per-request timeouts in addition to the SQL timeouts.
+Use the same primary Service and CA. Have the credential operator configure a
+mode-0600 `PGSERVICEFILE` and password file with one service named for each
+reviewed role, `sslmode=verify-full` and `connect_timeout=5`. Capture the
+expected role names and the owner-observed `DB_OID` from the reviewed migration
+request and runtime contract. Reuse these same files after restart.
 
 ```bash
-timeout 30s psql -X -w -qAt --set=ON_ERROR_STOP=1 -f "$DEMO/probe.sql" \
-  > "$PRIVATE/$PGSERVICE-role-receipt.json"
-timeout 30s psql -X -w -At --set=ON_ERROR_STOP=1 -c \
-  "SELECT version || ':' || encode(checksum, 'hex') FROM public._sqlx_migrations ORDER BY version" \
-  > "$PRIVATE/observed-ledger.txt"
-jq -r '.migrations[] | "\(.version):\(.checksum)"' "$MIGRATIONS" \
+jq -er '.databaseOid | select(type == "number" and . > 0)' \
+  "$PRIVATE/db-reviewed-request.json" > "$PRIVATE/expected-database-oid.txt"
+pnpm exec yaml --json --single < "$DEMO/runtime.yaml" |
+  jq -er '.workloadDatabase.workloads[] | "fleetiq_" + (split(" ")[0] | gsub("-"; "_"))' \
+  > "$PRIVATE/expected-roles.txt"
+test -s "$PRIVATE/expected-roles.txt"
+ENTRIES=$(jq -er '.migrationInventory.count' "$PIN")
+test "$(jq -er '.migrations | length' "$MIGRATIONS")" = "$ENTRIES"
+jq -er '.migrations | sort_by(.version | tonumber)[] | "\(.version):\(.checksum)"' "$MIGRATIONS" \
   > "$PRIVATE/expected-ledger.txt"
-cmp "$PRIVATE/expected-ledger.txt" "$PRIVATE/observed-ledger.txt"
+
+probe_roles() {
+  local phase=$1 role
+  while IFS= read -r role; do
+    PGSERVICE="$role" timeout 30s psql -X -w -qAt --set=ON_ERROR_STOP=1 \
+      --set="expected_role=$role" \
+      --set="expected_database_oid=$(<"$PRIVATE/expected-database-oid.txt")" \
+      --set="expected_ledger_entries=$ENTRIES" -f "$DEMO/probe.sql" \
+      > "$PRIVATE/$phase-$role.json"
+  done < "$PRIVATE/expected-roles.txt"
+  PGSERVICE=fleetiq_serve timeout 30s psql -X -w -At --set=ON_ERROR_STOP=1 -c \
+    "SELECT version || ':' || encode(checksum, 'hex') FROM public._sqlx_migrations ORDER BY version" \
+    > "$PRIVATE/$phase-ledger.txt"
+  cmp "$PRIVATE/expected-ledger.txt" "$PRIVATE/$phase-ledger.txt"
+}
 ```
 
-Repeat a bounded connection with `PGSSLMODE=disable` using identical known-good
-credentials and require HBA rejection. If your libpq service sets `sslmode`
-directly, override it in the connection parameters via
-`--dbname="service=$PGSERVICE sslmode=disable"`. Use short-lived connection
-test credentials and private diagnostic output. Confirm CNPG's effective
-database container memory limit, live reserved connection slots and sampled
-connections during the selected workers' measured service/administrative
-activity. Distinguish samples from peak evidence. The scoped probe checks
-actual ledger reads, expected role withdrawal, denial of DDL and role assumption,
-and session measurements. The shared workflow verifies grant coverage and
-exporter admission. [Worker Pod, replay and trigger handoffs](https://github.com/stanimirivanov/fleetiq-deploy/issues/97)
+Repeat a bounded connection using the same known-good credentials and
+`--dbname="service=fleetiq_serve sslmode=disable"`. Require HBA rejection and
+keep diagnostics private. The probe checks the exact runtime login, database
+OID, reviewed ledger count, role withdrawal, DDL denial and role assumption
+denial. The shared workflow verifies grant coverage and exporter admission.
 
-Commission a bounded synthetic tenant and its observation through authenticated
-FleetIQ product APIs. Record the same tenant/device/message identities and
-bounded observation before and after the separately authorized retained
-restart. Compare the result, Cluster UID and exact PVC/PV UIDs. Require the
-PostgreSQL start time to change and rerun the role and ledger probe. A new claim,
-lost observation, missed sample, incomplete protected operation or failed
-probe leaves the corresponding gate pending. Preserve data and sanitized
-evidence on failures and keep credentials and raw diagnostics outside Git.
+From an approved observation connection `OBSERVER_SERVICE` with full
+`pg_stat_activity` visibility, sample all database client connections by role
+and the live reserves. Retain samples with timestamps during bounded workload
+and administrative activity. Verify the effective database container memory limit
+is 768 MiB and check Pod restarts and termination reasons over the same window.
+
+```bash
+observe_db() {
+  PGSERVICE="$OBSERVER_SERVICE" timeout 30s psql -X -w -qAt --set=ON_ERROR_STOP=1 \
+    --command="SET statement_timeout = '8s'" "$@"
+}
+observe_db --command="
+  SELECT json_build_object('sampled_at', clock_timestamp(),
+    'max_connections', current_setting('max_connections')::integer,
+    'reserved_connections', current_setting('reserved_connections')::integer,
+    'superuser_reserved_connections', current_setting('superuser_reserved_connections')::integer,
+    'clients', coalesce(json_object_agg(usename, sessions), '{}'::json))
+  FROM (SELECT usename, count(*) AS sessions FROM pg_stat_activity
+        WHERE backend_type = 'client backend' AND usename IS NOT NULL
+        GROUP BY usename) AS counts" >> "$PRIVATE/db-connection-samples.jsonl"
+```
+
+Count the observation connection in nonproduct usage. Require the enabled
+resident pool totals to stay within their reviewed 34/36 connections and the
+serialized administrative operation to stay within its reviewed command bound.
+Use `64 - superuser_reserved_connections - reserved_connections` as the ordinary
+connection budget. At every sample, require ordinary slots to remain available.
+For the steady-state envelope, add the reviewed 38 product and routine
+administrative connections to the measured peak nonproduct usage and require
+that total to fit in the ordinary budget. Measure bootstrap separately with
+writers fenced. Report sampling interval, duration, covered roles and observed
+peaks. Synthetic held connections exercise the database envelope. Whole-demo
+fit requires observed real workers and their workload activity.
+[Worker Pod, replay and trigger handoffs](https://github.com/stanimirivanov/fleetiq-deploy/issues/97)
+
+### Capture the retained observation
+
+Commission a synthetic tenant through authenticated `POST /api/v1/admin/tenants`
+with the reviewed `provisioning_id`, `tenant_id` and
+`initial_administrator_actor_id`. Use the operator's bearer-authenticated
+`GET /api/v1/admin/tenants?limit=100` as the bounded observation. Set
+`QUAL_TENANT` to the commissioned ID and keep the bearer and trust settings in
+mode-0600 `CURL_CONFIG`. Use the same tenant and comparable observation after
+restart. Any additional reviewed product fixture, such as a device message,
+needs its own bounded stable read and comparison.
+
+Set `KUBECONFIG_FILE` and `KUBE_CONTEXT` to the selected authorized target.
+Have an operator authorized to read the retained storage metadata capture the
+exact bound data claim `DB_PVC`, confirmed from the live primary's data volume.
+Use the same observer connection to record the PostgreSQL system identifier.
+
+```bash
+kube_db() {
+  timeout 20s kubectl --kubeconfig "$KUBECONFIG_FILE" --context "$KUBE_CONTEXT" \
+    --request-timeout=10s "$@"
+}
+capture_retained() {
+  local phase=$1 pv
+  curl --disable --config "$CURL_CONFIG" --proto '=https' --fail --silent --show-error \
+    --max-time 10 \
+    --max-filesize 131072 "$PRODUCT_ORIGIN/api/v1/admin/tenants?limit=100" |
+    jq -ceS --arg tenant "$QUAL_TENANT" \
+      '[.. | objects | select(.tenant_id? == $tenant)] | select(length == 1) | .[0]' \
+    > "$PRIVATE/$phase-observation.json"
+  kube_db -n "$DATA" get cluster.postgresql.cnpg.io fleetiq-db -o json |
+    jq -er '.metadata.uid' > "$PRIVATE/$phase-cluster-uid.txt"
+  kube_db -n "$DATA" get pvc "$DB_PVC" -o json |
+    jq -ceS 'select(.status.phase == "Bound") | {uid: .metadata.uid, pv: .spec.volumeName}' \
+    > "$PRIVATE/$phase-claim.json"
+  pv=$(jq -er '.pv | select(length > 0)' "$PRIVATE/$phase-claim.json")
+  kube_db get pv "$pv" -o json |
+    jq -ceS --arg uid "$(jq -er '.uid' "$PRIVATE/$phase-claim.json")" \
+      'select(.spec.claimRef.uid == $uid and .spec.persistentVolumeReclaimPolicy == "Retain") |
+        {uid: .metadata.uid, claimUid: .spec.claimRef.uid}' > "$PRIVATE/$phase-volume.json"
+  observe_db --command='SELECT system_identifier FROM pg_control_system()' \
+    > "$PRIVATE/$phase-system-id.txt"
+  jq -er '.database_oid' "$PRIVATE/$phase-fleetiq_serve.json" \
+    > "$PRIVATE/$phase-database-oid.txt"
+  jq -er '.started_at' "$PRIVATE/$phase-fleetiq_serve.json" \
+    > "$PRIVATE/$phase-postmaster-start.txt"
+}
+probe_roles before
+capture_retained before
+```
+
+### Fence, drain, restart and verify
+
+Fence all writers and new release activity. Stop the simulator and archive,
+wait for in-flight operations to finish and close all producer connection
+pools, including the backend used for the observation. Observe the affected
+Pods terminate or the pools close before restarting. With the same observer
+service, require no unexpected clients on `fleetiq`. Confirm the existing
+exporter identity before allowing its short monitoring connections.
+
+```bash
+test "$(observe_db --command="SELECT NOT EXISTS (
+  SELECT FROM pg_stat_activity WHERE datname = 'fleetiq'
+    AND backend_type = 'client backend' AND pid <> pg_backend_pid()
+    AND usename IS DISTINCT FROM 'cnpg_metrics_exporter')")" = t
+primary_identity() {
+  local primary
+  primary=$(kube_db -n "$DATA" get cluster.postgresql.cnpg.io fleetiq-db -o json |
+    jq -er 'select(any(.status.conditions[]; .type == "Ready" and .status == "True")) |
+      .status.currentPrimary | select(length > 0)') || return
+  kube_db -n "$DATA" get pod "$primary" -o json |
+    jq -ce --arg claim "$DB_PVC" 'select(.metadata.labels["cnpg.io/cluster"] == "fleetiq-db"
+      and .metadata.deletionTimestamp == null
+      and any(.status.conditions[]; .type == "Ready" and .status == "True")
+      and any(.spec.volumes[]; .persistentVolumeClaim.claimName? == $claim)) |
+      {name: .metadata.name, uid: .metadata.uid}'
+}
+primary_identity > "$PRIVATE/before-primary.json"
+```
+
+With separate restart authorization, gracefully restart only the recorded
+single-instance Pod. Apply the UID precondition and allow up to 180 seconds for
+CNPG to replace it with a Ready primary mounting the same claim. Preserve the
+Cluster and retained storage. If replacement is ambiguous, keep the installation
+fenced and preserve the evidence. [Kubernetes DeleteOptions](https://kubernetes.io/docs/reference/kubernetes-api/definitions/delete-options-v1-meta/)
+
+```bash
+OLD_UID=$(jq -er '.uid' "$PRIVATE/before-primary.json")
+PRIMARY=$(jq -er '.name' "$PRIVATE/before-primary.json")
+jq -n --arg uid "$OLD_UID" \
+  '{apiVersion: "v1", kind: "DeleteOptions", preconditions: {uid: $uid}}' \
+  > "$PRIVATE/restart-delete-options.json"
+kube_db delete --raw "/api/v1/namespaces/$DATA/pods/$PRIMARY" \
+  --filename "$PRIVATE/restart-delete-options.json" > "$PRIVATE/restart-delete-result.json"
+deadline=$((SECONDS + 180))
+while (( SECONDS < deadline )); do
+  if primary_identity > "$PRIVATE/after-primary.json" &&
+      test "$(jq -er '.uid' "$PRIVATE/after-primary.json")" != "$OLD_UID"; then
+    break
+  fi
+  sleep 2
+done
+test "$SECONDS" -lt "$deadline"
+```
+
+Recommission the checked backend only for the authenticated read, rerun all
+role and ledger probes, and compare the retained evidence before reopening
+writers.
+
+```bash
+probe_roles after
+capture_retained after
+for component in observation.json cluster-uid.txt claim.json volume.json system-id.txt database-oid.txt; do
+  cmp "$PRIVATE/before-$component" "$PRIVATE/after-$component"
+done
+test "$(<"$PRIVATE/before-postmaster-start.txt")" != "$(<"$PRIVATE/after-postmaster-start.txt")"
+```
+
+A new claim, lost observation, incomplete drain, or failed probe leaves the
+qualification pending. Preserve data and sanitized evidence and keep credentials
+and raw diagnostics outside Git.

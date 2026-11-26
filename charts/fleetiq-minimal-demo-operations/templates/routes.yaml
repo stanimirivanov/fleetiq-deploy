@@ -10,7 +10,11 @@
 {{- $phase := trimSuffix "-route" .Values.operation }}
 {{- if eq $phase "migration" }}
 {{- $clientNamespace = printf "%s-releases" (trimSuffix "-data" $data) }}
-{{- $labels = dict $accountLabel "release-executor" "app.kubernetes.io/component" "fleetiq-demo-database-maintenance" }}
+{{- $workflow := required "Select the approved migration Workflow name" .Values.workflowName }}
+{{- if or (gt (len $workflow) 63) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $workflow)) }}
+{{- fail "Select a valid exact migration Workflow name" }}
+{{- end }}
+{{- $labels = dict $accountLabel "release-executor" "app.kubernetes.io/component" "fleetiq-demo-database-maintenance" "workflows.argoproj.io/workflow" $workflow }}
 {{- else }}
 {{- $attempt := required "Select the approved bootstrap attempt" .Values.attempt }}
 {{- if not (regexMatch "^demo-launch-[a-f0-9]{24}$" $attempt) }}

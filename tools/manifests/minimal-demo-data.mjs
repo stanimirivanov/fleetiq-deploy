@@ -5,7 +5,14 @@ import { resolve } from 'node:path';
 import { digest } from '../policy.mjs';
 import { root } from '../process.mjs';
 import { checkDatabaseRoles, dataPolicy } from './data-policy.mjs';
-import { database, demoNamespaces } from './minimal-demo-network.mjs';
+import {
+  attemptLabel,
+  database,
+  demoNamespaces,
+  dns,
+  postgresPort,
+  simulatorAccount,
+} from './minimal-demo-network.mjs';
 import { documents, validateSchemas } from './render.mjs';
 import { toolsLock } from './toolchain.mjs';
 
@@ -25,6 +32,61 @@ const residentPools = {
   'notification-worker': 4,
   'archive-worker': 2,
 };
+
+const demoPhases = {
+  migration: { workloads: [], maintenance: true, migrationLogin: true },
+  bootstrap: { workloads: [], maintenance: true, bootstrapLogin: true },
+  runtime: { workloads: Object.keys(residentPools) },
+};
+const ciliumNamespace = 'k8s:io.kubernetes.pod.namespace';
+const ciliumAccount = 'io.cilium.k8s.policy.serviceaccount';
+const migrationLabels = {
+  'app.kubernetes.io/component': 'fleetiq-demo-database-maintenance',
+};
+
+function checkTemporaryRoute(rendered, phase, namespace, clientNamespace, labels) {
+  const endpoint = (space, matchLabels) => ({
+    matchLabels: { [ciliumNamespace]: space, ...matchLabels },
+  });
+  const ports = (port, protocols = ['TCP']) => [
+    { ports: protocols.map((protocol) => ({ port: String(port), protocol })) },
+  ];
+  const policy = (side, namespace, matchLabels, rules) => ({
+    apiVersion: 'cilium.io/v2',
+    kind: 'CiliumNetworkPolicy',
+    metadata: { name: `fleetiq-demo-${phase}-${side}`, namespace },
+    spec: { endpointSelector: { matchLabels }, ...rules },
+  });
+  assert.deepEqual(
+    rendered,
+    [
+      policy('client', clientNamespace, labels, {
+        egress: [
+          {
+            toEndpoints: [endpoint('kube-system', dns)],
+            toPorts: ports(53, ['UDP', 'TCP']),
+          },
+          {
+            toEndpoints: [endpoint(namespace, database)],
+            toPorts: ports(postgresPort),
+          },
+          ...(phase === 'migration'
+            ? [{ toEntities: ['kube-apiserver'], toPorts: ports(6443) }]
+            : []),
+        ],
+      }),
+      policy('postgres', namespace, database, {
+        ingress: [
+          {
+            fromEndpoints: [endpoint(clientNamespace, labels)],
+            toPorts: ports(postgresPort),
+          },
+        ],
+      }),
+    ],
+    'Temporary database route differs from the exact operation and destinations',
+  );
+}
 
 export function validateBackendSelection(selection) {
   assert.equal(selection.format, 'fleetiq-minimal-demo-backend.v1');
@@ -58,9 +120,8 @@ export function validateBackendSelection(selection) {
   return selection;
 }
 
-function connectionBudget(workloads, maximum) {
+function connectionBudget(maximum) {
   assert.equal(maximum, '64', 'Require the approved PostgreSQL connection setting');
-  assert.deepEqual([...workloads].sort(), Object.keys(residentPools).sort());
   const normal = Object.entries(residentPools)
     .filter(([command]) => command !== 'archive-worker')
     .reduce((sum, [, limit]) => sum + limit, 0);
@@ -136,7 +197,9 @@ function checkDemoWorkflow(
         { configMapRef: { name: inputs.metadata.name } },
       ]);
     }
-    return { rendered, workflow };
+    assert.deepEqual(workflow.spec.podMetadata.labels, migrationLabels);
+    assert.equal(workflow.spec.serviceAccountName, 'release-executor');
+    return rendered;
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -161,12 +224,16 @@ export function checkMinimalDemoData(tools, consumer) {
         ...args,
       ]),
     );
-  let workloads;
+  const { workloads } = demoPhases.runtime;
   let connections;
   const phases = Object.fromEntries(
-    ['migration', 'bootstrap', 'runtime'].map((phase) => {
+    Object.entries(demoPhases).map(([phase, workloadDatabase]) => {
       const path = resolve(environment, `${phase}.yaml`);
-      const [{ workloadDatabase }] = documents(readFileSync(path, 'utf8'));
+      assert.deepEqual(
+        documents(readFileSync(path, 'utf8')),
+        [{ workloadDatabase }],
+        `Unexpected reviewed values for minimal-demo ${phase} phase`,
+      );
       const rendered = render(
         resolve(root, 'charts/fleetiq-data'),
         'fleetiq',
@@ -206,9 +273,7 @@ export function checkMinimalDemoData(tools, consumer) {
         requireTLS: true,
       });
       if (phase === 'runtime') {
-        workloads = workloadDatabase.workloads;
         connections = connectionBudget(
-          workloads,
           cluster.spec.postgresql.parameters.max_connections,
         );
       }
@@ -228,26 +293,40 @@ export function checkMinimalDemoData(tools, consumer) {
   const [container] = operation.podSpec.containers;
   assert.equal(container.image, backendSelection.backend.reference);
   assert.deepEqual(container.args, ['bootstrap-platform-operator', '--check-schema']);
-  const migrationRoute = render(chart, 'fleetiq', '--set', 'operation=migration-route');
+  const workflowName = 'demo-migration-0123456789abcdef01234567';
+  const bootstrapAttempt = 'demo-launch-0123456789abcdef01234567';
+  const migrationRoute = render(
+    chart,
+    'fleetiq',
+    '--set',
+    'operation=migration-route',
+    '--set-string',
+    `workflowName=${workflowName}`,
+  );
   const bootstrapRoute = render(
     chart,
     'fleetiq',
     '--set',
-    'operation=bootstrap-route,attempt=demo-launch-0123456789abcdef01234567',
+    'operation=bootstrap-route',
+    '--set-string',
+    `attempt=${bootstrapAttempt}`,
   );
-  const { rendered: workflowResources, workflow } = checkDemoWorkflow(tools, {
+  checkTemporaryRoute(migrationRoute, 'migration', namespace, `${consumer}-releases`, {
+    ...migrationLabels,
+    [ciliumAccount]: 'release-executor',
+    'workflows.argoproj.io/workflow': workflowName,
+  });
+  checkTemporaryRoute(bootstrapRoute, 'bootstrap', namespace, namespace, {
+    [attemptLabel]: bootstrapAttempt,
+    [ciliumAccount]: simulatorAccount(bootstrapAttempt),
+  });
+  const workflowResources = checkDemoWorkflow(tools, {
     namespace,
     consumer,
     postgres: data.image,
     backend: backendSelection.backend.reference,
     workloads,
   });
-  const clientLabels = migrationRoute[0].spec.endpointSelector.matchLabels;
-  assert.deepEqual(clientLabels, {
-    ...workflow.spec.podMetadata.labels,
-    'io.cilium.k8s.policy.serviceaccount': workflow.spec.serviceAccountName,
-  });
-  assert.equal(migrationRoute[0].metadata.namespace, workflow.metadata.namespace);
   const operations = [...bootstrap, ...migrationRoute, ...bootstrapRoute];
   return {
     phases: Object.fromEntries(
@@ -262,6 +341,7 @@ export function checkMinimalDemoData(tools, consumer) {
     ),
     operationSchemas: validateSchemas(tools, operations),
     workflowResources: workflowResources.length,
+    workflowSchemas: validateSchemas(tools, workflowResources),
     connections,
     execution: 'not-performed',
   };
