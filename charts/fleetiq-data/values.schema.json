@@ -11,17 +11,22 @@
     "storage",
     "database",
     "owner",
-    "resources"
+    "resources",
+    "runtime"
   ],
   "properties": {
     "workloadDatabase": {
       "type": "object",
       "additionalProperties": false,
       "required": ["workloads"],
+      "if": {
+        "properties": { "maintenance": { "const": true } },
+        "required": ["maintenance"]
+      },
+      "else": { "properties": { "workloads": { "minItems": 1 } } },
       "properties": {
         "workloads": {
           "type": "array",
-          "minItems": 1,
           "uniqueItems": true,
           "items": {
             "enum": [
@@ -52,7 +57,7 @@
     },
     "profile": {
       "type": "string",
-      "enum": ["local", "nonlocal", "minimal-demo-candidate"]
+      "enum": ["local", "nonlocal"]
     },
     "clusterName": {
       "type": "string",
@@ -180,6 +185,10 @@
         }
       }
     },
+    "externalNetworkPolicies": {
+      "type": "boolean",
+      "description": "Use operator-owned policies for a scoped local Cluster."
+    },
     "network": {
       "type": "object",
       "additionalProperties": false,
@@ -267,48 +276,34 @@
           "type": "boolean"
         }
       }
+    },
+    "postgresql": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxConnections": { "type": "integer", "minimum": 1, "maximum": 262143 },
+        "requireTLS": { "type": "boolean" }
+      }
     }
   },
   "allOf": [
     {
       "if": {
-        "properties": {
-          "profile": { "const": "minimal-demo-candidate" }
-        }
+        "properties": { "externalNetworkPolicies": { "const": true } },
+        "required": ["externalNetworkPolicies"]
       },
       "then": {
-        "not": {
-          "anyOf": [
-            { "required": ["runtime"] },
-            { "required": ["network"] },
-            { "required": ["workloadDatabase"] }
-          ]
-        },
+        "required": ["workloadDatabase"],
         "properties": {
-          "clusterName": { "const": "fleetiq-db" },
-          "image": {
-            "const": "registry.invalid/candidate/postgresql:18.4-system-trixie@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-          },
-          "instances": { "const": 1 },
-          "storage": { "const": { "className": "local-retained", "size": "4Gi" } },
-          "database": { "const": "fleetiq" },
-          "owner": {
-            "const": {
-              "role": "fleetiq_migrator",
-              "passwordSecret": "offline-candidate-migration-owner"
-            }
-          },
-          "resources": {
-            "const": {
-              "requests": { "cpu": "200m", "memory": "256Mi" },
-              "limits": { "cpu": "1", "memory": "768Mi" }
-            }
+          "profile": { "const": "local" },
+          "workloadDatabase": {
+            "required": ["retireLegacy"],
+            "properties": { "retireLegacy": { "const": true } }
           }
-        }
+        },
+        "not": { "required": ["network"] }
       },
-      "else": {
-        "required": ["runtime", "network"]
-      }
+      "else": { "required": ["network"] }
     },
     {
       "if": {

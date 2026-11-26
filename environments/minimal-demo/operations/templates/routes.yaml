@@ -1,0 +1,63 @@
+{{- if or (eq .Values.operation "migration-route") (eq .Values.operation "bootstrap-route") }}
+{{- $data := .Release.Namespace }}
+{{- if or (not (regexMatch "^[a-z][a-z0-9]*(-[a-z0-9]+)*-data$" $data)) (gt (len $data) 37) }}
+{{- fail "Select the delegated data namespace" }}
+{{- end }}
+{{- $namespaceLabel := "k8s:io.kubernetes.pod.namespace" }}
+{{- $accountLabel := "io.cilium.k8s.policy.serviceaccount" }}
+{{- $clientNamespace := $data }}
+{{- $labels := dict }}
+{{- $phase := trimSuffix "-route" .Values.operation }}
+{{- if eq $phase "migration" }}
+{{- $clientNamespace = printf "%s-releases" (trimSuffix "-data" $data) }}
+{{- $labels = dict $accountLabel "release-executor" "app.kubernetes.io/component" "fleetiq-demo-database-maintenance" }}
+{{- else }}
+{{- $attempt := required "Select the approved bootstrap attempt" .Values.attempt }}
+{{- if not (regexMatch "^demo-launch-[a-f0-9]{24}$" $attempt) }}
+{{- fail "Select the exact approved bootstrap attempt" }}
+{{- end }}
+{{- $labels = dict $accountLabel (replace "launch" "run" $attempt) "k8s-infrastructure.io/demo-attempt" $attempt }}
+{{- end }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: fleetiq-demo-{{ $phase }}-client
+  namespace: {{ $clientNamespace }}
+spec:
+  endpointSelector:
+    matchLabels: {{ toJson $labels }}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            {{ $namespaceLabel }}: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - { port: '53', protocol: UDP }
+            - { port: '53', protocol: TCP }
+    - toEndpoints:
+        - matchLabels:
+            {{ $namespaceLabel }}: {{ $data }}
+            cnpg.io/cluster: fleetiq-db
+      toPorts:
+        - ports: [{ port: '5432', protocol: TCP }]
+{{- if eq $phase "migration" }}
+    - toEntities: [kube-apiserver]
+      toPorts:
+        - ports: [{ port: '6443', protocol: TCP }]
+{{- end }}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: fleetiq-demo-{{ $phase }}-postgres
+  namespace: {{ $data }}
+spec:
+  endpointSelector:
+    matchLabels: { cnpg.io/cluster: fleetiq-db }
+  ingress:
+    - fromEndpoints:
+        - matchLabels: {{ set $labels $namespaceLabel $clientNamespace | toJson }}
+      toPorts:
+        - ports: [{ port: '5432', protocol: TCP }]
+{{- end }}

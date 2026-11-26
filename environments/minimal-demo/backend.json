@@ -1,0 +1,21 @@
+{
+  "format": "fleetiq-minimal-demo-backend.v1",
+  "backend": {
+    "reference": "ghcr.io/stanimirivanov/fleetiq-platform@sha256:11bebfe12129c95bc2c3854b482c388190b324264ba660921907816da68c22b0",
+    "source": {
+      "repository": "stanimirivanov/fleetiq-platform",
+      "revision": "c2135d3f77ef1150efbc7beeee8d160271822da7"
+    },
+    "publication": {
+      "run": 45691686449,
+      "attempt": 1,
+      "artifactDigest": "sha256:427d21924063a1c6e99d19b0ade53edccb694f6c0b3f13903c3c20b015d411f3",
+      "recordDigest": "sha256:47bf47c10a87d17399858e3400f0bb6f762d38fea0c074bc5f42897c0ceaf0e8"
+    }
+  },
+  "migrationInventory": {
+    "digest": "sha256:67772e214e26fdc892b65b1636acd721d14ca1291bb49f1c209c9ffba8f64927",
+    "count": 59
+  },
+  "qualifiedSqlRevision": "d269d16a4d23169e34042a29cb594b66c08d6e22"
+}

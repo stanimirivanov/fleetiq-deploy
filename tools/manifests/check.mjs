@@ -24,12 +24,11 @@ export function checkManifests() {
     manifestPolicy(rendered, state);
     measurements.push({ ...state, resources: rendered.length, schemas });
   }
-  const { fingerprint, schemas, execution } = checkMinimalDemoData(tools, 'fleetiq');
   return {
     kubernetes: toolsLock.kubernetes,
     bootstrap,
     minimalDemo: checkMinimalDemo(tools),
-    minimalDemoData: { resources: 1, schemas, fingerprint, execution },
+    minimalDemoData: checkMinimalDemoData(tools, 'fleetiq'),
     tools: Object.fromEntries(
       Object.entries(toolsLock.tools).map(([name, tool]) => [name, tool.version]),
     ),

@@ -1,0 +1,10 @@
+workloadDatabase:
+  workloads:
+    - serve --check-schema
+    - ingest-tcp
+    - replay-worker
+    - semantic-worker
+    - project-current
+    - analytics-worker
+    - notification-worker
+    - archive-worker

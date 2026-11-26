@@ -1,0 +1,19 @@
+image: ghcr.io/cloudnative-pg/postgresql:18.4-system-trixie@sha256:42708a75345b7a48fdd9257b071830783a97fd228529196b6313187a7198e185
+owner:
+  passwordSecret: fleetiq-db-migrator
+runtime:
+  passwordSecret: fleetiq-db-legacy-unused
+storage:
+  className: local-retained
+  size: 4Gi
+resources:
+  requests: { cpu: 200m, memory: 256Mi }
+  limits: { cpu: '1', memory: 768Mi }
+postgresql:
+  maxConnections: 64
+  requireTLS: true
+# Namespace and database routes come from the minimal-demo network composition.
+externalNetworkPolicies: true
+network: null
+workloadDatabase:
+  retireLegacy: true

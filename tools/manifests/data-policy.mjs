@@ -47,7 +47,7 @@ function workloadRoles(selection) {
 /** Database ownership, authentication and resources remain separate from application Pods. */
 export function dataPolicy(
   cluster,
-  { nonlocal, providerLocal = false, workloadDatabase },
+  { nonlocal, providerLocal = false, workloadDatabase, maxConnections, requireTLS },
 ) {
   const spec = cluster.spec;
   digestImage(spec.imageName);
@@ -88,7 +88,10 @@ export function dataPolicy(
       assert.equal(role[privilege], false, `${role.name}: ${privilege}`);
     assert.deepEqual(role.inRoles, []);
   }
-  let hba = ['hostssl all all all scram-sha-256'];
+  let hba = [
+    ...(requireTLS ? ['hostnossl all all all reject'] : []),
+    'hostssl all all all scram-sha-256',
+  ];
   if (workloadDatabase) {
     const expected = scopedRoles(initdb, workloadDatabase);
     assert.equal(roles.length, Object.keys(expected).length);
@@ -126,7 +129,10 @@ export function dataPolicy(
     assert.equal(role.login, true);
   }
   assert.deepEqual(spec.postgresql, {
-    parameters: { password_encryption: 'scram-sha-256' },
+    parameters: {
+      password_encryption: 'scram-sha-256',
+      ...(maxConnections ? { max_connections: String(maxConnections) } : {}),
+    },
     pg_hba: hba,
   });
   assert(

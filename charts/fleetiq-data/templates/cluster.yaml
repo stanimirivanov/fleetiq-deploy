@@ -1,26 +1,19 @@
-{{- $candidate := eq .Values.profile "minimal-demo-candidate" -}}
-{{- if $candidate -}}
-{{- /* Enforce the offline-only selection even with --skip-schema-validation. */ -}}
-{{- $expected := dict
-  "profile" "minimal-demo-candidate"
-  "clusterName" "fleetiq-db"
-  "image" "registry.invalid/candidate/postgresql:18.4-system-trixie@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-  "instances" 1
-  "database" "fleetiq"
-  "owner" (dict "role" "fleetiq_migrator" "passwordSecret" "offline-candidate-migration-owner")
-  "storage" (dict "className" "local-retained" "size" "4Gi")
-  "resources" (dict "requests" (dict "cpu" "200m" "memory" "256Mi") "limits" (dict "cpu" "1" "memory" "768Mi")) -}}
-{{- if ne (mustToJson .Values) (mustToJson $expected) -}}
-{{- fail "Use the exact reviewed offline minimal-demo-candidate values" -}}
-{{- end -}}
-{{- end -}}
-{{- if and (not $candidate) (eq .Values.owner.role .Values.runtime.role) }}
+{{- if eq .Values.owner.role .Values.runtime.role }}
 {{- fail "Migration owner and runtime role must be distinct" }}
 {{- end }}
-{{- if and (not $candidate) (eq .Values.owner.passwordSecret .Values.runtime.passwordSecret) }}
+{{- if eq .Values.owner.passwordSecret .Values.runtime.passwordSecret }}
 {{- fail "Migration owner and runtime password Secrets must be distinct" }}
 {{- end }}
 {{- $scoped := .Values.workloadDatabase }}
+{{- if and .Values.externalNetworkPolicies (or (ne .Values.profile "local") (not $scoped) (not $scoped.retireLegacy) .Values.network) }}
+{{- fail "External network policies require a local scoped installation with its legacy login retired and chart networking unset" }}
+{{- end }}
+{{- if and (not .Values.externalNetworkPolicies) (not .Values.network) }}
+{{- fail "Chart network policies require network configuration" }}
+{{- end }}
+{{- if and $scoped (not $scoped.workloads) (not $scoped.maintenance) }}
+{{- fail "An active scoped installation requires at least one workload" }}
+{{- end }}
 {{- if and $scoped (or (ne .Values.database "fleetiq") (and $scoped.migrationLogin $scoped.bootstrapLogin) (and (or $scoped.migrationLogin $scoped.bootstrapLogin) (not $scoped.maintenance))) }}
 {{- fail "Scoped database provisioning requires database fleetiq, exclusive temporary identities, and maintenance for migration login" }}
 {{- end }}
@@ -46,7 +39,6 @@ spec:
       database: {{ .Values.database | quote }}
       owner: {{ .Values.owner.role | quote }}
       secret: { name: {{ .Values.owner.passwordSecret | quote }} }
-  {{- if not $candidate }}
   managed:
     roles:
       {{- if $scoped }}
@@ -83,12 +75,11 @@ spec:
         inRoles: []
         passwordSecret: { name: {{ .Values.runtime.passwordSecret | quote }} }
       {{- end }}
-  {{- end }}
   postgresql:
     parameters:
       password_encryption: scram-sha-256
-      {{- if $candidate }}
-      max_connections: "64"
+      {{- with (dig "postgresql" "maxConnections" nil .Values.AsMap) }}
+      max_connections: {{ . | quote }}
       {{- end }}
     pg_hba:
       {{- if and $scoped $scoped.maintenance }}
@@ -99,5 +90,8 @@ spec:
       {{- end }}
       - host all all all reject
       {{- else }}
+      {{- if dig "postgresql" "requireTLS" false .Values.AsMap }}
+      - hostnossl all all all reject
+      {{- end }}
       - hostssl all all all scram-sha-256
       {{- end }}
