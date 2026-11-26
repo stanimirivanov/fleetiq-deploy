@@ -87,6 +87,7 @@ for (const [phase, tempLogin, runtimeLogins] of [
 
 const operations = resolve(root, 'charts/fleetiq-minimal-demo-operations');
 const pin = resolve(root, 'environments/minimal-demo/backend.json');
+const selectedBackendDigest = `sha256:${digest(readFileSync(pin))}`;
 
 test('bootstrap renders a checked operation for the exact data Job delegation', () => {
   const [carrier] = documents(
@@ -102,6 +103,8 @@ test('bootstrap renders a checked operation for the exact data Job delegation', 
       'operation=bootstrap',
       '--set-file',
       `backend=${pin}`,
+      '--set-string',
+      `backendDigest=${selectedBackendDigest}`,
     ]),
   );
   const operation = JSON.parse(carrier.data['operation.json']);
@@ -187,6 +190,18 @@ test('demo manifest qualification rejects weakened temporary PostgreSQL routes',
         delete postgres.spec.ingress[0].fromEndpoints[0].matchLabels[
           'workflows.argoproj.io/workflow'
         ];
+      },
+    ],
+    [
+      'administrative-route',
+      ([, postgres]) => {
+        delete postgres.spec.ingress[0].fromEndpoints[0].matchExpressions;
+      },
+    ],
+    [
+      'reclaim-route',
+      ([client]) => {
+        delete client.spec.endpointSelector.matchExpressions;
       },
     ],
     [
@@ -277,8 +292,7 @@ for (const flags of [[], ['--skip-schema-validation']]) {
   });
 }
 
-const selectedBackendDigest = 'sha256:' + digest(readFileSync(pin));
-const administration = (operation, input = {}, extra = []) =>
+const administration = (operation, input = {}, extra = [], bindSelection = true) =>
   documents(
     tools.helm([
       'template',
@@ -289,11 +303,12 @@ const administration = (operation, input = {}, extra = []) =>
       '--kube-version',
       toolsLock.kubernetes,
       '--set',
-      'operation=' + operation,
+      `operation=${operation}`,
       '--set-file',
-      'backend=' + pin,
-      '--set-string',
-      'backendDigest=' + selectedBackendDigest,
+      `backend=${pin}`,
+      ...(bindSelection
+        ? ['--set-string', `backendDigest=${selectedBackendDigest}`]
+        : []),
       ...Object.entries(input).flatMap(([key, value]) => [
         '--set-string',
         `inputs.${key}=${value}`,
@@ -378,7 +393,7 @@ for (const [mode, command, input, parameter, archive] of [
       .filter((entry) => entry.valueFrom)
       .map((entry) => entry.valueFrom.secretKeyRef.name);
     assert.deepEqual(references, [
-      'fleetiq-db-' + command + '-url',
+      `fleetiq-db-${command}-url`,
       ...Array(archive ? 5 : 0).fill('fleetiq-demo-reclaim-storage'),
     ]);
     assert.equal(operation.podSpec.initContainers, undefined);
@@ -388,7 +403,7 @@ for (const [mode, command, input, parameter, archive] of [
       const input = config.data['input.json'];
       assert.equal(
         config.metadata.name,
-        'qualification-operation-01-input.' + digest(input).replace(/^(.{32})/u, '$1.'),
+        `qualification-operation-01-input.${digest(input).replace(/^(.{32})/u, '$1.')}`,
       );
       assert.equal(operation.podSpec.volumes[1].configMap.name, config.metadata.name);
       if (mode === 'calculate') assert.match(input, /"end":9007199254740993[,}]/u);
@@ -397,6 +412,31 @@ for (const [mode, command, input, parameter, archive] of [
     }
   });
 }
+
+test('bootstrap requires the reviewed backend digest even without schema validation', () => {
+  assert.throws(() => administration('bootstrap', {}, [], false));
+  assert.throws(() =>
+    administration('bootstrap', {}, ['--skip-schema-validation'], false),
+  );
+});
+
+test('demo manifest qualification rejects mutable or replaced calculator input', () => {
+  const changedInput = {
+    ...tools,
+    helm(args) {
+      const output = tools.helm(args);
+      if (!args.includes('operation=register')) return output;
+      const rendered = documents(output);
+      const config = rendered.find((item) => item.data?.['input.json']);
+      config.immutable = false;
+      return rendered.map((item) => stringify(item)).join('---\n');
+    },
+  };
+  assert.throws(
+    () => checkMinimalDemoData(changedInput, 'qual-fleet'),
+    /Immutable calculator input differs/u,
+  );
+});
 
 test('administration refuses wrong targets, operations, backend bytes, and unexpected credential inputs', () => {
   for (const mode of ['restore', 'export', 'migrate', 'serve'])
@@ -407,7 +447,7 @@ test('administration refuses wrong targets, operations, backend bytes, and unexp
   assert.throws(() =>
     administration('rebuild', tenant, [
       '--set-string',
-      'backendDigest=sha256:' + 'a'.repeat(64),
+      `backendDigest=sha256:${'a'.repeat(64)}`,
     ]),
   );
   assert.throws(() =>

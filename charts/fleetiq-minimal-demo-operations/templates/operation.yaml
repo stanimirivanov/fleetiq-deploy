@@ -9,7 +9,8 @@
 {{- if not (regexMatch "^[a-z][a-z0-9-]{0,48}[a-z0-9]$" $name) }}
 {{- fail "Select a fresh provider Job name" }}
 {{- end }}
-{{- if and .Values.backendDigest (ne (printf "sha256:%s" (sha256sum .Values.backend)) .Values.backendDigest) }}
+{{- $digest := required "Supply the reviewed backend digest" .Values.backendDigest }}
+{{- if ne (printf "sha256:%s" (sha256sum .Values.backend)) $digest }}
 {{- fail "Backend selection differs from the reviewed digest" }}
 {{- end }}
 {{- $selection := mustFromJson .Values.backend }}

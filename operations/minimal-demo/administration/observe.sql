@@ -26,12 +26,19 @@ SELECT (
 \endif
 
 \if :migrate
-  SELECT jsonb_build_object(
-    'migrationEntries', count(*) FILTER (WHERE success),
-    'failedEntries', count(*) FILTER (WHERE NOT success),
-    'ledgerDigest', encode(sha256(convert_to(coalesce(string_agg(
-      version::text || ':' || encode(checksum, 'hex'), E'\n' ORDER BY version), ''), 'UTF8')), 'hex'))
-  FROM public._sqlx_migrations;
+  SELECT to_regclass('public._sqlx_migrations') IS NOT NULL AS ledger_present
+  \gset
+  \if :ledger_present
+    SELECT jsonb_build_object('ledgerPresent', true,
+      'migrationEntries', count(*) FILTER (WHERE success),
+      'failedEntries', count(*) FILTER (WHERE NOT success),
+      'ledgerDigest', encode(sha256(convert_to(coalesce(string_agg(
+        version::text || ':' || encode(checksum, 'hex'), E'\n' ORDER BY version), ''), 'UTF8')), 'hex'))
+    FROM public._sqlx_migrations;
+  \else
+    SELECT jsonb_build_object('ledgerPresent', false, 'migrationEntries', 0,
+      'failedEntries', 0, 'ledgerDigest', NULL);
+  \endif
 \elif :bootstrap
   SELECT jsonb_build_object('present', b.singleton IS TRUE,
     'identityMatches', coalesce((i.actor_id = b.actor_id AND
@@ -105,18 +112,38 @@ SELECT (
   LEFT JOIN history.numeric_summaries r ON (r.tenant_id, r.series_id) = (s.tenant_id, s.series_id)
     AND r.revision = coalesce((scope.v->>'receiptRevision')::bigint, s.revision);
 \elif :expire
-  WITH scope AS (SELECT :'scope'::jsonb AS v)
-  SELECT jsonb_build_object(
-    'restore', jsonb_build_object('status', r.status, 'generation', r.request_generation::text,
-      'hasPayload', r.payload IS NOT NULL, 'liveLease', coalesce(r.lease_until > clock_timestamp(), false)),
-    'export', jsonb_build_object('status', e.status, 'generation', e.selection_generation::text,
-      'hasPayload', e.payload IS NOT NULL, 'liveLease', coalesce(e.lease_until > clock_timestamp(), false),
-      'hasLease', e.lease_until IS NOT NULL))
+  -- Select every row for this fenced fixture tenant, including stable controls
+  -- and rows that can become eligible while the Job runs. Refuse a larger scope.
+  WITH scope AS (SELECT :'scope'::jsonb->>'tenant' AS tenant),
+  restores AS MATERIALIZED (
+    SELECT r.manifest_id::text AS id, r.request_generation::text AS generation,
+      r.status, r.payload IS NOT NULL AS "hasPayload",
+      r.expires_at AS "expiresAt", r.lease_until AS "leaseUntil"
+    FROM scope JOIN history.restore_jobs r ON r.tenant_id = scope.tenant
+    ORDER BY r.manifest_id LIMIT 33
+  ), exports AS MATERIALIZED (
+    SELECT e.job_id::text AS id, e.selection_generation::text AS generation,
+      encode(sha256(convert_to(e.request_key, 'UTF8')), 'hex') AS "requestDigest",
+      e.status, e.payload IS NOT NULL AS "hasPayload", e.attempt::text AS attempt,
+      e.expires_at AS "expiresAt", e.lease_until AS "leaseUntil"
+    FROM scope JOIN history.export_jobs e ON e.tenant_id = scope.tenant
+    ORDER BY e.job_id LIMIT 33
+  )
+  SELECT (nullif(scope.tenant, '') IS NOT NULL
+    AND EXISTS (SELECT 1 FROM metadata.tenants t WHERE t.tenant_id = scope.tenant)
+    AND (SELECT count(*) FROM restores) <= 32 AND (SELECT count(*) FROM exports) <= 32
+  ) AS fixture_bounded,
+  (SELECT jsonb_build_object('observedAt', transaction_timestamp(),
+    'restores', coalesce((SELECT jsonb_agg(to_jsonb(r) ORDER BY r.id::bigint) FROM restores r), '[]'),
+    'exports', coalesce((SELECT jsonb_agg(to_jsonb(e) ORDER BY e.id::bigint) FROM exports e), '[]'))
+  ) AS fixture_snapshot
   FROM scope
-  LEFT JOIN history.restore_jobs r ON r.tenant_id = scope.v->>'tenant'
-    AND r.manifest_id = (scope.v->>'restoreManifest')::bigint
-  LEFT JOIN history.export_jobs e ON e.tenant_id = scope.v->>'tenant'
-    AND e.job_id = (scope.v->>'exportJob')::bigint;
+  \gset
+  \if :fixture_bounded
+    SELECT :'fixture_snapshot'::jsonb;
+  \else
+    SELECT 1 / 0;
+  \endif
 \endif
 
 COMMIT;

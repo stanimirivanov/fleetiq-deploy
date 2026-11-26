@@ -64,7 +64,7 @@
         }
       },
       "else": {
-        "required": ["backend"],
+        "required": ["backend", "backendDigest"],
         "not": {
           "anyOf": [{ "required": ["attempt"] }, { "required": ["workflowName"] }]
         }
@@ -87,23 +87,6 @@
     {
       "if": { "properties": { "operation": { "const": "bootstrap" } } },
       "then": { "properties": { "inputs": { "maxProperties": 0 } } }
-    },
-    {
-      "if": {
-        "properties": {
-          "operation": {
-            "enum": [
-              "rebuild",
-              "expire",
-              "register",
-              "calculate",
-              "reclaim",
-              "summarize"
-            ]
-          }
-        }
-      },
-      "then": { "required": ["backendDigest"] }
     },
     {
       "if": { "properties": { "operation": { "enum": ["rebuild", "expire"] } } },

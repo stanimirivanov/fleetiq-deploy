@@ -10,6 +10,7 @@
 {{- $phase := trimSuffix "-route" .Values.operation }}
 {{- $support := printf "%s-demo-support" (trimSuffix "-data" $data) }}
 {{- $reclaim := eq $phase "reclaim" }}
+{{- $administrative := or $reclaim (eq $phase "administrative") }}
 {{- $nonRoutine := list (dict "key" "k8s-infrastructure.io/demo-routine" "operator" "DoesNotExist") }}
 {{- if eq $phase "migration" }}
 {{- $clientNamespace = printf "%s-releases" (trimSuffix "-data" $data) }}
@@ -33,6 +34,9 @@ metadata:
 spec:
   endpointSelector:
     matchLabels: {{ toJson $labels }}
+{{- if $administrative }}
+    matchExpressions: {{ toJson $nonRoutine }}
+{{- end }}
   egress:
     - toEndpoints:
         - matchLabels:
@@ -46,6 +50,9 @@ spec:
         - matchLabels:
             {{ $namespaceLabel }}: {{ $data }}
             cnpg.io/cluster: fleetiq-db
+{{- if $administrative }}
+          matchExpressions: {{ toJson $nonRoutine }}
+{{- end }}
       toPorts:
         - ports: [{ port: '5432', protocol: TCP }]
 {{- if $reclaim }}
@@ -71,9 +78,15 @@ metadata:
 spec:
   endpointSelector:
     matchLabels: { cnpg.io/cluster: fleetiq-db }
+{{- if $administrative }}
+    matchExpressions: {{ toJson $nonRoutine }}
+{{- end }}
   ingress:
     - fromEndpoints:
         - matchLabels: {{ set $labels $namespaceLabel $clientNamespace | toJson }}
+{{- if $administrative }}
+          matchExpressions: {{ toJson $nonRoutine }}
+{{- end }}
       toPorts:
         - ports: [{ port: '5432', protocol: TCP }]
 {{- if $reclaim }}

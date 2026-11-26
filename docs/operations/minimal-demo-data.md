@@ -174,9 +174,10 @@ Observe the Cluster HBA and CNPG bootstrap role reconciliation. Leave all produc
 writers fenced. Choose a fresh provider Job name `JOB`.
 
 Render and submit `operation: bootstrap` through the
-[administrative operations runbook](minimal-demo-administration.md#render-and-launch).
-Use the exact reviewed backend selection and provider attempt, and install its
-scoped database routes before submission. The producer's checked bootstrap
+[administrative operations runbook](minimal-demo-administration.md#render-the-reviewed-operation).
+Pass the approved SHA-256 of the exact backend selection as
+`REVIEWED_PIN_DIGEST`. Install the scoped `bootstrap-route` for the
+reviewed provider attempt before submission. The producer's checked bootstrap
 reads only the temporary URL and three operator identity inputs.
 [Platform bootstrap contract](https://github.com/stanimirivanov/fleetiq-platform/blob/c2135d3f77ef1150efbc7beeee8d160271822da7/docs/operations/platform-bootstrap.md)
 
