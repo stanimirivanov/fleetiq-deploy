@@ -23,7 +23,7 @@ For the separate minimal-demo namespace, private TCP and support-network composi
 see [minimal-demo private networking](minimal-demo-network.md) and the
 [minimal-demo database phases](minimal-demo-data.md). The demo uses the local
 `fleetiq-minimal-demo-operations` chart for temporary routes and the provider's
-checked bootstrap Job input. OCI publication covers the two workload charts.
+[reviewed administrative Job inputs](minimal-demo-administration.md). OCI publication covers the two workload charts.
 
 ## Offline qualification
 

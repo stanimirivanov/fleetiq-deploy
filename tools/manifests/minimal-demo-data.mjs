@@ -12,6 +12,7 @@ import {
   dns,
   postgresPort,
   simulatorAccount,
+  supportPorts,
 } from './minimal-demo-network.mjs';
 import { documents, validateSchemas } from './render.mjs';
 import { toolsLock } from './toolchain.mjs';
@@ -45,17 +46,26 @@ const migrationLabels = {
 };
 
 function checkTemporaryRoute(rendered, phase, namespace, clientNamespace, labels) {
+  const consumer = namespace.slice(0, -5);
+  const objectStore = { 'app.kubernetes.io/name': 'fleetiq-object-store' };
+  const nonRoutine = [
+    { key: 'k8s-infrastructure.io/demo-routine', operator: 'DoesNotExist' },
+  ];
+  const support = `${consumer}-demo-support`;
   const endpoint = (space, matchLabels) => ({
     matchLabels: { [ciliumNamespace]: space, ...matchLabels },
   });
   const ports = (port, protocols = ['TCP']) => [
     { ports: protocols.map((protocol) => ({ port: String(port), protocol })) },
   ];
-  const policy = (side, namespace, matchLabels, rules) => ({
+  const policy = (side, namespace, matchLabels, rules, matchExpressions) => ({
     apiVersion: 'cilium.io/v2',
     kind: 'CiliumNetworkPolicy',
     metadata: { name: `fleetiq-demo-${phase}-${side}`, namespace },
-    spec: { endpointSelector: { matchLabels }, ...rules },
+    spec: {
+      endpointSelector: { matchLabels, ...(matchExpressions && { matchExpressions }) },
+      ...rules,
+    },
   });
   assert.deepEqual(
     rendered,
@@ -70,6 +80,16 @@ function checkTemporaryRoute(rendered, phase, namespace, clientNamespace, labels
             toEndpoints: [endpoint(namespace, database)],
             toPorts: ports(postgresPort),
           },
+          ...(phase === 'reclaim'
+            ? [
+                {
+                  toEndpoints: [
+                    { ...endpoint(support, objectStore), matchExpressions: nonRoutine },
+                  ],
+                  toPorts: ports(supportPorts.objectStore.pod),
+                },
+              ]
+            : []),
           ...(phase === 'migration'
             ? [{ toEntities: ['kube-apiserver'], toPorts: ports(6443) }]
             : []),
@@ -83,6 +103,26 @@ function checkTemporaryRoute(rendered, phase, namespace, clientNamespace, labels
           },
         ],
       }),
+      ...(phase === 'reclaim'
+        ? [
+            policy(
+              'object-store',
+              support,
+              objectStore,
+              {
+                ingress: [
+                  {
+                    fromEndpoints: [
+                      { ...endpoint(namespace, labels), matchExpressions: nonRoutine },
+                    ],
+                    toPorts: ports(supportPorts.objectStore.pod),
+                  },
+                ],
+              },
+              nonRoutine,
+            ),
+          ]
+        : []),
     ],
     'Temporary database route differs from the exact operation and destinations',
   );
@@ -320,6 +360,18 @@ export function checkMinimalDemoData(tools, consumer) {
     [attemptLabel]: bootstrapAttempt,
     [ciliumAccount]: simulatorAccount(bootstrapAttempt),
   });
+  const reclaimRoute = render(
+    chart,
+    'fleetiq',
+    '--set',
+    'operation=reclaim-route',
+    '--set-string',
+    `attempt=${bootstrapAttempt}`,
+  );
+  checkTemporaryRoute(reclaimRoute, 'reclaim', namespace, namespace, {
+    [attemptLabel]: bootstrapAttempt,
+    [ciliumAccount]: simulatorAccount(bootstrapAttempt),
+  });
   const workflowResources = checkDemoWorkflow(tools, {
     namespace,
     consumer,
@@ -327,7 +379,12 @@ export function checkMinimalDemoData(tools, consumer) {
     backend: backendSelection.backend.reference,
     workloads,
   });
-  const operations = [...bootstrap, ...migrationRoute, ...bootstrapRoute];
+  const operations = [
+    ...bootstrap,
+    ...migrationRoute,
+    ...bootstrapRoute,
+    ...reclaimRoute,
+  ];
   return {
     phases: Object.fromEntries(
       Object.entries(phases).map(([phase, { rendered, schemas }]) => [
