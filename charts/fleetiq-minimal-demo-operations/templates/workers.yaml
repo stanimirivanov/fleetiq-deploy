@@ -1,0 +1,92 @@
+{{- if has .Values.operation (list "workers" "workers-maintenance") }}
+{{- $namespace := .Release.Namespace }}
+{{- $consumer := trimSuffix "-apps" $namespace }}
+{{- if or (not (hasSuffix "-apps" $namespace)) (gt (len $consumer) 32) (not (regexMatch "^[a-z][a-z0-9]*(-[a-z0-9]+)*$" $consumer)) (has $consumer (list "perfeng" "perfeng-local")) }}
+{{- fail "Select the delegated minimal-demo apps namespace" }}
+{{- end }}
+{{- $selection := mustFromJson .Values.backend }}
+{{- $image := $selection.backend.reference }}
+{{- if or (ne $selection.format "fleetiq-minimal-demo-backend.v1") (not (regexMatch "^ghcr[.]io/stanimirivanov/fleetiq-platform@sha256:[a-f0-9]{64}$" $image)) }}
+{{- fail "Select the immutable published backend" }}
+{{- end }}
+{{- range $role := list "ingest-tcp" "replay-worker" }}
+{{- $name := printf "fleetiq-%s" $role }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: {{ $namespace }}
+  name: {{ $name }}
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: {{ $namespace }}
+  name: {{ $name }}
+spec:
+  replicas: {{ ternary 1 0 (eq $.Values.operation "workers") }}
+  revisionHistoryLimit: 2
+  progressDeadlineSeconds: 300
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app.kubernetes.io/name: {{ $name }} }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: {{ $name }} }
+    spec:
+      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 60
+      nodeSelector:
+        k8s-infrastructure.io/consumer: {{ $consumer | quote }}
+        k8s-infrastructure.io/role: worker
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: {{ $role }}
+          image: {{ $image | quote }}
+          imagePullPolicy: Never
+          command: [/usr/local/bin/fleetiq-server]
+          args: [{{ $role }}]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: '1', memory: 512Mi }
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: fleetiq-db-{{ $role }}-url, key: url }
+          {{- if eq $role "ingest-tcp" }}
+            - name: FLEETIQ_TCP_BIND_ADDRESS
+              valueFrom:
+                configMapKeyRef: { name: fleetiq-ingest-tcp-network, key: FLEETIQ_TCP_BIND_ADDRESS }
+            - { name: FLEETIQ_TCP_IDENTITY_POLICY, value: registered-identifiers }
+            {{- range $key := list "FLEETIQ_TCP_TENANT_ID" "FLEETIQ_TCP_CHANNEL_ID" "FLEETIQ_TCP_PACKAGE_ID" "FLEETIQ_TCP_PACKAGE_VERSION" "FLEETIQ_TCP_IDENTIFIER_AUTHORITY" }}
+            - name: {{ $key }}
+              valueFrom:
+                configMapKeyRef:
+                  name: fleetiq-ingest-tcp-route
+                  key: {{ $key }}
+                  {{- if eq $key "FLEETIQ_TCP_IDENTIFIER_AUTHORITY" }}
+                  optional: true
+                  {{- end }}
+            {{- end }}
+          ports: [{ name: ingest, containerPort: 55027, protocol: TCP }]
+          {{- end }}
+          volumeMounts:
+            - { name: database-ca, mountPath: /etc/fleetiq/database, readOnly: true }
+      volumes:
+        - name: database-ca
+          configMap:
+            name: workload-database-ca
+            items: [{ key: ca.crt, path: ca.crt }]
+{{- end }}
+{{- end }}

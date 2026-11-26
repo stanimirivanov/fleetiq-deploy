@@ -48,7 +48,7 @@ Package the ingester with `app.kubernetes.io/name: fleetiq-ingest-tcp` and a
 `FLEETIQ_TCP_BIND_ADDRESS` reference to key `FLEETIQ_TCP_BIND_ADDRESS` in ConfigMap
 `fleetiq-ingest-tcp-network`. The explicit bind is `0.0.0.0:55027`. Use ordinary Pod
 networking with no host port. The package and producer credentials remain part
-of [TCP worker packaging](https://github.com/stanimirivanov/fleetiq-deploy/issues/97).
+of [TCP worker packaging](minimal-demo-workers.md).
 The listener uses the platform's [trusted identifier-routing TCP contract](https://github.com/stanimirivanov/fleetiq-platform/blob/5b31f959bb4a45611820aca72027959f74535e18/docs/operations/tcp-ingestion.md).
 The simulator requires the literal configured name `tcp-ingestion` and validates
 all IPv4 DNS answers before connecting. Private literal and arbitrary DNS inputs

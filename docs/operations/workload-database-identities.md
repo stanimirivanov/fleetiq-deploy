@@ -27,7 +27,7 @@ workload in its namespace, with key `url`. Use the CNPG read/write endpoint,
 The runtime chart mounts its existing `backend.databaseTrust` ConfigMap and
 selects the per-command URL for the API and any packaged analytics workers.
 TCP ingestion and replay packaging consumes the corresponding references in
-[#97](https://github.com/stanimirivanov/fleetiq-deploy/issues/97).
+[minimal-demo worker packaging](minimal-demo-workers.md).
 
 CloudNativePG reconciles the workload and bootstrap logins through standalone
 `DatabaseRole` resources. The Cluster continues to manage the migration owner
