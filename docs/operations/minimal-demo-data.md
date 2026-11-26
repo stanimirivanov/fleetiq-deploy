@@ -173,12 +173,10 @@ with the exact Cluster service DNS and CA path `/etc/fleetiq/database/ca.crt`.
 Observe the Cluster HBA and CNPG bootstrap role reconciliation. Leave all product
 writers fenced. Choose a fresh provider Job name `JOB`.
 
-Render and submit `operation: bootstrap` through the
-[administrative operations runbook](minimal-demo-administration.md#render-the-reviewed-operation).
-Pass the approved SHA-256 of the exact backend selection as
-`REVIEWED_PIN_DIGEST`. Install the scoped `bootstrap-route` for the
-reviewed provider attempt before submission. The producer's checked bootstrap
-reads only the temporary URL and three operator identity inputs.
+Submit the reviewed `bootstrap` request through
+[the administrative operator command](minimal-demo-administration.md#preview-grant-and-submit).
+Use the reviewed backend selection digest and stage the previewed bootstrap
+route. The producer reads the temporary URL and three operator identity inputs.
 [Platform bootstrap contract](https://github.com/stanimirivanov/fleetiq-platform/blob/c2135d3f77ef1150efbc7beeee8d160271822da7/docs/operations/platform-bootstrap.md)
 
 Require exactly one succeeded Job Pod, the approved worker placement and an
