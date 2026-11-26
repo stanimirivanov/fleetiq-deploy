@@ -43,25 +43,28 @@ try {
   for (const [name, tool] of Object.entries(toolsLock.tools)) {
     const platform = tool.platforms[`${process.platform}-${process.arch}`];
     assert(platform, 'Manifest tool installer supports Linux x64');
-    const directory = join(temporary, name);
-    await mkdir(directory);
-    const archive = join(directory, basename(new URL(platform.url).pathname));
-    await writeFile(archive, await download(platform.url, platform.sha256));
-    const members = run('tar', ['-tf', archive]).split(/\r?\n/u);
-    assert(
-      members.every(
-        (entry) =>
-          !entry.startsWith('/') && !entry.includes('..') && !entry.includes('\\'),
-      ),
-      'Unsafe archive member',
-    );
-    run('tar', ['-xf', archive, '-C', directory, platform.executable]);
-    const bytes = await readFile(join(directory, platform.executable));
-    assert.equal(
-      sha256(bytes),
-      platform.binarySha256,
-      'Extracted executable checksum mismatch',
-    );
+    let bytes = await download(platform.url, platform.sha256);
+    if (platform.executable) {
+      const directory = join(temporary, name);
+      await mkdir(directory);
+      const archive = join(directory, basename(new URL(platform.url).pathname));
+      await writeFile(archive, bytes);
+      const members = run('tar', ['-tf', archive]).split(/\r?\n/u);
+      assert(
+        members.every(
+          (entry) =>
+            !entry.startsWith('/') && !entry.includes('..') && !entry.includes('\\'),
+        ),
+        'Unsafe archive member',
+      );
+      run('tar', ['-xf', archive, '-C', directory, platform.executable]);
+      bytes = await readFile(join(directory, platform.executable));
+      assert.equal(
+        sha256(bytes),
+        platform.binarySha256,
+        'Extracted executable checksum mismatch',
+      );
+    }
     const file = join(destination, name);
     const pending = `${file}.pending`;
     await writeFile(pending, bytes, { mode: 0o755, flag: 'wx' });

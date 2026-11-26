@@ -53,6 +53,7 @@ export function manifestTools() {
   assert.equal(toolsLock.format, 'fleetiq-manifest-tools.v1');
   assert.deepEqual(Object.keys(toolsLock.tools).sort(), [
     'helm',
+    'jq',
     'kubeconform',
     'kustomize',
   ]);
@@ -62,10 +63,13 @@ export function manifestTools() {
     const platform = tool.platforms[`${process.platform}-${process.arch}`];
     assert(platform, 'Manifest tools support Linux x64; unsupported platform');
     const binary = resolve(directory, name);
-    verifiedBytes(binary, platform.binarySha256);
+    verifiedBytes(binary, platform.binarySha256 ?? platform.sha256);
     assert.match(
       run(binary, tool.versionArgs),
-      new RegExp(`^v?${tool.version.replaceAll('.', '\\.')}(?:$|[+\\s])`, 'u'),
+      new RegExp(
+        `^${tool.versionPrefix ?? 'v?'}${tool.version.replaceAll('.', '\\.')}(?:$|[+\\s])`,
+        'u',
+      ),
     );
     result[name] = (args, options = {}) =>
       run(binary, args, {

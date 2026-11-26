@@ -144,3 +144,67 @@ test('qualification checks both native manifest states and refuses a writer in m
     /maintenance/u,
   );
 });
+
+test('worker qualification rejects alternate database startup and trust inputs', () => {
+  for (const [description, mutate] of [
+    [
+      'command',
+      (pod) => {
+        pod.containers[0].command = ['/bin/alternate'];
+      },
+    ],
+    [
+      'Secret',
+      (pod) => {
+        pod.containers[0].env[0].valueFrom.secretKeyRef.name = 'fleetiq-db-serve-url';
+      },
+    ],
+    [
+      'extra env',
+      (pod) => {
+        pod.containers[0].env.push({ name: 'PGSSLMODE', value: 'disable' });
+      },
+    ],
+    [
+      'envFrom',
+      (pod) => {
+        pod.containers[0].envFrom = [{ secretRef: { name: 'alternate-env' } }];
+      },
+    ],
+    [
+      'CA key',
+      (pod) => {
+        pod.volumes[0].configMap.items[0].key = 'wrong.crt';
+      },
+    ],
+    [
+      'CA path',
+      (pod) => {
+        pod.volumes[0].configMap.items[0].path = 'wrong.crt';
+      },
+    ],
+    [
+      'CA mount',
+      (pod) => {
+        pod.containers[0].volumeMounts[0].readOnly = false;
+      },
+    ],
+  ]) {
+    const weakened = {
+      ...tools,
+      helm(args) {
+        const rendered = documents(tools.helm(args));
+        for (const { spec } of rendered.filter(({ kind }) => kind === 'Deployment'))
+          mutate(spec.template.spec);
+        return rendered.map((resource) => JSON.stringify(resource)).join('\n---\n');
+      },
+    };
+    assert.throws(
+      () => checkMinimalDemoWorkers(weakened, 'qual-fleet'),
+      {
+        name: 'AssertionError',
+      },
+      description,
+    );
+  }
+});

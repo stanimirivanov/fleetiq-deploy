@@ -4,6 +4,9 @@ def require($condition; $message):
 def same_turn($other):
   .databaseOid == $other.databaseOid and .turn == $other.turn
   and .sequence == $other.sequence and .fingerprint == $other.fingerprint;
+# Producer replay policy 1 mints each claim from the DB clock plus 30 seconds.
+def claimed_at_ms:
+  .leaseUntilMs - 30000;
 def replay_state:
   {generation, attempts, leaseUntilMs, checkpoint, status, decoded};
 def pending:
@@ -29,6 +32,10 @@ require(length == 7 and all(.[]; type == "object"); "Seven ordered installed sam
     and $accepted.sampledAtMs <= $ingestStopped.sampledAtMs;
     "The accepted turn did not persist unchanged across ingestion interruption")
 | require(
+    ($claimed | claimed_at_ms) >= $ingestStopped.leaseUntilMs
+    and $claimed.sampledAtMs >= ($claimed | claimed_at_ms);
+    "Replay claimed the accepted turn before its ingestion lease expiry")
+| require(
     ($claimed | pending)
     and $claimed.generation == ($ingestStopped.generation + 1)
     and $claimed.attempts == ($ingestStopped.attempts + 1)
@@ -42,7 +49,8 @@ require(length == 7 and all(.[]; type == "object"); "Seven ordered installed sam
     ($completed | completed)
     and $completed.generation == ($replayStopped.generation + 1)
     and $completed.attempts == ($replayStopped.attempts + 1)
-    and $completed.sampledAtMs >= $replayStopped.leaseUntilMs
+    and ($completed | claimed_at_ms) >= $replayStopped.leaseUntilMs
+    and $completed.sampledAtMs >= ($completed | claimed_at_ms)
     and $completed.sampledAtMs >= $replayStopped.sampledAtMs;
     "Replay did not advance the exact checkpoint after lease expiry")
 | require(

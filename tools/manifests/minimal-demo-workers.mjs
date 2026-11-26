@@ -8,6 +8,19 @@ import { documents, validateSchemas } from './render.mjs';
 import { toolsLock } from './toolchain.mjs';
 import { workloadDatabaseEnv } from './workload-database.mjs';
 
+const ingestRouteKeys = [
+  'FLEETIQ_TCP_TENANT_ID',
+  'FLEETIQ_TCP_CHANNEL_ID',
+  'FLEETIQ_TCP_PACKAGE_ID',
+  'FLEETIQ_TCP_PACKAGE_VERSION',
+  'FLEETIQ_TCP_IDENTIFIER_AUTHORITY',
+];
+
+const configMapEnv = (name, configMap, optional = {}) => ({
+  name,
+  valueFrom: { configMapKeyRef: { name: configMap, key: name, ...optional } },
+});
+
 export function checkMinimalDemoWorkers(tools, consumer) {
   const namespace = demoNamespaces(consumer).apps;
   const environment = resolve(root, 'environments/minimal-demo');
@@ -63,12 +76,38 @@ export function checkMinimalDemoWorkers(tools, consumer) {
     assert.equal(pod.initContainers, undefined);
     assert.equal(pod.containers.length, 1);
     const [container] = pod.containers;
+    assert.deepEqual(container.command, ['/usr/local/bin/fleetiq-server']);
     assert.deepEqual(container.args, [role]);
     assert.equal(container.image, backend.reference);
-    assert.deepEqual(
-      container.env.filter(({ name }) => name === 'DATABASE_URL'),
-      [workloadDatabaseEnv(workloadDatabase.workloads, role)],
-    );
+    assert.equal(pod.enableServiceLinks, false);
+    assert.equal(container.envFrom, undefined);
+    const expectedEnv = [workloadDatabaseEnv(workloadDatabase.workloads, role)];
+    if (role === 'ingest-tcp') {
+      expectedEnv.push(
+        configMapEnv('FLEETIQ_TCP_BIND_ADDRESS', 'fleetiq-ingest-tcp-network'),
+        { name: 'FLEETIQ_TCP_IDENTITY_POLICY', value: 'registered-identifiers' },
+        ...ingestRouteKeys.map((key) =>
+          configMapEnv(
+            key,
+            'fleetiq-ingest-tcp-route',
+            key === 'FLEETIQ_TCP_IDENTIFIER_AUTHORITY' ? { optional: true } : {},
+          ),
+        ),
+      );
+    }
+    assert.deepEqual(container.env, expectedEnv);
+    assert.deepEqual(pod.volumes, [
+      {
+        name: 'database-ca',
+        configMap: {
+          name: 'workload-database-ca',
+          items: [{ key: 'ca.crt', path: 'ca.crt' }],
+        },
+      },
+    ]);
+    assert.deepEqual(container.volumeMounts, [
+      { name: 'database-ca', mountPath: '/etc/fleetiq/database', readOnly: true },
+    ]);
   }
   const maintenance = render('workers-maintenance');
   const stopped = structuredClone(runtime);
