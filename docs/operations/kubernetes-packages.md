@@ -21,7 +21,9 @@ cluster RBAC, generated Secrets, migration hooks or bootstrap SQL in these packa
 The same chart sources support later local and non-local selections.
 For the separate minimal-demo namespace, private TCP and support-network composition,
 see [minimal-demo private networking](minimal-demo-network.md) and the
-[minimal-demo database phases](minimal-demo-data.md).
+[minimal-demo database phases](minimal-demo-data.md). The demo uses the local
+`fleetiq-minimal-demo-operations` chart for temporary routes and the provider's
+checked bootstrap Job input. OCI publication covers the two workload charts.
 
 ## Offline qualification
 

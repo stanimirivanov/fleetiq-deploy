@@ -81,7 +81,7 @@ for (const [phase, tempLogin, runtimeLogins] of [
   });
 }
 
-const operations = resolve(root, 'environments/minimal-demo/operations');
+const operations = resolve(root, 'charts/fleetiq-minimal-demo-operations');
 const pin = resolve(root, 'environments/minimal-demo/backend.json');
 
 test('bootstrap renders a checked operation for the exact data Job delegation', () => {

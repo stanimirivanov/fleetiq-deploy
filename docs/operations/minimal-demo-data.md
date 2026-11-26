@@ -62,6 +62,7 @@ DEPLOY=$PWD
 HELM=$DEPLOY/target/tools/manifests/helm
 KUSTOMIZE=$DEPLOY/target/tools/manifests/kustomize
 DEMO=$DEPLOY/environments/minimal-demo
+DEMO_OPERATIONS=$DEPLOY/charts/fleetiq-minimal-demo-operations
 DATA=$CONSUMER-data
 RELEASES=$CONSUMER-releases
 PIN=$DEMO/backend.json
@@ -131,7 +132,7 @@ printf '%s  %s\n' "$(jq -er '.migrationInventory.digest | sub("^sha256:"; "")' "
     "invalid.invalid/psql=$POSTGRES"
   "$KUSTOMIZE" build . > "$PRIVATE/db-workflow.yaml"
 )
-"$HELM" template fleetiq "$DEMO/operations" --namespace "$DATA" \
+"$HELM" template fleetiq "$DEMO_OPERATIONS" --namespace "$DATA" \
   --kube-version 1.35.0 --set operation=migration-route > "$PRIVATE/db-migration-route.yaml"
 ```
 
@@ -162,7 +163,7 @@ Observe the Cluster HBA and CNPG bootstrap role reconciliation. Leave all produc
 writers fenced. Choose a fresh provider Job name `JOB`.
 
 ```bash
-"$HELM" template "$JOB" "$DEMO/operations" --namespace "$DATA" \
+"$HELM" template "$JOB" "$DEMO_OPERATIONS" --namespace "$DATA" \
   --kube-version 1.35.0 --set operation=bootstrap --set-file "backend=$PIN" |
   pnpm exec yaml --json --single | jq -er '.data["operation.json"]' \
   > "$PRIVATE/db-bootstrap.json"
@@ -177,7 +178,7 @@ budget. [Provider operation approval](https://github.com/stanimirivanov/k8s-infr
 [platform bootstrap contract](https://github.com/stanimirivanov/fleetiq-platform/blob/c2135d3f77ef1150efbc7beeee8d160271822da7/docs/operations/platform-bootstrap.md)
 
 ```bash
-"$HELM" template fleetiq "$DEMO/operations" --namespace "$DATA" \
+"$HELM" template fleetiq "$DEMO_OPERATIONS" --namespace "$DATA" \
   --kube-version 1.35.0 --set "operation=bootstrap-route,attempt=$LAUNCHER" \
   > "$PRIVATE/db-bootstrap-route.yaml"
 ```

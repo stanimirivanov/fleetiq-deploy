@@ -215,7 +215,7 @@ export function checkMinimalDemoData(tools, consumer) {
       return [phase, { rendered, schemas: validateSchemas(tools, rendered) }];
     }),
   );
-  const chart = resolve(environment, 'operations');
+  const chart = resolve(root, 'charts/fleetiq-minimal-demo-operations');
   const bootstrap = render(
     chart,
     'demo-bootstrap-01',
