@@ -1,0 +1,40 @@
+{{- if eq .Values.operation "bootstrap" }}
+{{- if or (not (regexMatch "^[a-z][a-z0-9]*(-[a-z0-9]+)*-data$" .Release.Namespace)) (gt (len .Release.Namespace) 37) }}
+{{- fail "Select the delegated data namespace" }}
+{{- end }}
+{{- if not (regexMatch "^[a-z][a-z0-9-]{0,48}[a-z0-9]$" .Release.Name) }}
+{{- fail "Select a fresh provider Job name" }}
+{{- end }}
+{{- $selection := mustFromJson .Values.backend }}
+{{- $image := $selection.backend.reference }}
+{{- if not (regexMatch "^ghcr[.]io/stanimirivanov/fleetiq-platform@sha256:[a-f0-9]{64}$" $image) }}
+{{- fail "Select the immutable published backend" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+data:
+  # Render only. Pass operation.json to the provider for exact Job admission.
+  operation.json: |
+    {{- $env := list (dict "name" "DATABASE_URL" "valueFrom" (dict "secretKeyRef" (dict "name" "fleetiq-db-bootstrap-platform-operator-url" "key" "url"))) }}
+    {{- range $key := list "FLEETIQ_BOOTSTRAP_ACTOR_ID" "FLEETIQ_BOOTSTRAP_AUTHORITY_ID" "FLEETIQ_BOOTSTRAP_EXTERNAL_SUBJECT" }}
+    {{- $env = append $env (dict "name" $key "valueFrom" (dict "secretKeyRef" (dict "name" "fleetiq-bootstrap-operator" "key" $key))) }}
+    {{- end }}
+    {{- $container := dict
+      "name" "bootstrap"
+      "image" $image
+      "imagePullPolicy" "Never"
+      "command" (list "/usr/local/bin/fleetiq-server")
+      "args" (list "bootstrap-platform-operator" "--check-schema")
+      "env" $env
+      "volumeMounts" (list (dict "name" "database-ca" "mountPath" "/etc/fleetiq/database" "readOnly" true))
+      "resources" (dict "requests" (dict "cpu" "100m" "memory" "192Mi") "limits" (dict "cpu" "1" "memory" "384Mi"))
+      "securityContext" (dict "readOnlyRootFilesystem" true) }}
+    {{- $pod := dict
+      "securityContext" (dict "runAsUser" 10001 "runAsGroup" 10001)
+      "volumes" (list (dict "name" "database-ca" "configMap" (dict "name" "workload-database-ca")))
+      "containers" (list $container) }}
+    {{- dict "name" .Release.Name "namespace" .Release.Namespace "deadlineSeconds" 300 "podSpec" $pod | toPrettyJson | nindent 4 }}
+{{- end }}

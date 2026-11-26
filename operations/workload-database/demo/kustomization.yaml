@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../base
+generatorOptions:
+  immutable: true
+configMapGenerator:
+  - name: workload-database-inputs
+    envs: [reviewed-install.env]
+  - name: workload-database-sql
+    behavior: merge
+    files: [inventory.json]
+patches:
+  - target:
+      kind: WorkflowTemplate
+      name: workload-database-v1
+    patch: |
+      apiVersion: argoproj.io/v1alpha1
+      kind: WorkflowTemplate
+      metadata:
+        name: workload-database-v1
+      spec:
+        podMetadata:
+          labels:
+            app.kubernetes.io/component: fleetiq-demo-database-maintenance

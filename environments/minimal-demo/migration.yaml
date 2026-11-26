@@ -1,0 +1,4 @@
+workloadDatabase:
+  workloads: []
+  maintenance: true
+  migrationLogin: true

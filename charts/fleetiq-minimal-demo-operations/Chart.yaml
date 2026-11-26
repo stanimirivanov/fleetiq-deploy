@@ -1,0 +1,6 @@
+apiVersion: v2
+name: fleetiq-minimal-demo-operations
+description: Minimal-demo database attempt and temporary network routes
+type: application
+version: 0.1.0
+kubeVersion: '>=1.35.0 <1.36.0'

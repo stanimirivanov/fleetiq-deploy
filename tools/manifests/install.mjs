@@ -78,7 +78,7 @@ try {
       ? Buffer.from(
           JSON.stringify(
             parse(source.toString('utf8')).spec.versions.find(
-              ({ name }) => name === 'v1',
+              ({ name }) => name === schema.apiVersion.split('/').at(-1),
             ).schema.openAPIV3Schema,
           ),
         )
