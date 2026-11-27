@@ -3,31 +3,218 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["operation"],
+  "definitions": {
+    "identifier": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "signedInteger": { "type": "string", "pattern": "^(0|-?[1-9][0-9]{0,18})$" },
+    "positiveInteger": { "type": "string", "pattern": "^[1-9][0-9]{0,18}$" },
+    "tenant": {
+      "type": "object",
+      "required": ["tenant"],
+      "additionalProperties": false,
+      "properties": { "tenant": { "$ref": "#/definitions/identifier" } }
+    }
+  },
   "properties": {
-    "operation": { "enum": ["bootstrap", "bootstrap-route", "migration-route"] },
+    "operation": {
+      "enum": [
+        "bootstrap",
+        "rebuild",
+        "register",
+        "calculate",
+        "reclaim",
+        "summarize",
+        "expire",
+        "administrative-route",
+        "bootstrap-route",
+        "migration-route",
+        "reclaim-route"
+      ]
+    },
     "attempt": { "type": "string", "pattern": "^demo-launch-[a-f0-9]{24}$" },
     "workflowName": {
       "type": "string",
       "maxLength": 63,
       "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
     },
-    "backend": { "type": "string", "minLength": 1 }
+    "backend": { "type": "string", "minLength": 1, "maxLength": 4096 },
+    "backendDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "inputs": { "type": "object" }
   },
   "allOf": [
     {
+      "if": {
+        "properties": {
+          "operation": {
+            "enum": [
+              "administrative-route",
+              "bootstrap-route",
+              "migration-route",
+              "reclaim-route"
+            ]
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["backend"] },
+            { "required": ["backendDigest"] },
+            { "required": ["inputs"] }
+          ]
+        }
+      },
+      "else": {
+        "required": ["backend", "backendDigest"],
+        "not": {
+          "anyOf": [{ "required": ["attempt"] }, { "required": ["workflowName"] }]
+        }
+      }
+    },
+    {
       "if": { "properties": { "operation": { "const": "migration-route" } } },
-      "then": { "required": ["workflowName"] },
-      "else": { "not": { "required": ["workflowName"] } }
+      "then": { "required": ["workflowName"], "not": { "required": ["attempt"] } }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": {
+            "enum": ["administrative-route", "bootstrap-route", "reclaim-route"]
+          }
+        }
+      },
+      "then": { "required": ["attempt"], "not": { "required": ["workflowName"] } }
     },
     {
       "if": { "properties": { "operation": { "const": "bootstrap" } } },
-      "then": { "required": ["backend"] },
-      "else": { "not": { "required": ["backend"] } }
+      "then": { "properties": { "inputs": { "maxProperties": 0 } } }
     },
     {
-      "if": { "properties": { "operation": { "const": "bootstrap-route" } } },
-      "then": { "required": ["attempt"] },
-      "else": { "not": { "required": ["attempt"] } }
+      "if": { "properties": { "operation": { "enum": ["rebuild", "expire"] } } },
+      "then": {
+        "required": ["inputs"],
+        "properties": { "inputs": { "$ref": "#/definitions/tenant" } }
+      }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "register" } } },
+      "then": {
+        "required": ["inputs"],
+        "properties": {
+          "inputs": {
+            "additionalProperties": false,
+            "required": [
+              "tenant",
+              "calculator",
+              "version",
+              "implementation",
+              "input",
+              "input_version",
+              "output",
+              "output_version"
+            ],
+            "properties": {
+              "tenant": { "$ref": "#/definitions/identifier" },
+              "calculator": { "$ref": "#/definitions/identifier" },
+              "version": { "$ref": "#/definitions/identifier" },
+              "implementation": { "enum": ["window-mean-v1", "window-mad-v1"] },
+              "input": { "$ref": "#/definitions/identifier" },
+              "output": { "$ref": "#/definitions/identifier" },
+              "input_version": { "$ref": "#/definitions/positiveInteger" },
+              "output_version": { "$ref": "#/definitions/positiveInteger" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "calculate" } } },
+      "then": {
+        "required": ["inputs"],
+        "properties": {
+          "inputs": {
+            "additionalProperties": false,
+            "required": [
+              "tenant",
+              "scope",
+              "calculator",
+              "version",
+              "evaluation",
+              "configuration",
+              "target",
+              "start",
+              "end",
+              "finalize",
+              "known",
+              "evaluated",
+              "minimum"
+            ],
+            "properties": {
+              "tenant": { "$ref": "#/definitions/identifier" },
+              "scope": { "$ref": "#/definitions/identifier" },
+              "calculator": { "$ref": "#/definitions/identifier" },
+              "version": { "$ref": "#/definitions/identifier" },
+              "evaluation": { "$ref": "#/definitions/identifier" },
+              "configuration": { "$ref": "#/definitions/identifier" },
+              "target": { "$ref": "#/definitions/identifier" },
+              "start": { "$ref": "#/definitions/signedInteger" },
+              "end": { "$ref": "#/definitions/signedInteger" },
+              "finalize": { "$ref": "#/definitions/signedInteger" },
+              "known": { "$ref": "#/definitions/signedInteger" },
+              "evaluated": { "$ref": "#/definitions/signedInteger" },
+              "minimum": { "$ref": "#/definitions/positiveInteger" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "reclaim" } } },
+      "then": {
+        "required": ["inputs"],
+        "properties": {
+          "inputs": {
+            "additionalProperties": false,
+            "required": ["tenant", "manifest", "policyRevision"],
+            "properties": {
+              "tenant": { "$ref": "#/definitions/identifier" },
+              "manifest": { "$ref": "#/definitions/positiveInteger" },
+              "policyRevision": { "$ref": "#/definitions/positiveInteger" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "summarize" } } },
+      "then": {
+        "required": ["inputs"],
+        "properties": {
+          "inputs": {
+            "additionalProperties": false,
+            "required": [
+              "tenant",
+              "asset",
+              "property",
+              "version",
+              "start",
+              "end",
+              "resolution"
+            ],
+            "dependencies": { "manifest": ["generation"], "generation": ["manifest"] },
+            "properties": {
+              "tenant": { "$ref": "#/definitions/identifier" },
+              "asset": { "$ref": "#/definitions/identifier" },
+              "property": { "$ref": "#/definitions/identifier" },
+              "version": { "$ref": "#/definitions/positiveInteger" },
+              "start": { "$ref": "#/definitions/signedInteger" },
+              "end": { "$ref": "#/definitions/signedInteger" },
+              "resolution": { "$ref": "#/definitions/positiveInteger" },
+              "manifest": { "$ref": "#/definitions/positiveInteger" },
+              "generation": { "$ref": "#/definitions/positiveInteger" }
+            }
+          }
+        }
+      }
     }
   ]
 }

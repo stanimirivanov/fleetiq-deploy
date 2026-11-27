@@ -4,9 +4,9 @@ Status: Proposed target; planning only. Reviewed 2026-10-17.
 
 ## TL;DR
 
-- Use the shared Kubernetes substrate, Helm OCI packages, Kustomize composition,
-  Argo CD reconciliation and Argo Workflows release orchestration locally and
-  remotely. Different capacity and identity settings do not require new tooling.
+- Use the shared Kubernetes substrate, Helm OCI packages, Kustomize composition
+  and provider-owned Argo CD locally and remotely. Select Argo Workflows for the
+  qualified maintenance path. Use provider-scoped Jobs for bounded operations.
 - `fleetiq-deploy` owns FleetIQ environments and promotions; `perfeng-environment`
   continues to own Perfeng. Neither becomes the other's deployment dependency.
 - The provider needs consumer isolation and qualified networking, storage, access
@@ -19,7 +19,8 @@ Status: Proposed target; planning only. Reviewed 2026-10-17.
 Read the [execution plan](../exec-plans/active/kubernetes-gitops-deployment.md)
 for delivery order and the [provider prompt](../handoffs/k8s-infrastructure-consumer-onboarding.md)
 for work outside FleetIQ. [ADR 0002](../adr/0002-kubernetes-gitops-target.md)
-records the proposed decision.
+records the accepted ownership and execution boundaries. The release workflow
+below describes the selected maintenance profile.
 
 ## Findings from the actual repositories
 

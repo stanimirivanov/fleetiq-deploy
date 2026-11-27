@@ -1,0 +1,122 @@
+{{- $commands := dict "bootstrap" "bootstrap-platform-operator" "rebuild" "rebuild-current" "register" "register-calculator" "calculate" "calculate-once" "reclaim" "reclaim-once" "summarize" "summarize-once" "expire" "expire-history-once" }}
+{{- $operation := .Values.operation }}
+{{- if hasKey $commands $operation }}
+{{- $namespace := .Release.Namespace }}
+{{- $name := .Release.Name }}
+{{- if or (not (regexMatch "^[a-z][a-z0-9]*(-[a-z0-9]+)*-data$" $namespace)) (gt (len $namespace) 37) }}
+{{- fail "Select the delegated data namespace" }}
+{{- end }}
+{{- if not (regexMatch "^[a-z][a-z0-9-]{0,48}[a-z0-9]$" $name) }}
+{{- fail "Select a fresh provider Job name" }}
+{{- end }}
+{{- $digest := required "Supply the reviewed backend digest" .Values.backendDigest }}
+{{- if ne (printf "sha256:%s" (sha256sum .Values.backend)) $digest }}
+{{- fail "Backend selection differs from the reviewed digest" }}
+{{- end }}
+{{- $selection := mustFromJson .Values.backend }}
+{{- $image := $selection.backend.reference }}
+{{- if or (ne $selection.format "fleetiq-minimal-demo-backend.v1") (ne $selection.backend.source.repository "stanimirivanov/fleetiq-platform") (not (regexMatch "^ghcr[.]io/stanimirivanov/fleetiq-platform@sha256:[a-f0-9]{64}$" $image)) }}
+{{- fail "Select the immutable published backend" }}
+{{- end }}
+{{- $command := index $commands $operation }}
+{{- $args := list $command }}
+{{- $env := list (dict "name" "DATABASE_URL" "valueFrom" (dict "secretKeyRef" (dict "name" (printf "fleetiq-db-%s-url" $command) "key" "url"))) }}
+{{- $volumes := list (dict "name" "database-ca" "configMap" (dict "name" "workload-database-ca")) }}
+{{- $mounts := list (dict "name" "database-ca" "mountPath" "/etc/fleetiq/database" "readOnly" true) }}
+{{- $input := deepCopy (default (dict) .Values.inputs) }}
+{{- range $key, $value := $input }}
+{{- if or (ne (trim $value) $value) (regexMatch "\\p{Cc}" $value) }}
+{{- fail "Administrative input contains surrounding whitespace or control characters" }}
+{{- end }}
+{{- end }}
+{{- $numeric := index (dict "register" (list "input_version" "output_version") "calculate" (list "start" "end" "finalize" "known" "evaluated" "minimum") "reclaim" (list "manifest" "policyRevision") "summarize" (list "version" "start" "end" "resolution" "manifest" "generation")) $operation | default (list) }}
+{{- range $key := $numeric }}
+{{- if hasKey $input $key }}
+{{- $literal := index $input $key }}
+{{- $number := int64 $literal }}
+{{- if ne (printf "%d" $number) $literal }}
+{{- fail "Administrative input exceeds the signed 64-bit integer range" }}
+{{- end }}
+{{- if and (has $key (list "version" "input_version" "output_version")) (gt $number 4294967295) }}
+{{- fail "Property version exceeds the producer range" }}
+{{- end }}
+{{- $_ := set $input $key $number }}
+{{- end }}
+{{- end }}
+{{- if eq $operation "calculate" }}
+{{- $window := sub $input.end $input.start }}
+{{- $lateness := sub $input.finalize $input.end }}
+{{- if or (ge $input.start $input.end) (lt $window 1) (gt $window 604800000) (lt $input.finalize $input.end) (lt $lateness 0) (gt $lateness 604800000) (lt $input.known $input.finalize) (lt $input.evaluated $input.known) (gt $input.minimum 1024) }}
+{{- fail "Select a bounded calculator window" }}
+{{- end }}
+{{- else if eq $operation "summarize" }}
+{{- $window := sub $input.end $input.start }}
+{{- if or (ge $input.start $input.end) (lt $window 1) (gt $window 604800000) (gt (div $window $input.resolution) 64) (ne (mod $input.start $input.resolution) 0) (ne (mod $input.end $input.resolution) 0) }}
+{{- fail "Select a bounded epoch-aligned summary window" }}
+{{- end }}
+{{- end }}
+{{- if eq $operation "bootstrap" }}
+{{- $args = append $args "--check-schema" }}
+{{- range $key := list "FLEETIQ_BOOTSTRAP_ACTOR_ID" "FLEETIQ_BOOTSTRAP_AUTHORITY_ID" "FLEETIQ_BOOTSTRAP_EXTERNAL_SUBJECT" }}
+{{- $env = append $env (dict "name" $key "valueFrom" (dict "secretKeyRef" (dict "name" "fleetiq-bootstrap-operator" "key" $key))) }}
+{{- end }}
+{{- end }}
+{{- if eq $operation "reclaim" }}
+{{- range $key := list "FLEETIQ_ARCHIVE_ENDPOINT" "FLEETIQ_ARCHIVE_BUCKET" "FLEETIQ_ARCHIVE_REGION" "FLEETIQ_ARCHIVE_ACCESS_KEY" "FLEETIQ_ARCHIVE_SECRET_KEY" }}
+{{- $env = append $env (dict "name" $key "valueFrom" (dict "secretKeyRef" (dict "name" "fleetiq-demo-reclaim-storage" "key" $key))) }}
+{{- end }}
+{{- end }}
+{{- $envNames := index (dict
+    "rebuild" (dict "tenant" "FLEETIQ_PROJECTION_REBUILD_TENANT")
+    "reclaim" (dict "tenant" "FLEETIQ_RECLAIM_TENANT_ID" "manifest" "FLEETIQ_RECLAIM_MANIFEST_ID" "policyRevision" "FLEETIQ_RECLAIM_POLICY_REVISION")
+    "summarize" (dict "tenant" "FLEETIQ_SUMMARY_TENANT_ID" "asset" "FLEETIQ_SUMMARY_ASSET_ID" "property" "FLEETIQ_SUMMARY_PROPERTY_ID" "version" "FLEETIQ_SUMMARY_PROPERTY_VERSION" "start" "FLEETIQ_SUMMARY_START_MS" "end" "FLEETIQ_SUMMARY_END_MS" "resolution" "FLEETIQ_SUMMARY_RESOLUTION_MS" "manifest" "FLEETIQ_SUMMARY_MANIFEST_ID" "generation" "FLEETIQ_SUMMARY_RESTORE_GENERATION")
+    "expire" (dict "tenant" "FLEETIQ_HISTORY_CLEANUP_TENANT_ID")) $operation | default (dict) }}
+{{- range $key, $variable := $envNames }}
+{{- if hasKey $input $key }}
+{{- /* Escape Kubernetes EnvVar value expansion while preserving original producer input. */}}
+{{- $env = append $env (dict "name" $variable "value" (replace "$" "$$" (toString (index $input $key)))) }}
+{{- end }}
+{{- end }}
+{{- if or (eq $operation "register") (eq $operation "calculate") }}
+{{- $bytes := mustToJson $input }}
+{{- if gt (len $bytes) 4096 }}
+{{- fail "Calculator input exceeds the producer file limit" }}
+{{- end }}
+{{- $fingerprint := sha256sum $bytes }}
+{{- $inputName := printf "%s-input.%s.%s" $name (substr 0 32 $fingerprint) (substr 32 64 $fingerprint) }}
+{{- $volumes = append $volumes (dict "name" "operation-input" "configMap" (dict "name" $inputName)) }}
+{{- $mounts = append $mounts (dict "name" "operation-input" "mountPath" "/etc/fleetiq/operation" "readOnly" true) }}
+{{- $variable := ternary "FLEETIQ_CALCULATOR_DEFINITION_FILE" "FLEETIQ_CALCULATOR_REQUEST_FILE" (eq $operation "register") }}
+{{- $env = append $env (dict "name" $variable "value" "/etc/fleetiq/operation/input.json") }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $inputName }}
+  namespace: {{ $namespace }}
+immutable: true
+data:
+  input.json: {{ $bytes | quote }}
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  namespace: {{ $namespace }}
+data:
+  # Offline carrier for the provider. Apply only the separate immutable input, if present.
+  approved-inputs.json: {{ mustToJson $input | quote }}
+  operation.json: |
+    {{- $container := dict
+      "name" (ternary "bootstrap" "operation" (eq $operation "bootstrap"))
+      "image" $image
+      "imagePullPolicy" "Never"
+      "command" (list "/usr/local/bin/fleetiq-server")
+      "args" $args
+      "env" $env
+      "volumeMounts" $mounts
+      "resources" (dict "requests" (dict "cpu" "100m" "memory" "192Mi") "limits" (dict "cpu" "1" "memory" "384Mi"))
+      "securityContext" (dict "readOnlyRootFilesystem" true) }}
+    {{- $pod := dict "securityContext" (dict "runAsUser" 10001 "runAsGroup" 10001) "volumes" $volumes "containers" (list $container) }}
+    {{- dict "name" $name "namespace" $namespace "deadlineSeconds" 300 "podSpec" $pod | toPrettyJson | nindent 4 }}
+{{- end }}

@@ -176,26 +176,11 @@ with the exact Cluster service DNS and CA path `/etc/fleetiq/database/ca.crt`.
 Observe the Cluster HBA and CNPG bootstrap role reconciliation. Leave all product
 writers fenced. Choose a fresh provider Job name `JOB`.
 
-```bash
-"$HELM" template "$JOB" "$DEMO_OPERATIONS" --namespace "$DATA" \
-  --kube-version 1.35.0 --set operation=bootstrap --set-file "backend=$PIN" |
-  pnpm exec yaml --json --single | jq -er '.data["operation.json"]' \
-  > "$PRIVATE/db-bootstrap.json"
-```
-
-Pass the JSON to the provider's `minimal_delegation configure` offline
-preview and `job` renderer. The provider returns the exact Job and approved
-launcher digest. Use its `demo-launch-…` identity as `LAUNCHER`. Apply only
-the reviewed route pair and submit the provider-rendered Job through its
-scoped launcher. The ephemeral Job has a 300-second deadline and no retry
-budget. [Provider operation approval](https://github.com/stanimirivanov/k8s-infrastructure/blob/main/docs/minimal-delegation.md#approve-an-operation),
-[platform bootstrap contract](https://github.com/stanimirivanov/fleetiq-platform/blob/c2135d3f77ef1150efbc7beeee8d160271822da7/docs/operations/platform-bootstrap.md)
-
-```bash
-"$HELM" template fleetiq "$DEMO_OPERATIONS" --namespace "$DATA" \
-  --kube-version 1.35.0 --set operation=bootstrap-route --set-string "attempt=$LAUNCHER" \
-  > "$PRIVATE/db-bootstrap-route.yaml"
-```
+Submit the reviewed `bootstrap` request through
+[the native provider Job path](minimal-demo-administration.md#submit-once).
+Use the reviewed backend selection digest and stage the previewed bootstrap
+route. The producer reads the temporary URL and three operator identity inputs.
+[Platform bootstrap contract](https://github.com/stanimirivanov/fleetiq-platform/blob/c2135d3f77ef1150efbc7beeee8d160271822da7/docs/operations/platform-bootstrap.md)
 
 Require exactly one succeeded Job Pod, the approved worker placement and an
 exit-zero checked bootstrap reporting `platform operator bootstrapped`. For a

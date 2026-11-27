@@ -6,12 +6,15 @@ import { digest } from '../policy.mjs';
 import { root } from '../process.mjs';
 import { checkDatabaseRoles, dataPolicy } from './data-policy.mjs';
 import {
+  application,
   attemptLabel,
   database,
   demoNamespaces,
   dns,
   postgresPort,
+  routineLabel,
   simulatorAccount,
+  supportPorts,
 } from './minimal-demo-network.mjs';
 import { documents, validateSchemas } from './render.mjs';
 import { toolsLock } from './toolchain.mjs';
@@ -44,45 +47,93 @@ const migrationLabels = {
   'app.kubernetes.io/component': 'fleetiq-demo-database-maintenance',
 };
 
-function checkTemporaryRoute(rendered, phase, namespace, clientNamespace, labels) {
-  const endpoint = (space, matchLabels) => ({
+function checkTemporaryRoute(rendered, phase, spaces, clientNamespace, labels) {
+  const { data: namespace, support } = spaces;
+  const objectStore = application('object-store');
+  const nonRoutine = [{ key: routineLabel, operator: 'DoesNotExist' }];
+  const sqlFence = ['administrative', 'reclaim'].includes(phase)
+    ? nonRoutine
+    : undefined;
+  const endpoint = (space, matchLabels, matchExpressions) => ({
     matchLabels: { [ciliumNamespace]: space, ...matchLabels },
+    ...(matchExpressions && { matchExpressions }),
   });
   const ports = (port, protocols = ['TCP']) => [
     { ports: protocols.map((protocol) => ({ port: String(port), protocol })) },
   ];
-  const policy = (side, namespace, matchLabels, rules) => ({
+  const policy = (side, namespace, matchLabels, rules, matchExpressions) => ({
     apiVersion: 'cilium.io/v2',
     kind: 'CiliumNetworkPolicy',
     metadata: { name: `fleetiq-demo-${phase}-${side}`, namespace },
-    spec: { endpointSelector: { matchLabels }, ...rules },
+    spec: {
+      endpointSelector: { matchLabels, ...(matchExpressions && { matchExpressions }) },
+      ...rules,
+    },
   });
   assert.deepEqual(
     rendered,
     [
-      policy('client', clientNamespace, labels, {
-        egress: [
-          {
-            toEndpoints: [endpoint('kube-system', dns)],
-            toPorts: ports(53, ['UDP', 'TCP']),
-          },
-          {
-            toEndpoints: [endpoint(namespace, database)],
-            toPorts: ports(postgresPort),
-          },
-          ...(phase === 'migration'
-            ? [{ toEntities: ['kube-apiserver'], toPorts: ports(6443) }]
-            : []),
-        ],
-      }),
-      policy('postgres', namespace, database, {
-        ingress: [
-          {
-            fromEndpoints: [endpoint(clientNamespace, labels)],
-            toPorts: ports(postgresPort),
-          },
-        ],
-      }),
+      policy(
+        'client',
+        clientNamespace,
+        labels,
+        {
+          egress: [
+            {
+              toEndpoints: [endpoint('kube-system', dns)],
+              toPorts: ports(53, ['UDP', 'TCP']),
+            },
+            {
+              toEndpoints: [endpoint(namespace, database, sqlFence)],
+              toPorts: ports(postgresPort),
+            },
+            ...(phase === 'reclaim'
+              ? [
+                  {
+                    toEndpoints: [endpoint(support, objectStore, nonRoutine)],
+                    toPorts: ports(supportPorts.objectStore.pod),
+                  },
+                ]
+              : []),
+            ...(phase === 'migration'
+              ? [{ toEntities: ['kube-apiserver'], toPorts: ports(6443) }]
+              : []),
+          ],
+        },
+        sqlFence,
+      ),
+      policy(
+        'postgres',
+        namespace,
+        database,
+        {
+          ingress: [
+            {
+              fromEndpoints: [endpoint(clientNamespace, labels, sqlFence)],
+              toPorts: ports(postgresPort),
+            },
+          ],
+        },
+        sqlFence,
+      ),
+      ...(phase === 'reclaim'
+        ? [
+            policy(
+              'object-store',
+              support,
+              objectStore,
+              {
+                ingress: [
+                  {
+                    fromEndpoints: [endpoint(namespace, labels, nonRoutine)],
+                    toPorts: ports(supportPorts.objectStore.pod),
+                  },
+                ],
+              },
+              nonRoutine,
+            ),
+          ]
+        : []),
     ],
     'Temporary database route differs from the exact operation and destinations',
   );
@@ -206,10 +257,10 @@ function checkDemoWorkflow(
 }
 
 export function checkMinimalDemoData(tools, consumer) {
-  const namespace = demoNamespaces(consumer).data;
-  const backendSelection = validateBackendSelection(
-    JSON.parse(readFileSync(selectionPath, 'utf8')),
-  );
+  const spaces = demoNamespaces(consumer);
+  const namespace = spaces.data;
+  const selectionBytes = readFileSync(selectionPath);
+  const backendSelection = validateBackendSelection(JSON.parse(selectionBytes));
   const data = documents(readFileSync(resolve(environment, 'data.yaml'), 'utf8'))[0];
   const render = (chart, name, ...args) =>
     documents(
@@ -281,20 +332,87 @@ export function checkMinimalDemoData(tools, consumer) {
     }),
   );
   const chart = resolve(root, 'charts/fleetiq-minimal-demo-operations');
-  const bootstrap = render(
-    chart,
-    'demo-bootstrap-01',
-    '--set',
-    'operation=bootstrap',
-    '--set-file',
-    `backend=${selectionPath}`,
-  );
+  const renderOperation = (mode, name, input = {}) =>
+    render(
+      chart,
+      name,
+      '--set',
+      `operation=${mode}`,
+      '--set-file',
+      `backend=${selectionPath}`,
+      '--set-string',
+      `backendDigest=sha256:${digest(selectionBytes)}`,
+      ...Object.entries(input).flatMap(([key, value]) => [
+        '--set-string',
+        `inputs.${key}=${value}`,
+      ]),
+    );
+  const bootstrap = renderOperation('bootstrap', 'demo-bootstrap-01');
   const operation = JSON.parse(bootstrap[0].data['operation.json']);
   const [container] = operation.podSpec.containers;
   assert.equal(container.image, backendSelection.backend.reference);
   assert.deepEqual(container.args, ['bootstrap-platform-operator', '--check-schema']);
+  const calculator = {
+    tenant: 'fixture',
+    calculator: 'mean',
+    version: '1',
+  };
+  const calculatorInputs = [
+    [
+      'register',
+      {
+        ...calculator,
+        implementation: 'window-mean-v1',
+        input: 'temperature',
+        input_version: 1,
+        output: 'temperature.mean',
+        output_version: 1,
+      },
+    ],
+    [
+      'calculate',
+      {
+        ...calculator,
+        scope: 'unit-1',
+        evaluation: 'evaluation-1',
+        configuration: 'config-1',
+        target: 'unit-1',
+        start: 0,
+        end: 10,
+        finalize: 10,
+        known: 10,
+        evaluated: 10,
+        minimum: 1,
+      },
+    ],
+  ].flatMap(([mode, input]) => {
+    const name = `demo-${mode}-01`;
+    const rendered = renderOperation(mode, name, input);
+    const [config, carrier] = rendered;
+    const bytes = JSON.stringify(input, Object.keys(input).sort());
+    const hash = digest(bytes);
+    const inputName = `${name}-input.${hash.slice(0, 32)}.${hash.slice(32)}`;
+    assert.equal(rendered.length, 2);
+    assert.deepEqual(
+      config,
+      {
+        apiVersion: 'v1',
+        kind: 'ConfigMap',
+        metadata: { name: inputName, namespace },
+        immutable: true,
+        data: { 'input.json': bytes },
+      },
+      'Immutable calculator input differs from the reviewed fixture',
+    );
+    assert.deepEqual(JSON.parse(carrier.data['operation.json']).podSpec.volumes, [
+      { name: 'database-ca', configMap: { name: 'workload-database-ca' } },
+      { name: 'operation-input', configMap: { name: inputName } },
+    ]);
+    return rendered;
+  });
   const workflowName = 'demo-migration-0123456789abcdef01234567';
-  const bootstrapAttempt = 'demo-launch-0123456789abcdef01234567';
+  const attempt = 'demo-launch-0123456789abcdef01234567';
+  const releases = `${consumer}-releases`;
   const migrationRoute = render(
     chart,
     'fleetiq',
@@ -303,23 +421,28 @@ export function checkMinimalDemoData(tools, consumer) {
     '--set-string',
     `workflowName=${workflowName}`,
   );
-  const bootstrapRoute = render(
-    chart,
-    'fleetiq',
-    '--set',
-    'operation=bootstrap-route',
-    '--set-string',
-    `attempt=${bootstrapAttempt}`,
-  );
-  checkTemporaryRoute(migrationRoute, 'migration', namespace, `${consumer}-releases`, {
+  checkTemporaryRoute(migrationRoute, 'migration', spaces, releases, {
     ...migrationLabels,
     [ciliumAccount]: 'release-executor',
     'workflows.argoproj.io/workflow': workflowName,
   });
-  checkTemporaryRoute(bootstrapRoute, 'bootstrap', namespace, namespace, {
-    [attemptLabel]: bootstrapAttempt,
-    [ciliumAccount]: simulatorAccount(bootstrapAttempt),
-  });
+  const administrativeRoutes = ['bootstrap', 'administrative', 'reclaim'].flatMap(
+    (phase) => {
+      const route = render(
+        chart,
+        'fleetiq',
+        '--set',
+        `operation=${phase}-route`,
+        '--set-string',
+        `attempt=${attempt}`,
+      );
+      checkTemporaryRoute(route, phase, spaces, namespace, {
+        [attemptLabel]: attempt,
+        [ciliumAccount]: simulatorAccount(attempt),
+      });
+      return route;
+    },
+  );
   const workflowResources = checkDemoWorkflow(tools, {
     namespace,
     consumer,
@@ -327,7 +450,12 @@ export function checkMinimalDemoData(tools, consumer) {
     backend: backendSelection.backend.reference,
     workloads,
   });
-  const operations = [...bootstrap, ...migrationRoute, ...bootstrapRoute];
+  const operations = [
+    ...bootstrap,
+    ...calculatorInputs,
+    ...migrationRoute,
+    ...administrativeRoutes,
+  ];
   return {
     phases: Object.fromEntries(
       Object.entries(phases).map(([phase, { rendered, schemas }]) => [

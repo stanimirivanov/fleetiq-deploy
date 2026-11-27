@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { stringify } from 'yaml';
 import { checkMinimalDemoData } from '../manifests/minimal-demo-data.mjs';
 import { documents } from '../manifests/render.mjs';
 import { manifestTools, toolsLock } from '../manifests/toolchain.mjs';
+import { digest } from '../policy.mjs';
 import { root } from '../process.mjs';
 
 const tools = manifestTools();
@@ -85,6 +87,7 @@ for (const [phase, tempLogin, runtimeLogins] of [
 
 const operations = resolve(root, 'charts/fleetiq-minimal-demo-operations');
 const pin = resolve(root, 'environments/minimal-demo/backend.json');
+const selectedBackendDigest = `sha256:${digest(readFileSync(pin))}`;
 
 test('bootstrap renders a checked operation for the exact data Job delegation', () => {
   const [carrier] = documents(
@@ -100,6 +103,8 @@ test('bootstrap renders a checked operation for the exact data Job delegation', 
       'operation=bootstrap',
       '--set-file',
       `backend=${pin}`,
+      '--set-string',
+      `backendDigest=${selectedBackendDigest}`,
     ]),
   );
   const operation = JSON.parse(carrier.data['operation.json']);
@@ -185,6 +190,18 @@ test('demo manifest qualification rejects weakened temporary PostgreSQL routes',
         delete postgres.spec.ingress[0].fromEndpoints[0].matchLabels[
           'workflows.argoproj.io/workflow'
         ];
+      },
+    ],
+    [
+      'administrative-route',
+      ([, postgres]) => {
+        delete postgres.spec.ingress[0].fromEndpoints[0].matchExpressions;
+      },
+    ],
+    [
+      'reclaim-route',
+      ([client]) => {
+        delete client.spec.endpointSelector.matchExpressions;
       },
     ],
     [
@@ -274,3 +291,201 @@ for (const flags of [[], ['--skip-schema-validation']]) {
     );
   });
 }
+
+const administration = (operation, input = {}, extra = [], bindSelection = true) =>
+  documents(
+    tools.helm([
+      'template',
+      'qualification-operation-01',
+      operations,
+      '--namespace',
+      'qual-fleet-data',
+      '--kube-version',
+      toolsLock.kubernetes,
+      '--set',
+      `operation=${operation}`,
+      '--set-file',
+      `backend=${pin}`,
+      ...(bindSelection
+        ? ['--set-string', `backendDigest=${selectedBackendDigest}`]
+        : []),
+      ...Object.entries(input).flatMap(([key, value]) => [
+        '--set-string',
+        `inputs.${key}=${value}`,
+      ]),
+      ...extra,
+    ]),
+  );
+
+const tenant = { tenant: 'test-tenant' };
+const declaration = {
+  ...tenant,
+  calculator: 'mean',
+  version: '1',
+  implementation: 'window-mean-v1',
+  input: 'temperature',
+  input_version: '1',
+  output: 'temperature.mean',
+  output_version: '1',
+};
+const evaluation = {
+  ...tenant,
+  calculator: 'mean',
+  version: '1',
+  configuration: 'config-1',
+  evaluation: 'evaluation-1',
+  scope: 'unit-1',
+  target: 'unit-1',
+  start: '9007199254740992',
+  end: '9007199254740993',
+  finalize: '9007199254740994',
+  known: '9007199254740994',
+  evaluated: '9007199254740995',
+  minimum: '1',
+};
+const summary = {
+  ...tenant,
+  asset: 'unit-1',
+  property: 'temperature',
+  version: '1',
+  start: '-10',
+  end: '10',
+  resolution: '10',
+};
+
+for (const [mode, command, input, parameter, archive] of [
+  ['rebuild', 'rebuild-current', tenant, 'FLEETIQ_PROJECTION_REBUILD_TENANT'],
+  [
+    'register',
+    'register-calculator',
+    declaration,
+    'FLEETIQ_CALCULATOR_DEFINITION_FILE',
+  ],
+  ['calculate', 'calculate-once', evaluation, 'FLEETIQ_CALCULATOR_REQUEST_FILE'],
+  [
+    'reclaim',
+    'reclaim-once',
+    { ...tenant, manifest: '1', policyRevision: '2' },
+    'FLEETIQ_RECLAIM_TENANT_ID',
+    true,
+  ],
+  ['summarize', 'summarize-once', summary, 'FLEETIQ_SUMMARY_TENANT_ID'],
+  ['expire', 'expire-history-once', tenant, 'FLEETIQ_HISTORY_CLEANUP_TENANT_ID'],
+]) {
+  test(`the ${mode} template uses the exact producer command and capability`, () => {
+    const rendered = administration(mode, input);
+    const operation = JSON.parse(rendered.at(-1).data['operation.json']);
+    assert.equal(operation.namespace, 'qual-fleet-data');
+    assert.equal(operation.deadlineSeconds, 300);
+    const [container] = operation.podSpec.containers;
+    assert.deepEqual(container.args, [command]);
+    assert.deepEqual(container.command, ['/usr/local/bin/fleetiq-server']);
+    assert.equal(container.imagePullPolicy, 'Never');
+    assert.deepEqual(container.resources, {
+      requests: { cpu: '100m', memory: '192Mi' },
+      limits: { cpu: '1', memory: '384Mi' },
+    });
+    assert.equal(
+      container.env.some((item) => item.name === parameter),
+      true,
+    );
+    const references = container.env
+      .filter((entry) => entry.valueFrom)
+      .map((entry) => entry.valueFrom.secretKeyRef.name);
+    assert.deepEqual(references, [
+      `fleetiq-db-${command}-url`,
+      ...Array(archive ? 5 : 0).fill('fleetiq-demo-reclaim-storage'),
+    ]);
+    assert.equal(operation.podSpec.initContainers, undefined);
+    if (['register', 'calculate'].includes(mode)) {
+      const [config] = rendered;
+      assert.equal(config.immutable, true);
+      const input = config.data['input.json'];
+      assert.equal(rendered.at(-1).data['approved-inputs.json'], input);
+      assert.equal(
+        config.metadata.name,
+        `qualification-operation-01-input.${digest(input).replace(/^(.{32})/u, '$1.')}`,
+      );
+      assert.equal(operation.podSpec.volumes[1].configMap.name, config.metadata.name);
+      if (mode === 'calculate') assert.match(input, /"end":9007199254740993[,}]/u);
+    } else {
+      assert.equal(rendered.length, 1);
+    }
+  });
+}
+
+test('summary observation inputs preserve both presence and absence of restore selectors', () => {
+  const [hot] = administration('summarize', summary);
+  const hotInputs = JSON.parse(hot.data['approved-inputs.json']);
+  assert.equal(Object.hasOwn(hotInputs, 'manifest'), false);
+  assert.equal(Object.hasOwn(hotInputs, 'generation'), false);
+  const [restored] = administration('summarize', {
+    ...summary,
+    manifest: '123',
+    generation: '2',
+  });
+  const restoredInputs = JSON.parse(restored.data['approved-inputs.json']);
+  assert.equal(restoredInputs.manifest, 123);
+  assert.equal(restoredInputs.generation, 2);
+});
+
+test('bootstrap requires the reviewed backend digest even without schema validation', () => {
+  assert.throws(() => administration('bootstrap', {}, [], false));
+  assert.throws(() =>
+    administration('bootstrap', {}, ['--skip-schema-validation'], false),
+  );
+});
+
+test('demo manifest qualification rejects mutable or replaced calculator input', () => {
+  const changedInput = {
+    ...tools,
+    helm(args) {
+      const output = tools.helm(args);
+      if (!args.includes('operation=register')) return output;
+      const rendered = documents(output);
+      const config = rendered.find((item) => item.data?.['input.json']);
+      config.immutable = false;
+      return rendered.map((item) => stringify(item)).join('---\n');
+    },
+  };
+  assert.throws(
+    () => checkMinimalDemoData(changedInput, 'qual-fleet'),
+    /Immutable calculator input differs/u,
+  );
+});
+
+test('administration refuses wrong targets, operations, backend bytes, and unexpected credential inputs', () => {
+  for (const mode of ['restore', 'export', 'migrate', 'serve'])
+    assert.throws(() => administration(mode));
+  assert.throws(() =>
+    administration('rebuild', tenant, ['--namespace', 'foreign-apps']),
+  );
+  assert.throws(() =>
+    administration('rebuild', tenant, [
+      '--set-string',
+      `backendDigest=sha256:${'a'.repeat(64)}`,
+    ]),
+  );
+  assert.throws(() =>
+    administration('rebuild', { ...tenant, secretName: 'fleetiq-db-serve-url' }),
+  );
+  assert.throws(() =>
+    administration('reclaim', {
+      ...tenant,
+      manifest: '9223372036854775808',
+      policyRevision: '1',
+    }),
+  );
+  assert.throws(() => administration('calculate', { ...evaluation, minimum: '1025' }));
+  assert.throws(() => administration('summarize', { ...summary, manifest: '1' }));
+  assert.throws(() => administration('summarize', { ...summary, end: '13' }));
+});
+
+test('rebuild preserves literal identifiers instead of expanding Kubernetes environment references', () => {
+  const [rendered] = administration('rebuild', { tenant: 'test-$(DATABASE_URL)' });
+  const op = JSON.parse(rendered.data['operation.json']);
+  assert.deepEqual(op.podSpec.containers[0].env[1], {
+    name: 'FLEETIQ_PROJECTION_REBUILD_TENANT',
+    value: 'test-$$(DATABASE_URL)',
+  });
+});

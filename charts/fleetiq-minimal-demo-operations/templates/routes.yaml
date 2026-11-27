@@ -1,4 +1,4 @@
-{{- if or (eq .Values.operation "migration-route") (eq .Values.operation "bootstrap-route") }}
+{{- if or (eq .Values.operation "migration-route") (eq .Values.operation "bootstrap-route") (eq .Values.operation "administrative-route") (eq .Values.operation "reclaim-route") }}
 {{- $data := .Release.Namespace }}
 {{- if or (not (regexMatch "^[a-z][a-z0-9]*(-[a-z0-9]+)*-data$" $data)) (gt (len $data) 37) }}
 {{- fail "Select the delegated data namespace" }}
@@ -8,6 +8,10 @@
 {{- $clientNamespace := $data }}
 {{- $labels := dict }}
 {{- $phase := trimSuffix "-route" .Values.operation }}
+{{- $support := printf "%s-demo-support" (trimSuffix "-data" $data) }}
+{{- $reclaim := eq $phase "reclaim" }}
+{{- $administrative := or $reclaim (eq $phase "administrative") }}
+{{- $nonRoutine := list (dict "key" "k8s-infrastructure.io/demo-routine" "operator" "DoesNotExist") }}
 {{- if eq $phase "migration" }}
 {{- $clientNamespace = printf "%s-releases" (trimSuffix "-data" $data) }}
 {{- $workflow := required "Select the approved migration Workflow name" .Values.workflowName }}
@@ -16,9 +20,9 @@
 {{- end }}
 {{- $labels = dict $accountLabel "release-executor" "app.kubernetes.io/component" "fleetiq-demo-database-maintenance" "workflows.argoproj.io/workflow" $workflow }}
 {{- else }}
-{{- $attempt := required "Select the approved bootstrap attempt" .Values.attempt }}
+{{- $attempt := required "Select the approved administrative attempt" .Values.attempt }}
 {{- if not (regexMatch "^demo-launch-[a-f0-9]{24}$" $attempt) }}
-{{- fail "Select the exact approved bootstrap attempt" }}
+{{- fail "Select the exact approved administrative attempt" }}
 {{- end }}
 {{- $labels = dict $accountLabel (replace "launch" "run" $attempt) "k8s-infrastructure.io/demo-attempt" $attempt }}
 {{- end }}
@@ -30,6 +34,9 @@ metadata:
 spec:
   endpointSelector:
     matchLabels: {{ toJson $labels }}
+{{- if $administrative }}
+    matchExpressions: {{ toJson $nonRoutine }}
+{{- end }}
   egress:
     - toEndpoints:
         - matchLabels:
@@ -43,8 +50,20 @@ spec:
         - matchLabels:
             {{ $namespaceLabel }}: {{ $data }}
             cnpg.io/cluster: fleetiq-db
+{{- if $administrative }}
+          matchExpressions: {{ toJson $nonRoutine }}
+{{- end }}
       toPorts:
         - ports: [{ port: '5432', protocol: TCP }]
+{{- if $reclaim }}
+    - toEndpoints:
+        - matchLabels:
+            {{ $namespaceLabel }}: {{ $support }}
+            app.kubernetes.io/name: fleetiq-object-store
+          matchExpressions: {{ toJson $nonRoutine }}
+      toPorts:
+        - ports: [{ port: '9000', protocol: TCP }]
+{{- end }}
 {{- if eq $phase "migration" }}
     - toEntities: [kube-apiserver]
       toPorts:
@@ -59,9 +78,33 @@ metadata:
 spec:
   endpointSelector:
     matchLabels: { cnpg.io/cluster: fleetiq-db }
+{{- if $administrative }}
+    matchExpressions: {{ toJson $nonRoutine }}
+{{- end }}
   ingress:
     - fromEndpoints:
         - matchLabels: {{ set $labels $namespaceLabel $clientNamespace | toJson }}
+{{- if $administrative }}
+          matchExpressions: {{ toJson $nonRoutine }}
+{{- end }}
       toPorts:
         - ports: [{ port: '5432', protocol: TCP }]
+{{- if $reclaim }}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: fleetiq-demo-reclaim-object-store
+  namespace: {{ $support }}
+spec:
+  endpointSelector:
+    matchLabels: { app.kubernetes.io/name: fleetiq-object-store }
+    matchExpressions: {{ toJson $nonRoutine }}
+  ingress:
+    - fromEndpoints:
+        - matchLabels: {{ set $labels $namespaceLabel $data | toJson }}
+          matchExpressions: {{ toJson $nonRoutine }}
+      toPorts:
+        - ports: [{ port: '9000', protocol: TCP }]
+{{- end }}
 {{- end }}
