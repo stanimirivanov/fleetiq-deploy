@@ -2,6 +2,7 @@
 BEGIN;
 \ir ../workload-database/base/sql/context.sql
 \ir ../workload-database/base/sql/policy.sql
+\ir acl.sql
 
 SELECT pg_advisory_xact_lock(120, 1);
 SELECT pg_temp.check_ledger(false), pg_temp.check_drained();

@@ -4,6 +4,7 @@
 
 Render the provider carrier and attempt-bound database route offline. The deployment
 owner stages and withdraws the temporary database login under the writer fence.
+Rehearsal requires approved owner execution of both reviewed SQL batches.
 Live acceptance in [#139](https://github.com/stanimirivanov/fleetiq-deploy/issues/139)
 still requires a protected read under that fence and a single read-only recovery
 result. [Offline preparation in PR #152](https://github.com/stanimirivanov/fleetiq-deploy/pull/152)
@@ -50,26 +51,54 @@ seven existing minimal-demo outputs.
 
 ## Scoped database lifecycle
 
-The deployment owner and credential operator use the retained installation's
-reviewed release lock and the same target throughout. Render the opt-in values
-over `environments/minimal-demo/data.yaml` with `charts/fleetiq-data`.
+Follow the existing release review and approval flow for the retained database.
+Use the installation release lock and the same fenced target throughout. Render
+`rebuild-current-owner.yaml` and `rebuild-current.yaml` over
+`environments/minimal-demo/data.yaml` with `charts/fleetiq-data`. Bind the following
+inputs to the reviewed release request digest before staging either phase.
+[Retained database release preparation][release-review]
+
+- The retained target and provider incarnation, CNPG Cluster and claim UIDs,
+  primary Service DNS, and the observed `fleetiq` database OID.
+- The deployment Git revision and hashes of the grant and withdrawal SQL files
+  and every transitive `\ir` include. Preserve their relative paths in staging.
+- The digests of both saved phase renders, the backend image digest, the verified
+  publication run and attempt with their artifact and record digests, and the
+  published migration inventory digest.
+- The reviewed tenant, migration owner, legacy role and installed workload ACL
+  selection. Bind the expected rebuild ACL and the withdrawal checks for role
+  dependencies, connection denial, routes and credentials. [Rebuild ACL inventory][rebuild-acl]
+
+Use the reviewed request digest in both batches. Retain the request, phase
+renders, SQL checksums and owner execution receipts with the release evidence.
+
+The existing migration route admits the named approved migration Workflow,
+which runs the canonical fence, migrate, grant and verify batches.
+[Minimal-demo migration and grants][migration-route]
+
+Before using either rebuild phase in rehearsal, the database owner
+needs approved immutable execution of the exact checked-in grant and withdrawal
+batches against the retained target above. Each owner execution attempt needs
+a reviewed route scoped to that execution identity.
 
 1. Keep product writers fenced and observe the drain. Have the credential
    operator re-stage the existing migration owner credentials and confirm the
-   approved owner route. Use `rebuild-current-owner.yaml` to admit the migration
-   owner as the only product login and reconcile the retained
+   route for the approved grant execution. Use `rebuild-current-owner.yaml` to
+   admit the migration owner as the only product login and reconcile the retained
    `fleetiq_rebuild_current` role with `NOLOGIN` and `disablePassword`.
    Verify the reconciled role and observed admission. The credential operator
-   stages the `fleetiq-db-rebuild-current` basic-auth Secret and the separate
-   `fleetiq-db-rebuild-current-url` Secret. Both are private and attempt-bound.
+   stages the `fleetiq-db-rebuild-current` Secret of type `kubernetes.io/basic-auth`
+   with username `fleetiq_rebuild_current` and label `cnpg.io/reload: "true"`.
+   Stage the separate `fleetiq-db-rebuild-current-url` Secret with the same
+   credentials. Both Secrets are private and attempt-bound. [CNPG password reconciliation][cnpg-passwords]
 2. The deployment owner applies the reviewed [grant batch][grant-batch] under the
    existing database-owner authority. The batch takes the shared transaction lock
    and checks the reviewed migration inventory, primary, database OID, role
-   isolation, and drain. It verifies the ordinary workload grants and applies a
-   separate ACL for the pinned backend's schema check and rebuild. The source
-   row lock uses a column protected by the installed history immutability trigger.
-   Both batches use the [workload database SQL context][identity], including the approved
-   `release_digest`, owner `PGUSER`, `FLEETIQ_DATABASE_OID`,
+   isolation, and drain. It verifies the ordinary workload grants, checks the
+   source row's immutability trigger and applies the scoped rebuild ACL. The
+   transaction commits only after verifying every intended effective rebuild
+   privilege. Both batches use the [workload database SQL context][identity],
+   including the approved `release_digest`, owner `PGUSER`, `FLEETIQ_DATABASE_OID`,
    `FLEETIQ_RELEASE_DIGEST`, `FLEETIQ_LEGACY_ROLE`, `FLEETIQ_WORKLOADS` and
    `FLEETIQ_MIGRATION_INVENTORY`.
 3. Withdraw the owner route for the attempt. Use `rebuild-current.yaml` to
@@ -81,7 +110,8 @@ over `environments/minimal-demo/data.yaml` with `charts/fleetiq-data`.
    tenant selection. Keep the credential exclusive to that attempt.
 4. Withdraw the attempt route and launcher grant, then reconcile
    `rebuild-current-owner.yaml` again. Wait for active rebuild sessions to close
-   and restore the approved owner route. The deployment owner applies the reviewed [withdrawal batch][withdraw-batch].
+   and stage the approved owner route for the withdrawal execution. The
+   deployment owner applies the reviewed [withdrawal batch][withdraw-batch].
    It revokes the scoped ACL and verifies effective connection denial and no
    remaining database-object dependencies for the role. Verify that the old
    credential cannot connect and retire both rebuild Secrets. Withdraw the owner
@@ -129,10 +159,14 @@ in pending and winner verification. Live timings, handoff counts and semantic
 parity remain open.
 
 [baseline]: minimal-demo-operator-baseline.md#proposed-operator-contract-for-the-pilot
+[cnpg-passwords]: https://cloudnative-pg.io/docs/1.30/declarative_role_management/#password-management
 [maintenance]: kubernetes-packages.md#networks-maintenance-and-non-local-limits
 [grant-batch]: ../../operations/rebuild-current/grant.sql
 [identity]: workload-database-identities.md#operate-the-upgrade
+[migration-route]: minimal-demo-data.md#migration-and-grants
 [provider]: https://github.com/stanimirivanov/k8s-infrastructure/blob/db9f01b7db30a4a72581781af35c04f38f9a1ec7/docs/minimal-delegation.md#approve-an-operation
+[rebuild-acl]: ../../operations/rebuild-current/acl.sql
+[release-review]: workload-database-identities.md#prepare-the-reviewed-release
 [snapshot]: https://github.com/stanimirivanov/fleetiq-platform/blob/c2135d3f77ef1150efbc7beeee8d160271822da7/docs/operations/current-property-state.md#snapshot-procedure
 [withdrawal]: https://github.com/stanimirivanov/k8s-infrastructure/blob/db9f01b7db30a4a72581781af35c04f38f9a1ec7/docs/minimal-delegation.md#withdrawal-and-retained-state
 [withdraw-batch]: ../../operations/rebuild-current/withdraw.sql

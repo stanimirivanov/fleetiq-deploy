@@ -1,6 +1,6 @@
 \set rebuild_acl_action REVOKE
 \set rebuild_acl_direction FROM
-\ir acl.sql
+\ir apply-acl.sql
 
 DO $$ BEGIN
   IF has_database_privilege('fleetiq_rebuild_current', current_database(), 'CONNECT')
