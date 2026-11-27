@@ -5,10 +5,7 @@ metadata:
 spec:
   entrypoint: execute
   serviceAccountName: release-executor
-  activeDeadlineSeconds: 300
-  synchronization:
-    mutexes:
-      - name: fleetiq-workload-database
+  activeDeadlineSeconds: 900
   arguments:
     parameters:
       - name: release-digest
@@ -41,6 +38,9 @@ spec:
   templates:
     - name: execute
       activeDeadlineSeconds: 120
+      synchronization:
+        mutexes:
+          - name: fleetiq-workload-database
       container:
         image: invalid.invalid/psql
         imagePullPolicy: Never

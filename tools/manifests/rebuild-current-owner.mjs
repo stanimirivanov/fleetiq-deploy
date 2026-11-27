@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { resolve } from 'node:path';
+import { posix, resolve } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { parse, stringify } from 'yaml';
 import { root } from '../process.mjs';
 import { documents, validateSchemas } from './render.mjs';
@@ -27,21 +28,18 @@ function checkWorkflow(rendered, { action, releases, postgres, inputs, inventory
       'podMetadata',
       'securityContext',
       'serviceAccountName',
-      'synchronization',
       'templates',
       'volumes',
     ],
     'Owner workflow exposes unreviewed spec fields',
   );
+  assert.equal(spec.entrypoint, 'execute');
   assert.deepEqual(spec.arguments, { parameters: [{ name: 'release-digest' }] });
   assert.equal(spec.serviceAccountName, 'release-executor');
-  assert.deepEqual(spec.synchronization, {
-    mutexes: [{ name: 'fleetiq-workload-database' }],
-  });
   assert.deepEqual(spec.podMetadata, {
     labels: { 'app.kubernetes.io/component': 'fleetiq-demo-rebuild-current-owner' },
   });
-  assert.equal(spec.activeDeadlineSeconds, 300);
+  assert.equal(spec.activeDeadlineSeconds, 900);
   assert.deepEqual(spec.securityContext, {
     runAsNonRoot: true,
     runAsUser: 10001,
@@ -54,10 +52,14 @@ function checkWorkflow(rendered, { action, releases, postgres, inputs, inventory
     'activeDeadlineSeconds',
     'container',
     'name',
+    'synchronization',
   ]);
   assert.equal(spec.templates.length, 1);
   assert.equal(template.name, spec.entrypoint);
   assert.equal(template.activeDeadlineSeconds, 120);
+  assert.deepEqual(template.synchronization, {
+    mutexes: [{ name: 'fleetiq-workload-database' }],
+  });
   const { container } = template;
   assert.equal(container.image, postgres);
   assert.equal(container.imagePullPolicy, 'Never');
@@ -106,7 +108,10 @@ function checkWorkflow(rendered, { action, releases, postgres, inputs, inventory
     sql.metadata.name,
     new RegExp(`^workload-database-sql-${action}-v1-[a-z0-9]{10}$`, 'u'),
   );
-  assert.deepEqual(sqlInputs.data, { ...inputs, 'inventory.json': inventory });
+  assert(
+    isDeepStrictEqual(sqlInputs.data, { ...inputs, 'inventory.json': inventory }),
+    'Owner input bytes differ from the reviewed inputs',
+  );
   const { env } = container;
   const fixed = {
     PGDATABASE: 'fleetiq',
@@ -151,23 +156,43 @@ function checkWorkflow(rendered, { action, releases, postgres, inputs, inventory
       items: [{ key: 'ca.crt', path: 'ca.crt' }],
     },
   });
-  assert.equal(batch.name, 'operation');
-  assert.equal(batch.configMap.name, sql.metadata.name);
-  const paths = batch.configMap.items.map(({ key, path }) => {
-    assert.equal(sql.data[key], readFileSync(resolve(operations, path), 'utf8'));
-    return path;
-  });
-  assert.deepEqual(
-    paths.sort(),
-    [
-      ...['context', 'policy', ...(action === 'grant' ? ['verification'] : [])].map(
-        (file) => `workload-database/base/sql/${file}.sql`,
-      ),
-      ...['acl', 'apply-acl', 'context', 'revoke', action].map(
-        (file) => `rebuild-current/${file}.sql`,
-      ),
-    ].sort(),
+  const items = [
+    { key: 'context.sql', path: 'workload-database/base/sql/context.sql' },
+    { key: 'policy.sql', path: 'workload-database/base/sql/policy.sql' },
+    ...['acl', 'apply-acl', 'context', 'revoke', action].map((file) => ({
+      key: `rebuild-${file}.sql`,
+      path: `rebuild-current/${file}.sql`,
+    })),
+    ...(action === 'grant'
+      ? [
+          {
+            key: 'verification.sql',
+            path: 'workload-database/base/sql/verification.sql',
+          },
+        ]
+      : []),
+  ];
+  assert(
+    isDeepStrictEqual(batch, {
+      name: 'operation',
+      configMap: { name: sql.metadata.name, items },
+    }),
+    'Owner SQL projection differs from the reviewed inventory',
   );
+  const mountedPaths = new Set(items.map(({ path }) => posix.join('/operation', path)));
+  for (const { key, path } of items) {
+    const bytes = readFileSync(resolve(operations, path), 'utf8');
+    assert(sql.data[key] === bytes, `Owner SQL bytes differ for ${key}`);
+    for (const [, argument] of bytes.matchAll(/^[ \t]*\\ir\b[ \t]*(.*)$/gmu)) {
+      const include = argument.trim();
+      assert(
+        /^[\w./-]+$/u.test(include) &&
+          !posix.isAbsolute(include) &&
+          mountedPaths.has(posix.resolve('/operation', posix.dirname(path), include)),
+        `Owner SQL include falls outside the reviewed projection for ${key}`,
+      );
+    }
+  }
 }
 
 export function checkRebuildOwnerWorkflows(
@@ -220,6 +245,25 @@ export function checkRebuildOwnerWorkflows(
       assert.throws(
         () => checkWorkflow(wrongBatch, reviewed),
         /Owner entrypoint differs from the reviewed batch/u,
+      );
+      const withUnreviewedMount = parse(overlayBytes);
+      withUnreviewedMount.patches[0].patch +=
+        '- op: replace\n  path: /spec/volumes/1/configMap/items/0/path\n  value: nonexistent-owner-sql-fixture.sql\n';
+      writeFileSync(overlay, stringify(withUnreviewedMount));
+      const unreviewedMount = render();
+      assert.throws(
+        () => checkWorkflow(unreviewedMount, reviewed),
+        /Owner SQL projection differs from the reviewed inventory/u,
+      );
+      const withWorkflowLock = parse(overlayBytes);
+      withWorkflowLock.patches[0].patch +=
+        '- op: add\n  path: /spec/synchronization\n  value: { mutexes: [{ name: fleetiq-workload-database }] }\n';
+      writeFileSync(overlay, stringify(withWorkflowLock));
+      const workflowLevelLock = render();
+      validateSchemas(tools, workflowLevelLock);
+      assert.throws(
+        () => checkWorkflow(workflowLevelLock, reviewed),
+        /Owner workflow exposes unreviewed spec fields/u,
       );
       const withExit = parse(overlayBytes);
       withExit.patches[0].patch +=

@@ -63,9 +63,10 @@ fixture inputs together. A pass requires both the carrier and paired Cilium
 policy checks. The gate also renders and checks the two opt-in database phases
 for exact roles and HBA admission. The owner execution fixture composes both
 versioned templates with immutable reviewed inputs and SQL. It checks their
-single psql entrypoints, mounted include paths and paired exact-attempt routes.
-Native rejection fixtures cover unstaged inputs, wrong batches, additional
-Workflow execution and invalid route selections. Kubeconform validates each
+single psql entrypoints, bounded Workflow and Pod deadlines, leaf mutexes,
+reviewed SQL projections and relative includes, and paired exact-attempt routes.
+Native rejection fixtures cover unstaged inputs, wrong batches, unreviewed SQL
+mounts, Workflow-level mutexes, additional execution and invalid route selections. Kubeconform validates each
 approved render. Diagnose offline failures against the [rebuild pilot guide](../operations/minimal-demo-rebuild-current-pilot.md).
 
 ## Limits and review

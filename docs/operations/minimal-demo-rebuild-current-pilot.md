@@ -17,7 +17,7 @@ acts on the whole tenant. The asset, property and version select only the
 durable evidence probe. Review the published backend selection, then supply
 the file bytes and the corresponding reviewed SHA-256. The only credential
 reference is `fleetiq-db-rebuild-current-url` key `url`, and the Job mounts
-the public `workload-database-ca`. A future staged URL must use verify-full
+the public CA ConfigMap `workload-database-ca`. A future staged URL must use verify-full
 with the exact primary Service name and `/etc/fleetiq/database/ca.crt`.
 
 This render uses a synthetic tenant, target name and Job name. Run it from the
@@ -75,48 +75,64 @@ before staging its WorkflowTemplate. [Retained database release preparation][rel
   selection. Bind the expected rebuild ACL and the withdrawal checks for role
   dependencies, connection denial, routes and credentials. [Rebuild ACL inventory][rebuild-acl]
 
-From the reviewed checkout, the release owner copies `operations/` into fresh
-private release staging. In the selected `operations/rebuild-current-owner/grant`
-or `operations/rebuild-current-owner/withdraw` overlay, place the verified
-publication inventory as `inventory.json` and the reviewed values as
-`reviewed-owner.env`. Include these four keys.
+From the reviewed checkout, the release owner copies `operations/` into a
+fresh private staging directory, `OWNER_STAGING`. For each action overlay
+under `operations/rebuild-current-owner/`, place the verified publication
+inventory as `inventory.json` and the reviewed values as `reviewed-owner.env`.
+Include these four keys.
 
 - `PGHOST` is `fleetiq-db-rw.<data namespace>.svc`.
 - `FLEETIQ_DATABASE_OID` is the observed `fleetiq` OID.
 - `FLEETIQ_WORKLOADS` is the JSON array of installed workload commands.
 - `FLEETIQ_RELEASE_DIGEST` is the reviewed request digest for this action.
 
-From that overlay in the staging copy, render using the release namespace
-`RELEASES` and exact PostgreSQL image `POSTGRES` from the reviewed demo values.
-Set `OWNER_ACTION` to the selected overlay's name, `grant` or `withdraw`. Use the
-manifest tool paths and private directory from the existing demo preparation.
-Stage the two immutable ConfigMaps and the selected versioned template through
-the existing template authority. Record their exact bytes and UIDs with the
-review. Preserve the template and its inputs for recovery. A changed selection
-needs a separately reviewed template version.
+Set `OWNER_ACTION` to `grant` for the grant overlay and `withdraw` for the
+withdrawal overlay. Use the release namespace `RELEASES`, reviewed PostgreSQL
+image `POSTGRES`, pinned tool paths and private directory from demo preparation.
 [Demo preparation][migration-route]
 
 ```bash
-"$KUSTOMIZE" edit set namespace "$RELEASES"
-"$KUSTOMIZE" edit set image "invalid.invalid/psql=$POSTGRES"
-"$KUSTOMIZE" build . > "$PRIVATE/db-rebuild-owner-$OWNER_ACTION.yaml"
+OWNER_ACTION=grant
+(
+  cd "$OWNER_STAGING/operations/rebuild-current-owner/$OWNER_ACTION"
+  "$KUSTOMIZE" edit set namespace "$RELEASES"
+  "$KUSTOMIZE" edit set image "invalid.invalid/psql=$POSTGRES"
+  "$KUSTOMIZE" build . > "$PRIVATE/db-rebuild-owner-$OWNER_ACTION.yaml"
+)
 ```
 
-Stage the existing `workload-database-owner` Secret key `password` and public
-`workload-database-ca` ConfigMap key `ca.crt` in the release namespace. The
-credential operator uses the same password as the temporary data-namespace
-migration owner and verifies the CA for the reviewed primary Service. The
-Workflow runs the fixed batch as `fleetiq_migrator` using `psql` with verify-full
-TLS, the same Argo mutex as ordinary migration, and no automatic retry. Mounted
-SQL preserves the reviewed include paths. The batch checks the request digest
+Use the existing authorities for each resource. The pre-authorized release
+namespace owner stages the two immutable ConfigMaps for each action, reads
+them back and records their names, UIDs, immutability and verified data bytes
+or hashes. The template staging authority stages only the WorkflowTemplates
+and records each live UID and reviewed spec. Retain all four ConfigMaps,
+both templates and their receipts for recovery. A changed selection needs a
+separately reviewed template version. [Pinned provider RBAC][owner-rbac]
+
+The credential owner stages the Secret `workload-database-owner` with key `password` and
+the public CA ConfigMap `workload-database-ca` with key `ca.crt` in the release namespace.
+Use the temporary data-namespace migration owner's password and verify the CA
+for the reviewed primary Service. The fixed `psql` batch uses verify-full TLS
+as `fleetiq_migrator`. Its single execution template takes the same Argo mutex
+as ordinary migration only after approval. The batch checks the request digest
 against the immutable inputs before modifying privileges.
+
+Stage both sets of ConfigMaps and templates, prepare both reviewed requests and
+their exact route manifests, and confirm the existing credential, staging,
+submission, network, witness and approval authorities for both actions before
+executing the grant. Submit each request only when its phase and witnesses
+are ready.
 
 ## Approve one owner execution
 
-Submit a suspended Workflow with a fresh explicit `WORKFLOW_NAME` using the
-provider's release-releaser identity. Select the staged action template and its
-`release-digest`. Capture the Workflow UID and render the route with the same
-name in the reviewed data namespace `DATA`. [Provider submission][owner-admission]
+For each action, the release owner prepares the private request artifact
+`$PRIVATE/db-$WORKFLOW_NAME-request.yaml` using the pinned provider's exact
+suspended Workflow shape. Choose a fresh explicit `WORKFLOW_NAME` in
+`RELEASES`. Select the staged `rebuild-current-owner-grant-v1` or
+`rebuild-current-owner-withdraw-v1` template and the matching reviewed
+`release-digest`. Verify the consumer label and submitter identity against
+the reviewed provider delegation. Render the route in `DATA` with the same
+Workflow name. [Provider submission][owner-admission]
 
 ```bash
 "$HELM" template fleetiq "$DEMO_OPERATIONS" --namespace "$DATA" \
@@ -124,18 +140,51 @@ name in the reviewed data namespace `DATA`. [Provider submission][owner-admissio
   --set-string "workflowName=$WORKFLOW_NAME" > "$PRIVATE/db-$WORKFLOW_NAME-route.yaml"
 ```
 
-The network operator stages the two named Cilium policies. Verify that the pair
-matches the Workflow name, owner component, executor ServiceAccount and release
-namespace and admits only DNS, the executor's API traffic and the intended
-PostgreSQL destination. The independent approver checks the suspended UID and
-request, actual template and immutable input references against the staging
-receipt, the observed owner phase and writer drain, and the installed route
-pair before clearing suspension through the provider. Require one succeeded
-owner Pod and retain the Workflow and Pod UIDs, outcome and reviewed inputs with
-the receipts. Withdraw both policies after the Pod terminates. Retain the
-Workflow name and UID until both routes are withdrawn, and never reuse a name.
-An authorized retry of the same reviewed action requires a fresh name, route and
-independent approval. Keep ambiguous outcomes unresolved and retain evidence.
+After review, authenticate the provider's `release-releaser` for the exact
+target. Set `RELEASER_KUBECONFIG` and `RELEASER_CONTEXT` to its private
+kubeconfig path and reviewed context, then run the named create. Capture the
+returned Workflow UID. If the response is lost, recover the request by its
+exact name through the existing read authority and verify its identity before
+proceeding.
+
+```bash
+kubectl --kubeconfig "$RELEASER_KUBECONFIG" --context "$RELEASER_CONTEXT" \
+  create -f "$PRIVATE/db-$WORKFLOW_NAME-request.yaml"
+```
+
+The authorized network owner installs and reads back both Cilium policies,
+including egress in `RELEASES` and ingress in `DATA`. Confirm and record their
+UIDs and exact specs. Check the Workflow name, owner component, executor
+ServiceAccount and release namespace selectors and the DNS, executor API and
+intended PostgreSQL destinations.
+
+A separately authorized witness uses existing read access to verify the live
+template and input UIDs and bytes or hashes against the staging receipts,
+the installed route pair against the network receipt, and the observed phase,
+database catalog and writer drain. Check for owned Pods of the exact
+Workflow UID. The witness gives the target-bound receipt to the independent
+approver. The provider's `release-viewer` can read Workflows and
+WorkflowTemplates for that receipt. The approver uses `release-approver` to
+get the exact Workflow, compare its suspended UID and request with the receipt,
+and patch only the initial suspension with the provider's approval annotation.
+Use the observed Workflow resource version as a precondition for that patch.
+[Provider approval][owner-admission]
+
+Argo starts the 900-second Workflow deadline at `.status.startedAt`, while
+the request is still suspended. Immediately before approval, check that the
+remaining time covers the full 120-second Pod deadline plus mutex wait and
+Pod startup. If the request is stale or lacks that time, keep it suspended.
+After the witness confirms the exact UID and absence of owned Pods, the
+pre-authorized release namespace owner retires that exact Workflow through
+existing authority with a UID precondition. The network owner removes both
+exact policies and confirms their absence. Retain the request and route
+receipts. Resolve an ambiguous outcome before authorizing any fresh name,
+route and approval. [Argo deadline and suspension][argo-deadline]
+
+Require exactly one succeeded owner Pod and retain the Workflow and Pod UIDs,
+outcome and reviewed inputs with the receipts. The network owner withdraws
+both policies after the Pod terminates and confirms their absence. Keep the
+Workflow name and UID with the receipts and reserve the name permanently.
 
 ## Scoped database lifecycle
 
@@ -213,6 +262,7 @@ reads of the queue, projection and source rows as needed. Record remaining gaps
 in pending and winner verification. Live timings, handoff counts and semantic
 parity remain open.
 
+[argo-deadline]: https://github.com/argoproj/argo-workflows/blob/v4.1.5/workflow/controller/operator.go#L318-L361
 [baseline]: minimal-demo-operator-baseline.md#proposed-operator-contract-for-the-pilot
 [cnpg-passwords]: https://cloudnative-pg.io/docs/1.30/declarative_role_management/#password-management
 [maintenance]: kubernetes-packages.md#networks-maintenance-and-non-local-limits
@@ -220,6 +270,7 @@ parity remain open.
 [identity]: workload-database-identities.md#operate-the-upgrade
 [migration-route]: minimal-demo-data.md#render-the-phases
 [owner-admission]: https://github.com/stanimirivanov/k8s-infrastructure/blob/db9f01b7db30a4a72581781af35c04f38f9a1ec7/docs/delegated-argo.md#submission-approval-and-identity
+[owner-rbac]: https://github.com/stanimirivanov/k8s-infrastructure/blob/db9f01b7db30a4a72581781af35c04f38f9a1ec7/scripts/delegated_argo_policy.py#L41-L165
 [provider]: https://github.com/stanimirivanov/k8s-infrastructure/blob/db9f01b7db30a4a72581781af35c04f38f9a1ec7/docs/minimal-delegation.md#approve-an-operation
 [rebuild-acl]: ../../operations/rebuild-current/acl.sql
 [release-review]: workload-database-identities.md#prepare-the-reviewed-release
