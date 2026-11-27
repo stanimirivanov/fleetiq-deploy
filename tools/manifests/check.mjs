@@ -4,6 +4,7 @@ import { checkWorkloadDatabase } from '../../harness/manifests/workload-database
 import { checkBootstrap } from './bootstrap.mjs';
 import { checkMinimalDemoData } from './minimal-demo-data.mjs';
 import { checkMinimalDemo } from './minimal-demo-render.mjs';
+import { checkMinimalDemoWorkers } from './minimal-demo-workers.mjs';
 import { manifestPolicy } from './policy.mjs';
 import { fixtureStates, renderFixture, validateSchemas } from './render.mjs';
 import { manifestTools, toolsLock } from './toolchain.mjs';
@@ -29,6 +30,7 @@ export function checkManifests() {
     bootstrap,
     minimalDemo: checkMinimalDemo(tools),
     minimalDemoData: checkMinimalDemoData(tools, 'fleetiq'),
+    minimalDemoWorkers: checkMinimalDemoWorkers(tools, 'fleetiq'),
     tools: Object.fromEntries(
       Object.entries(toolsLock.tools).map(([name, tool]) => [name, tool.version]),
     ),

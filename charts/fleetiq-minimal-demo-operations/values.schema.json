@@ -4,7 +4,15 @@
   "additionalProperties": false,
   "required": ["operation"],
   "properties": {
-    "operation": { "enum": ["bootstrap", "bootstrap-route", "migration-route"] },
+    "operation": {
+      "enum": [
+        "bootstrap",
+        "bootstrap-route",
+        "migration-route",
+        "workers",
+        "workers-maintenance"
+      ]
+    },
     "attempt": { "type": "string", "pattern": "^demo-launch-[a-f0-9]{24}$" },
     "workflowName": {
       "type": "string",
@@ -20,7 +28,11 @@
       "else": { "not": { "required": ["workflowName"] } }
     },
     {
-      "if": { "properties": { "operation": { "const": "bootstrap" } } },
+      "if": {
+        "properties": {
+          "operation": { "enum": ["bootstrap", "workers", "workers-maintenance"] }
+        }
+      },
       "then": { "required": ["backend"] },
       "else": { "not": { "required": ["backend"] } }
     },
