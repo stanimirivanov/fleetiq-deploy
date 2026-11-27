@@ -205,11 +205,78 @@ function checkDemoWorkflow(
   }
 }
 
+function checkRebuildPilot(tools, render, chart, namespace, backendBytes, image) {
+  // Synthetic values exercise only the offline carrier and route boundaries.
+  const name = 'demo-rebuild-01';
+  const tenant = 'qual-pilot/tenant-01';
+  const backendDigest = `sha256:${digest(backendBytes)}`;
+  const carrier = render(
+    chart,
+    name,
+    '--set-string',
+    'operation=rebuild-current',
+    '--set-literal',
+    `tenant=${tenant}`,
+    '--set-string',
+    `backendDigest=${backendDigest}`,
+    '--set-file',
+    `backend=${selectionPath}`,
+  );
+  const attempt = 'demo-launch-abcdef0123456789abcdef01';
+  const routes = render(
+    chart,
+    'fleetiq',
+    '--set-string',
+    'operation=rebuild-current-route',
+    '--set-string',
+    `attempt=${attempt}`,
+  );
+  const filename = 'minimal-demo-rebuild.json';
+  const output = tools.conftest(
+    [
+      'test',
+      '--config-file',
+      resolve(root, 'harness/manifests/conftest.toml'),
+      '--policy',
+      resolve(root, 'harness/manifests/rebuild-current.rego'),
+      '--strict',
+      '--show-builtin-errors',
+      '--fail-on-warn',
+      '--parser',
+      'json',
+      '--output',
+      'json',
+      '--stdin-filename',
+      filename,
+      '-',
+    ],
+    {
+      input: JSON.stringify({
+        approved: { name, namespace, image, tenant, attempt },
+        carrier,
+        routes,
+      }),
+    },
+  );
+  const reports = JSON.parse(output);
+  assert(
+    Array.isArray(reports) &&
+      reports.length === 1 &&
+      reports[0]?.filename === filename &&
+      reports[0].namespace === 'fleetiq.minimal_demo.rebuild' &&
+      reports[0].successes === 2 &&
+      !reports[0].failures?.length &&
+      !reports[0].warnings?.length &&
+      !reports[0].exceptions?.length,
+    'Rebuild policy did not pass both required checks',
+  );
+  return [...carrier, ...routes];
+}
+
 export function checkMinimalDemoData(tools, consumer) {
   const namespace = demoNamespaces(consumer).data;
-  const backendSelection = validateBackendSelection(
-    JSON.parse(readFileSync(selectionPath, 'utf8')),
-  );
+  const backendBytes = readFileSync(selectionPath, 'utf8');
+  const backendSelection = validateBackendSelection(JSON.parse(backendBytes));
   const data = documents(readFileSync(resolve(environment, 'data.yaml'), 'utf8'))[0];
   const render = (chart, name, ...args) =>
     documents(
@@ -327,7 +394,20 @@ export function checkMinimalDemoData(tools, consumer) {
     backend: backendSelection.backend.reference,
     workloads,
   });
-  const operations = [...bootstrap, ...migrationRoute, ...bootstrapRoute];
+  const rebuildPilot = checkRebuildPilot(
+    tools,
+    render,
+    chart,
+    namespace,
+    backendBytes,
+    backendSelection.backend.reference,
+  );
+  const operations = [
+    ...bootstrap,
+    ...migrationRoute,
+    ...bootstrapRoute,
+    ...rebuildPilot,
+  ];
   return {
     phases: Object.fromEntries(
       Object.entries(phases).map(([phase, { rendered, schemas }]) => [

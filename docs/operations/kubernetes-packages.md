@@ -24,6 +24,8 @@ see [minimal-demo private networking](minimal-demo-network.md) and the
 [minimal-demo database phases](minimal-demo-data.md). The demo uses the local
 `fleetiq-minimal-demo-operations` chart for temporary routes and the provider's
 checked bootstrap Job input. OCI publication covers the two workload charts.
+The [offline rebuild-current pilot](minimal-demo-rebuild-current-pilot.md)
+documents the opt-in carrier, matching route and open cutover prerequisites.
 
 ## Offline qualification
 
