@@ -146,6 +146,29 @@ const rebuildArgs = [
   `backend=${pin}`,
 ];
 
+test('demo manifest qualification requires both rebuild policy results', () => {
+  const report = {
+    filename: 'minimal-demo-rebuild.json',
+    namespace: 'fleetiq.minimal_demo.rebuild',
+    successes: 0,
+  };
+  for (const reports of [
+    [],
+    [report],
+    [{ ...report, successes: 1 }],
+    [{ ...report, namespace: 'wrong', successes: 2 }],
+  ]) {
+    assert.throws(
+      () =>
+        checkMinimalDemoData(
+          { ...tools, conftest: () => JSON.stringify(reports) },
+          'qual-fleet',
+        ),
+      /Rebuild policy did not pass both required checks/u,
+    );
+  }
+});
+
 test('demo manifest qualification rejects a rebuild carrier without its CA mount', () => {
   const missingMount = {
     ...tools,
@@ -161,7 +184,7 @@ test('demo manifest qualification rejects a rebuild carrier without its CA mount
   };
   assert.throws(
     () => checkMinimalDemoData(missingMount, 'qual-fleet'),
-    /Rebuild Job must mount the selected database CA read-only/u,
+    /conftest test/u,
   );
 });
 
@@ -305,7 +328,9 @@ test('demo manifest qualification rejects weakened temporary PostgreSQL routes',
     };
     assert.throws(
       () => checkMinimalDemoData(weakenedRoute, 'qual-fleet'),
-      /Temporary database route differs/u,
+      phase === 'rebuild-current-route'
+        ? /conftest test/u
+        : /Temporary database route differs/u,
     );
   }
 });

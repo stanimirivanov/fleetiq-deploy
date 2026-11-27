@@ -2,6 +2,18 @@
   "format": "fleetiq-manifest-tools.v1",
   "kubernetes": "1.35.0",
   "tools": {
+    "conftest": {
+      "version": "0.71.1",
+      "versionArgs": ["--version"],
+      "platforms": {
+        "linux-x64": {
+          "url": "https://github.com/open-policy-agent/conftest/releases/download/v0.71.1/conftest_0.71.1_Linux_x86_64.tar.gz",
+          "sha256": "c3f6b2a753bd56e377a1e51a95ae3e057f926f2e9139f7d5b5dfbbaf810f7985",
+          "executable": "conftest",
+          "binarySha256": "3a86abbf1564b4d15c228792d469dafac70abd5c7c7fb7c36fdba299832b1ef1"
+        }
+      }
+    },
     "helm": {
       "version": "4.3.1",
       "versionArgs": ["version", "--short"],

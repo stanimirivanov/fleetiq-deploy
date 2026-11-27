@@ -57,6 +57,12 @@ workloads, maintenance phase, and role flags against the
 failures, check the rendered example against the checked-in SQL, immutable
 ConfigMaps, and reviewed step order in that same guide.
 
+The same manifest gate runs the [rebuild carrier and route policy](../../harness/manifests/rebuild-current.rego)
+with pinned Conftest. It evaluates the strictly parsed Helm output and approved
+fixture inputs together. A pass requires both the carrier and paired Cilium
+policy checks. Kubeconform still validates every rendered resource. Diagnose
+offline failures against the [rebuild pilot guide](../operations/minimal-demo-rebuild-current-pilot.md).
+
 ## Limits and review
 
 Repository-owned policy can be changed by a PR. It cannot prove its own

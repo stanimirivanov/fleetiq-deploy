@@ -1,0 +1,2 @@
+# Explicit configuration isolates the manifest gate from a caller's local file.
+namespace = ["fleetiq.minimal_demo.rebuild"]

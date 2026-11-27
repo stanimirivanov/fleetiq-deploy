@@ -52,6 +52,7 @@ export function verifiedBytes(file, expected) {
 export function manifestTools() {
   assert.equal(toolsLock.format, 'fleetiq-manifest-tools.v1');
   assert.deepEqual(Object.keys(toolsLock.tools).sort(), [
+    'conftest',
     'helm',
     'kubeconform',
     'kustomize',
@@ -63,21 +64,31 @@ export function manifestTools() {
     assert(platform, 'Manifest tools support Linux x64; unsupported platform');
     const binary = resolve(directory, name);
     verifiedBytes(binary, platform.binarySha256);
+    // Conftest reads CONFTEST_* and discovers plugins even on --version.
+    const conftestEnvironment = { XDG_DATA_HOME: '/dev/null' };
+    const version = run(
+      binary,
+      tool.versionArgs,
+      name === 'conftest' ? { env: conftestEnvironment } : {},
+    );
     assert.match(
-      run(binary, tool.versionArgs),
+      name === 'conftest' ? version.replace(/^Conftest: /u, '') : version,
       new RegExp(`^v?${tool.version.replaceAll('.', '\\.')}(?:$|[+\\s])`, 'u'),
     );
     result[name] = (args, options = {}) =>
       run(binary, args, {
         ...options,
-        env: {
-          ...process.env,
-          KUBECONFIG: join(directory, 'unused-offline-kubeconfig'),
-          HELM_PLUGINS: join(directory, 'no-plugins'),
-          HELM_CONFIG_HOME: join(directory, 'helm-config'),
-          HELM_CACHE_HOME: join(directory, 'helm-cache'),
-          HELM_DATA_HOME: join(directory, 'helm-data'),
-        },
+        env:
+          name === 'conftest'
+            ? conftestEnvironment
+            : {
+                ...process.env,
+                KUBECONFIG: join(directory, 'unused-offline-kubeconfig'),
+                HELM_PLUGINS: join(directory, 'no-plugins'),
+                HELM_CONFIG_HOME: join(directory, 'helm-config'),
+                HELM_CACHE_HOME: join(directory, 'helm-cache'),
+                HELM_DATA_HOME: join(directory, 'helm-data'),
+              },
       });
   }
   const schemas = join(directory, 'schemas');

@@ -44,14 +44,7 @@ const migrationLabels = {
   'app.kubernetes.io/component': 'fleetiq-demo-database-maintenance',
 };
 
-function checkTemporaryRoute(
-  rendered,
-  phase,
-  namespace,
-  clientNamespace,
-  labels,
-  nameSuffix = '',
-) {
+function checkTemporaryRoute(rendered, phase, namespace, clientNamespace, labels) {
   const endpoint = (space, matchLabels) => ({
     matchLabels: { [ciliumNamespace]: space, ...matchLabels },
   });
@@ -61,7 +54,7 @@ function checkTemporaryRoute(
   const policy = (side, namespace, matchLabels, rules) => ({
     apiVersion: 'cilium.io/v2',
     kind: 'CiliumNetworkPolicy',
-    metadata: { name: `fleetiq-demo-${phase}-${side}${nameSuffix}`, namespace },
+    metadata: { name: `fleetiq-demo-${phase}-${side}`, namespace },
     spec: { endpointSelector: { matchLabels }, ...rules },
   });
   assert.deepEqual(
@@ -212,7 +205,7 @@ function checkDemoWorkflow(
   }
 }
 
-function checkRebuildPilot(render, chart, namespace, backendBytes, image) {
+function checkRebuildPilot(tools, render, chart, namespace, backendBytes, image) {
   // Synthetic values exercise only the offline carrier and route boundaries.
   const name = 'demo-rebuild-01';
   const tenant = 'qual-pilot/tenant-01';
@@ -229,50 +222,8 @@ function checkRebuildPilot(render, chart, namespace, backendBytes, image) {
     '--set-file',
     `backend=${selectionPath}`,
   );
-  assert.equal(carrier.length, 1);
-  const [configMap] = carrier;
-  assert.equal(configMap.kind, 'ConfigMap');
-  assert.deepEqual(configMap.metadata, { name, namespace });
-  const operation = JSON.parse(configMap.data['operation.json']);
-  assert.equal(operation.name, name);
-  assert.equal(operation.namespace, namespace);
-  assert.equal(operation.deadlineSeconds, 300);
-  assert.equal(operation.podSpec.initContainers, undefined);
-  assert.deepEqual(operation.podSpec.securityContext, {
-    runAsUser: 10001,
-    runAsGroup: 10001,
-  });
-  assert.deepEqual(operation.podSpec.volumes, [
-    { name: 'database-ca', configMap: { name: 'workload-database-ca' } },
-  ]);
-  assert.equal(operation.podSpec.containers.length, 1);
-  const [container] = operation.podSpec.containers;
-  assert.equal(container.image, image);
-  assert.equal(container.imagePullPolicy, 'Never');
-  assert.deepEqual(container.command, ['/usr/local/bin/fleetiq-server']);
-  assert.deepEqual(container.args, ['rebuild-current']);
-  assert.deepEqual(
-    container.volumeMounts,
-    [{ name: 'database-ca', mountPath: '/etc/fleetiq/database', readOnly: true }],
-    'Rebuild Job must mount the selected database CA read-only',
-  );
-  assert.deepEqual(container.securityContext, { readOnlyRootFilesystem: true });
-  assert.deepEqual(container.resources, {
-    requests: { cpu: '100m', memory: '192Mi' },
-    limits: { cpu: '1', memory: '384Mi' },
-  });
-  assert.deepEqual(container.env, [
-    {
-      name: 'DATABASE_URL',
-      valueFrom: {
-        secretKeyRef: { name: 'fleetiq-db-rebuild-current-url', key: 'url' },
-      },
-    },
-    { name: 'FLEETIQ_PROJECTION_REBUILD_TENANT', value: tenant },
-  ]);
-  const digestPrefix = 'abcdef0123456789abcdef01';
-  const attempt = `demo-launch-${digestPrefix}`;
-  const route = render(
+  const attempt = 'demo-launch-abcdef0123456789abcdef01';
+  const routes = render(
     chart,
     'fleetiq',
     '--set-string',
@@ -280,18 +231,46 @@ function checkRebuildPilot(render, chart, namespace, backendBytes, image) {
     '--set-string',
     `attempt=${attempt}`,
   );
-  checkTemporaryRoute(
-    route,
-    'rebuild-current',
-    namespace,
-    namespace,
+  const filename = 'minimal-demo-rebuild.json';
+  const output = tools.conftest(
+    [
+      'test',
+      '--config-file',
+      resolve(root, 'harness/manifests/conftest.toml'),
+      '--policy',
+      resolve(root, 'harness/manifests/rebuild-current.rego'),
+      '--strict',
+      '--show-builtin-errors',
+      '--fail-on-warn',
+      '--parser',
+      'json',
+      '--output',
+      'json',
+      '--stdin-filename',
+      filename,
+      '-',
+    ],
     {
-      [attemptLabel]: attempt,
-      [ciliumAccount]: simulatorAccount(attempt),
+      input: JSON.stringify({
+        approved: { name, namespace, image, tenant, attempt },
+        carrier,
+        routes,
+      }),
     },
-    `-${digestPrefix}`,
   );
-  return [...carrier, ...route];
+  const reports = JSON.parse(output);
+  assert(
+    Array.isArray(reports) &&
+      reports.length === 1 &&
+      reports[0]?.filename === filename &&
+      reports[0].namespace === 'fleetiq.minimal_demo.rebuild' &&
+      reports[0].successes === 2 &&
+      !reports[0].failures?.length &&
+      !reports[0].warnings?.length &&
+      !reports[0].exceptions?.length,
+    'Rebuild policy did not pass both required checks',
+  );
+  return [...carrier, ...routes];
 }
 
 export function checkMinimalDemoData(tools, consumer) {
@@ -416,6 +395,7 @@ export function checkMinimalDemoData(tools, consumer) {
     workloads,
   });
   const rebuildPilot = checkRebuildPilot(
+    tools,
     render,
     chart,
     namespace,
