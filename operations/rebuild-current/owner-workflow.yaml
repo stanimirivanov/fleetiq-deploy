@@ -1,0 +1,99 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: rebuild-current-owner
+spec:
+  entrypoint: execute
+  serviceAccountName: release-executor
+  activeDeadlineSeconds: 300
+  synchronization:
+    mutexes:
+      - name: fleetiq-workload-database
+  arguments:
+    parameters:
+      - name: release-digest
+  podMetadata:
+    labels:
+      app.kubernetes.io/component: fleetiq-demo-rebuild-current-owner
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  volumes:
+    - name: database-ca
+      configMap:
+        name: workload-database-ca
+        items:
+          - { key: ca.crt, path: ca.crt }
+    - name: operation
+      configMap:
+        name: workload-database-sql
+        items:
+          - { key: context.sql, path: workload-database/base/sql/context.sql }
+          - { key: policy.sql, path: workload-database/base/sql/policy.sql }
+          - { key: rebuild-acl.sql, path: rebuild-current/acl.sql }
+          - { key: rebuild-apply-acl.sql, path: rebuild-current/apply-acl.sql }
+          - { key: rebuild-context.sql, path: rebuild-current/context.sql }
+          - { key: rebuild-revoke.sql, path: rebuild-current/revoke.sql }
+  templates:
+    - name: execute
+      activeDeadlineSeconds: 120
+      container:
+        image: invalid.invalid/psql
+        imagePullPolicy: Never
+        command: [psql]
+        args:
+          - -X
+          - --no-password
+          - --set=ON_ERROR_STOP=1
+          - --set=release_digest={{workflow.parameters.release-digest}}
+          - --file=/operation/unselected.sql
+        env:
+          - name: PGPASSWORD
+            valueFrom:
+              secretKeyRef: { name: workload-database-owner, key: password }
+          - name: PGHOST
+            valueFrom:
+              configMapKeyRef: { name: rebuild-owner-inputs, key: PGHOST }
+          - name: PGUSER
+            value: fleetiq_migrator
+          - name: PGDATABASE
+            value: fleetiq
+          - name: PGPORT
+            value: '5432'
+          - name: PGSSLMODE
+            value: verify-full
+          - name: PGSSLROOTCERT
+            value: /etc/fleetiq/database/ca.crt
+          - name: PGGSSENCMODE
+            value: disable
+          - name: PGCONNECT_TIMEOUT
+            value: '5'
+          - name: FLEETIQ_DATABASE_OID
+            valueFrom:
+              configMapKeyRef: { name: rebuild-owner-inputs, key: FLEETIQ_DATABASE_OID }
+          - name: FLEETIQ_LEGACY_ROLE
+            value: fleetiq_runtime
+          - name: FLEETIQ_WORKLOADS
+            valueFrom:
+              configMapKeyRef: { name: rebuild-owner-inputs, key: FLEETIQ_WORKLOADS }
+          - name: FLEETIQ_RELEASE_DIGEST
+            valueFrom:
+              configMapKeyRef: { name: rebuild-owner-inputs, key: FLEETIQ_RELEASE_DIGEST }
+          - name: FLEETIQ_MIGRATION_INVENTORY
+            valueFrom:
+              configMapKeyRef: { name: rebuild-owner-inputs, key: inventory.json }
+        volumeMounts:
+          - { name: database-ca, mountPath: /etc/fleetiq/database, readOnly: true }
+          - { name: operation, mountPath: /operation, readOnly: true }
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: [ALL]
+        resources:
+          requests: { cpu: 100m, memory: 32Mi }
+          limits: { cpu: 500m, memory: 128Mi }

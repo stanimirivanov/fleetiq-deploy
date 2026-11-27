@@ -61,9 +61,12 @@ The same manifest gate runs the [rebuild carrier and route policy](../../harness
 with pinned Conftest. It evaluates the strictly parsed Helm output and approved
 fixture inputs together. A pass requires both the carrier and paired Cilium
 policy checks. The gate also renders and checks the two opt-in database phases
-for exact roles and HBA admission. Kubeconform validates every rendered resource.
-Diagnose offline failures against the
-[rebuild pilot guide](../operations/minimal-demo-rebuild-current-pilot.md).
+for exact roles and HBA admission. The owner execution fixture composes both
+versioned templates with immutable reviewed inputs and SQL. It checks their
+single psql entrypoints, mounted include paths and paired exact-attempt routes.
+Native rejection fixtures cover unstaged inputs, wrong batches, additional
+Workflow execution and invalid route selections. Kubeconform validates each
+approved render. Diagnose offline failures against the [rebuild pilot guide](../operations/minimal-demo-rebuild-current-pilot.md).
 
 ## Limits and review
 

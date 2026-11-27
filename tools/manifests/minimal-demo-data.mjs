@@ -13,6 +13,7 @@ import {
   postgresPort,
   simulatorAccount,
 } from './minimal-demo-network.mjs';
+import { checkRebuildOwnerWorkflows } from './rebuild-current-owner.mjs';
 import { documents, validateSchemas } from './render.mjs';
 import { toolsLock } from './toolchain.mjs';
 
@@ -51,7 +52,14 @@ const migrationLabels = {
   'app.kubernetes.io/component': 'fleetiq-demo-database-maintenance',
 };
 
-function checkTemporaryRoute(rendered, phase, namespace, clientNamespace, labels) {
+function checkTemporaryRoute(
+  rendered,
+  phase,
+  namespace,
+  clientNamespace,
+  labels,
+  suffix = '',
+) {
   const endpoint = (space, matchLabels) => ({
     matchLabels: { [ciliumNamespace]: space, ...matchLabels },
   });
@@ -61,7 +69,7 @@ function checkTemporaryRoute(rendered, phase, namespace, clientNamespace, labels
   const policy = (side, namespace, matchLabels, rules) => ({
     apiVersion: 'cilium.io/v2',
     kind: 'CiliumNetworkPolicy',
-    metadata: { name: `fleetiq-demo-${phase}-${side}`, namespace },
+    metadata: { name: `fleetiq-demo-${phase}-${side}${suffix}`, namespace },
     spec: { endpointSelector: { matchLabels }, ...rules },
   });
   assert.deepEqual(
@@ -77,7 +85,7 @@ function checkTemporaryRoute(rendered, phase, namespace, clientNamespace, labels
             toEndpoints: [endpoint(namespace, database)],
             toPorts: ports(postgresPort),
           },
-          ...(phase === 'migration'
+          ...(clientNamespace !== namespace
             ? [{ toEntities: ['kube-apiserver'], toPorts: ports(6443) }]
             : []),
         ],
@@ -412,11 +420,53 @@ export function checkMinimalDemoData(tools, consumer) {
     backendBytes,
     backendSelection.backend.reference,
   );
+  const renderOwnerRoute = (...values) =>
+    render(
+      chart,
+      'fleetiq',
+      '--set-string',
+      'operation=rebuild-current-owner-route',
+      ...values,
+    );
+  const ownerRoutes = ['demo-owner-grant-01', 'demo-owner-withdraw-01'].flatMap(
+    (name) => {
+      const route = renderOwnerRoute('--set-string', `workflowName=${name}`);
+      checkTemporaryRoute(
+        route,
+        'rebuild-current-owner',
+        namespace,
+        `${consumer}-releases`,
+        {
+          'app.kubernetes.io/component': 'fleetiq-demo-rebuild-current-owner',
+          [ciliumAccount]: 'release-executor',
+          'workflows.argoproj.io/workflow': name,
+        },
+        `-${name}`,
+      );
+      return route;
+    },
+  );
+  assert.throws(() => renderOwnerRoute(), /helm template/u);
+  assert.throws(
+    () => renderOwnerRoute('--set-string', 'workflowName=demo-owner-*'),
+    /helm template/u,
+  );
+  assert.throws(
+    () =>
+      renderOwnerRoute(
+        '--set-string',
+        'workflowName=demo-owner-grant-01',
+        '--set-string',
+        `attempt=${bootstrapAttempt}`,
+      ),
+    /helm template/u,
+  );
   const operations = [
     ...bootstrap,
     ...migrationRoute,
     ...bootstrapRoute,
     ...rebuildPilot,
+    ...ownerRoutes,
   ];
   return {
     phases: Object.fromEntries(
@@ -432,6 +482,12 @@ export function checkMinimalDemoData(tools, consumer) {
     operationSchemas: validateSchemas(tools, operations),
     workflowResources: workflowResources.length,
     workflowSchemas: validateSchemas(tools, workflowResources),
+    rebuildOwnerWorkflows: checkRebuildOwnerWorkflows(tools, {
+      namespace,
+      consumer,
+      postgres: data.image,
+      workloads,
+    }),
     connections,
     execution: 'not-performed',
   };

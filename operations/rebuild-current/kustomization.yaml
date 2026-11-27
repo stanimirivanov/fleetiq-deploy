@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../workload-database/base
+  - owner-workflow.yaml
+patches:
+  # Reuse the canonical SQL and reference rules without publishing a migration template.
+  - patch: |
+      apiVersion: argoproj.io/v1alpha1
+      kind: WorkflowTemplate
+      metadata:
+        name: workload-database-v1
+      $patch: delete
+generatorOptions:
+  immutable: true
+configMapGenerator:
+  - name: workload-database-sql
+    behavior: merge
+    files:
+      - rebuild-acl.sql=acl.sql
+      - rebuild-apply-acl.sql=apply-acl.sql
+      - rebuild-context.sql=context.sql
+      - rebuild-grant.sql=grant.sql
+      - rebuild-revoke.sql=revoke.sql
+      - rebuild-withdraw.sql=withdraw.sql

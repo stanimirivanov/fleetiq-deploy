@@ -370,6 +370,13 @@ test('demo manifest qualification rejects weakened temporary PostgreSQL routes',
         ];
       },
     ],
+    [
+      'rebuild-current-owner-route',
+      ([client]) => {
+        client.spec.endpointSelector.matchLabels['app.kubernetes.io/component'] =
+          'fleetiq-demo-database-maintenance';
+      },
+    ],
   ]) {
     const weakenedRoute = {
       ...tools,

@@ -10,7 +10,8 @@
         "bootstrap-route",
         "migration-route",
         "rebuild-current",
-        "rebuild-current-route"
+        "rebuild-current-route",
+        "rebuild-current-owner-route"
       ]
     },
     "attempt": { "type": "string", "pattern": "^demo-launch-[a-f0-9]{24}$" },
@@ -28,7 +29,11 @@
   },
   "allOf": [
     {
-      "if": { "properties": { "operation": { "const": "migration-route" } } },
+      "if": {
+        "properties": {
+          "operation": { "enum": ["migration-route", "rebuild-current-owner-route"] }
+        }
+      },
       "then": { "required": ["workflowName"] },
       "else": { "not": { "required": ["workflowName"] } }
     },
