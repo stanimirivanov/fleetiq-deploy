@@ -222,7 +222,7 @@ function checkRebuildPilot(render, chart, namespace, backendBytes, image) {
     name,
     '--set-string',
     'operation=rebuild-current',
-    '--set-string',
+    '--set-literal',
     `tenant=${tenant}`,
     '--set-string',
     `backendDigest=${backendDigest}`,
@@ -230,18 +230,37 @@ function checkRebuildPilot(render, chart, namespace, backendBytes, image) {
     `backend=${selectionPath}`,
   );
   assert.equal(carrier.length, 1);
-  assert.equal(carrier[0].kind, 'ConfigMap');
-  const operation = JSON.parse(carrier[0].data['operation.json']);
+  const [configMap] = carrier;
+  assert.equal(configMap.kind, 'ConfigMap');
+  assert.deepEqual(configMap.metadata, { name, namespace });
+  const operation = JSON.parse(configMap.data['operation.json']);
   assert.equal(operation.name, name);
   assert.equal(operation.namespace, namespace);
   assert.equal(operation.deadlineSeconds, 300);
   assert.equal(operation.podSpec.initContainers, undefined);
+  assert.deepEqual(operation.podSpec.securityContext, {
+    runAsUser: 10001,
+    runAsGroup: 10001,
+  });
+  assert.deepEqual(operation.podSpec.volumes, [
+    { name: 'database-ca', configMap: { name: 'workload-database-ca' } },
+  ]);
   assert.equal(operation.podSpec.containers.length, 1);
   const [container] = operation.podSpec.containers;
   assert.equal(container.image, image);
   assert.equal(container.imagePullPolicy, 'Never');
   assert.deepEqual(container.command, ['/usr/local/bin/fleetiq-server']);
   assert.deepEqual(container.args, ['rebuild-current']);
+  assert.deepEqual(
+    container.volumeMounts,
+    [{ name: 'database-ca', mountPath: '/etc/fleetiq/database', readOnly: true }],
+    'Rebuild Job must mount the selected database CA read-only',
+  );
+  assert.deepEqual(container.securityContext, { readOnlyRootFilesystem: true });
+  assert.deepEqual(container.resources, {
+    requests: { cpu: '100m', memory: '192Mi' },
+    limits: { cpu: '1', memory: '384Mi' },
+  });
   assert.deepEqual(container.env, [
     {
       name: 'DATABASE_URL',

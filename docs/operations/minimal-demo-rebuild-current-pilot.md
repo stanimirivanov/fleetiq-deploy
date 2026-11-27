@@ -1,9 +1,10 @@
 # Minimal-demo rebuild-current offline pilot
 
-[#139](https://github.com/stanimirivanov/fleetiq-deploy/issues/139) stops at
-offline preparation. The operations chart produces a provider carrier and an
-attempt-bound database route for review. Cutover requires the database grant,
-fenced read access and recovery prerequisites below.
+[PR #152](https://github.com/stanimirivanov/fleetiq-deploy/pull/152) covers offline
+preparation. The operations chart produces a provider carrier and an attempt-bound
+database route for review. Live acceptance remains open in
+[#139](https://github.com/stanimirivanov/fleetiq-deploy/issues/139) and requires
+the database grant, fenced read access and recovery prerequisites below.
 
 ## Offline preparation
 
@@ -17,12 +18,13 @@ the public `workload-database-ca`. A future staged URL must use verify-full
 with the exact primary Service name and `/etc/fleetiq/database/ca.crt`.
 
 This render uses a synthetic tenant, target name and Job name. Run it from the
-repository root with the installed manifest tools.
+repository root with the installed manifest tools. Use `--set-literal` so Helm
+preserves punctuation in the reviewed tenant identifier.
 
 ```bash
 target/tools/manifests/helm template demo-rebuild-01 charts/fleetiq-minimal-demo-operations \
   --namespace qual-fleet-data --kube-version 1.35.0 \
-  --set-string operation=rebuild-current --set-string tenant=qual-pilot/tenant-01 \
+  --set-string operation=rebuild-current --set-literal 'tenant=qual-pilot/tenant-01' \
   --set-file backend=environments/minimal-demo/backend.json \
   --set-string backendDigest=sha256:640c563bb21697197242c69e345d43c6182f42733a406cec1fed0038c413bd31
 ```
@@ -43,9 +45,6 @@ agree on `demo-launch-e2e9749c6db012ad7ba8bc9c`. Both route selectors match the
 Job's attempt and runtime identities. Raw bytes matched the baseline across 36
 ordinary local, provider-local and nonlocal Helm and Kustomize outputs and
 seven existing minimal-demo outputs.
-The Compose installation gate (`pnpm qualify`) remains pending. Automatic
-approval review blocked its temporary Docker resource creation pending
-explicit authorization.
 
 ## Cutover prerequisites
 
@@ -80,10 +79,16 @@ The separately authorized disposable rehearsal must capture one native create,
 scoped withdrawal and private target-bound receipt custody.
 Rehearsal must measure the whole attempt, including denial, wrong tenant or
 input, stale target, foreign Job, unavailable evidence and failed withdrawal.
-Use before and after protected reads to prove the one-generation and one-revision
-advance, processed count, pending state and exact winning change. Compare the
-same fixture with the draft SQL snapshot only in qualification. Live timings,
-handoff counts and semantic parity are still open.
+Use before and after protected reads to verify that generation and revision each
+advance by one. In qualification only, compare generation, revision and processed
+count with the draft SQL snapshots for the same exact tenant, asset, property and
+version under the fence. The draft SQL's opaque row digest can show a change
+within SQL. Check pending state from the protected GET against the approved
+fixture's committed queue state. Compare the winner's presence, value, quality,
+event time and provenance with the same fixture. Use supplementary authoritative
+reads of the queue, projection and source rows as needed. Record remaining gaps
+in pending and winner verification. Live timings, handoff counts and semantic
+parity remain open.
 
 [baseline]: minimal-demo-operator-baseline.md#proposed-operator-contract-for-the-pilot
 [maintenance]: kubernetes-packages.md#networks-maintenance-and-non-local-limits

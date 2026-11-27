@@ -146,46 +146,27 @@ const rebuildArgs = [
   `backend=${pin}`,
 ];
 
-test('rebuild renders a single provider carrier with the exact tenant and artifact', () => {
-  const rendered = documents(
-    tools.helm([
-      ...rebuildArgs,
-      '--set-string',
-      rebuildDigest,
-      '--set-string',
-      'tenant=qual-pilot/tenant-01',
-    ]),
-  );
-  assert.equal(rendered.length, 1);
-  const [carrier] = rendered;
-  assert.equal(carrier.kind, 'ConfigMap');
-  assert.deepEqual(carrier.metadata, {
-    name: 'demo-rebuild-01',
-    namespace: 'qual-fleet-data',
-  });
-  const operation = JSON.parse(carrier.data['operation.json']);
-  assert.equal(operation.name, 'demo-rebuild-01');
-  assert.equal(operation.namespace, 'qual-fleet-data');
-  assert.equal(operation.deadlineSeconds, 300);
-  assert.equal(operation.podSpec.initContainers, undefined);
-  assert.equal(operation.podSpec.containers.length, 1);
-  const [container] = operation.podSpec.containers;
-  assert.equal(container.image, JSON.parse(backendBytes).backend.reference);
-  assert.deepEqual(container.command, ['/usr/local/bin/fleetiq-server']);
-  assert.deepEqual(container.args, ['rebuild-current']);
-  assert.deepEqual(container.env, [
-    {
-      name: 'DATABASE_URL',
-      valueFrom: {
-        secretKeyRef: { name: 'fleetiq-db-rebuild-current-url', key: 'url' },
-      },
+test('demo manifest qualification rejects a rebuild carrier without its CA mount', () => {
+  const missingMount = {
+    ...tools,
+    helm(args) {
+      const output = tools.helm(args);
+      if (!args.includes('operation=rebuild-current')) return output;
+      const [carrier] = documents(output);
+      const operation = JSON.parse(carrier.data['operation.json']);
+      delete operation.podSpec.containers[0].volumeMounts;
+      carrier.data['operation.json'] = JSON.stringify(operation);
+      return stringify(carrier);
     },
-    { name: 'FLEETIQ_PROJECTION_REBUILD_TENANT', value: 'qual-pilot/tenant-01' },
-  ]);
+  };
+  assert.throws(
+    () => checkMinimalDemoData(missingMount, 'qual-fleet'),
+    /Rebuild Job must mount the selected database CA read-only/u,
+  );
 });
 
 test('rebuild refuses malformed inputs and a mismatched reviewed backend digest', () => {
-  const tenant = ['--set-string', 'tenant=qual-pilot/tenant-01'];
+  const tenant = ['--set-literal', 'tenant=qual-pilot/tenant-01'];
   const digest = ['--set-string', rebuildDigest];
   assert.throws(() => tools.helm([...rebuildArgs, ...tenant]));
   assert.throws(() =>
@@ -199,7 +180,7 @@ test('rebuild refuses malformed inputs and a mismatched reviewed backend digest'
   assert.throws(() => tools.helm([...rebuildArgs, ...digest]));
   for (const invalid of ['', ' tenant', 'tenant\u2003', 'a\u0085b', '界'.repeat(129)]) {
     assert.throws(() =>
-      tools.helm([...rebuildArgs, ...digest, '--set-string', `tenant=${invalid}`]),
+      tools.helm([...rebuildArgs, ...digest, '--set-literal', `tenant=${invalid}`]),
     );
   }
   assert.throws(() =>
@@ -222,20 +203,20 @@ test('rebuild refuses malformed inputs and a mismatched reviewed backend digest'
   );
 });
 
-test('rebuild preserves a tenant with valid Unicode and a literal Kubernetes expansion token', () => {
+test('rebuild preserves tenant punctuation, Unicode and a literal Kubernetes expansion token', () => {
   const [carrier] = documents(
     tools.helm([
       ...rebuildArgs,
       '--set-string',
       rebuildDigest,
-      '--set-string',
-      'tenant=qual-pilot/東京$(DATABASE_URL)',
+      '--set-literal',
+      'tenant=qual-pilot/東京,team\\west$(DATABASE_URL)',
     ]),
   );
   const [container] = JSON.parse(carrier.data['operation.json']).podSpec.containers;
   assert.deepEqual(container.env[1], {
     name: 'FLEETIQ_PROJECTION_REBUILD_TENANT',
-    value: 'qual-pilot/東京$$(DATABASE_URL)',
+    value: 'qual-pilot/東京,team\\west$$(DATABASE_URL)',
   });
 });
 
