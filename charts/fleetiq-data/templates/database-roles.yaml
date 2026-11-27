@@ -6,6 +6,13 @@
 {{- fail "Bootstrap role collides with an existing role" }}
 {{- end }}
 {{- $_ := set $roles $bootstrap (dict "login" (default false $scoped.bootstrapLogin) "secret" "fleetiq-db-bootstrap-platform-operator") }}
+{{- $rebuild := "fleetiq_rebuild_current" }}
+{{- if hasKey $scoped "rebuildCurrentLogin" }}
+{{- if or (eq $.Values.owner.role $rebuild) (eq $.Values.runtime.role $rebuild) }}
+{{- fail "Rebuild-current role collides with an existing role" }}
+{{- end }}
+{{- $_ := set $roles $rebuild (dict "login" $scoped.rebuildCurrentLogin "secret" "fleetiq-db-rebuild-current") }}
+{{- end }}
 {{- $known := list "serve --check-schema" "ingest-tcp" "replay-worker" "semantic-worker" "project-current" "analytics-worker" "notification-worker" "archive-worker" }}
 {{- range $command := $scoped.workloads }}
 {{- if not (has $command $known) }}
@@ -41,6 +48,9 @@ spec:
   databaseRoleReclaimPolicy: retain
   login: {{ $role.login }}
   inherit: false
+  {{- if eq $name $rebuild }}
+  connectionLimit: 2
+  {{- end }}
   {{- if $role.login }}
   passwordSecret: { name: {{ $role.secret | quote }} }
   {{- else }}

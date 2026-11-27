@@ -21,3 +21,7 @@ adds worker-specific database ingress. See [worker packaging](../../docs/operati
 Use the [minimal-demo candidate renderer](../../docs/operations/minimal-demo-data.md)
 to inspect the approved sizing separately. Its template requires a synthetic image
 and placeholder Secret and omits the default profile's runtime and network inputs.
+
+The [rebuild-current pilot](../../docs/operations/minimal-demo-rebuild-current-pilot.md#scoped-database-lifecycle)
+uses separate owner and attempt values. Both require maintenance, retired legacy
+admission and the minimal-demo external network policy composition.

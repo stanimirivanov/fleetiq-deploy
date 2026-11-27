@@ -50,6 +50,10 @@
         "bootstrapLogin": {
           "type": "boolean"
         },
+        "rebuildCurrentLogin": {
+          "type": "boolean",
+          "description": "Opt in to the retained rebuild-current role. Use true only in its exclusive attempt phase."
+        },
         "retireLegacy": {
           "type": "boolean"
         }

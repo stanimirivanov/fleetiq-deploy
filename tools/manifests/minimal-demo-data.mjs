@@ -37,6 +37,13 @@ const demoPhases = {
   migration: { workloads: [], maintenance: true, migrationLogin: true },
   bootstrap: { workloads: [], maintenance: true, bootstrapLogin: true },
   runtime: { workloads: Object.keys(residentPools) },
+  'rebuild-current-owner': {
+    workloads: [],
+    maintenance: true,
+    migrationLogin: true,
+    rebuildCurrentLogin: false,
+  },
+  'rebuild-current': { workloads: [], maintenance: true, rebuildCurrentLogin: true },
 };
 const ciliumNamespace = 'k8s:io.kubernetes.pod.namespace';
 const ciliumAccount = 'io.cilium.k8s.policy.serviceaccount';
@@ -314,7 +321,10 @@ export function checkMinimalDemoData(tools, consumer) {
         legacy: { name: 'fleetiq_runtime', secret: data.runtime.passwordSecret },
         ...workloadDatabase,
       });
-      assert.equal(rendered.length, 10);
+      assert.equal(
+        rendered.length,
+        Object.hasOwn(workloadDatabase, 'rebuildCurrentLogin') ? 11 : 10,
+      );
       assert.equal(cluster.kind, 'Cluster');
       assert.equal(cluster.apiVersion, 'postgresql.cnpg.io/v1');
       assert.deepEqual(cluster.metadata, {
