@@ -1,4 +1,4 @@
-{{- if or (eq .Values.operation "migration-route") (eq .Values.operation "bootstrap-route") }}
+{{- if has .Values.operation (list "migration-route" "bootstrap-route" "rebuild-current-route") }}
 {{- $data := .Release.Namespace }}
 {{- if or (not (regexMatch "^[a-z][a-z0-9]*(-[a-z0-9]+)*-data$" $data)) (gt (len $data) 37) }}
 {{- fail "Select the delegated data namespace" }}
@@ -8,6 +8,7 @@
 {{- $clientNamespace := $data }}
 {{- $labels := dict }}
 {{- $phase := trimSuffix "-route" .Values.operation }}
+{{- $suffix := "" }}
 {{- if eq $phase "migration" }}
 {{- $clientNamespace = printf "%s-releases" (trimSuffix "-data" $data) }}
 {{- $workflow := required "Select the approved migration Workflow name" .Values.workflowName }}
@@ -16,16 +17,19 @@
 {{- end }}
 {{- $labels = dict $accountLabel "release-executor" "app.kubernetes.io/component" "fleetiq-demo-database-maintenance" "workflows.argoproj.io/workflow" $workflow }}
 {{- else }}
-{{- $attempt := required "Select the approved bootstrap attempt" .Values.attempt }}
+{{- $attempt := required "Select the approved provider attempt" .Values.attempt }}
 {{- if not (regexMatch "^demo-launch-[a-f0-9]{24}$" $attempt) }}
-{{- fail "Select the exact approved bootstrap attempt" }}
+{{- fail "Select the exact approved provider attempt" }}
 {{- end }}
 {{- $labels = dict $accountLabel (replace "launch" "run" $attempt) "k8s-infrastructure.io/demo-attempt" $attempt }}
+{{- if eq $phase "rebuild-current" }}
+{{- $suffix = trimPrefix "demo-launch" $attempt }}
+{{- end }}
 {{- end }}
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: fleetiq-demo-{{ $phase }}-client
+  name: fleetiq-demo-{{ $phase }}-client{{ $suffix }}
   namespace: {{ $clientNamespace }}
 spec:
   endpointSelector:
@@ -54,7 +58,7 @@ spec:
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: fleetiq-demo-{{ $phase }}-postgres
+  name: fleetiq-demo-{{ $phase }}-postgres{{ $suffix }}
   namespace: {{ $data }}
 spec:
   endpointSelector:

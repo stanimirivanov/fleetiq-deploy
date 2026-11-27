@@ -44,7 +44,14 @@ const migrationLabels = {
   'app.kubernetes.io/component': 'fleetiq-demo-database-maintenance',
 };
 
-function checkTemporaryRoute(rendered, phase, namespace, clientNamespace, labels) {
+function checkTemporaryRoute(
+  rendered,
+  phase,
+  namespace,
+  clientNamespace,
+  labels,
+  nameSuffix = '',
+) {
   const endpoint = (space, matchLabels) => ({
     matchLabels: { [ciliumNamespace]: space, ...matchLabels },
   });
@@ -54,7 +61,7 @@ function checkTemporaryRoute(rendered, phase, namespace, clientNamespace, labels
   const policy = (side, namespace, matchLabels, rules) => ({
     apiVersion: 'cilium.io/v2',
     kind: 'CiliumNetworkPolicy',
-    metadata: { name: `fleetiq-demo-${phase}-${side}`, namespace },
+    metadata: { name: `fleetiq-demo-${phase}-${side}${nameSuffix}`, namespace },
     spec: { endpointSelector: { matchLabels }, ...rules },
   });
   assert.deepEqual(
@@ -205,11 +212,73 @@ function checkDemoWorkflow(
   }
 }
 
+function checkRebuildPilot(render, chart, namespace, backendBytes, image) {
+  // Synthetic values exercise only the offline carrier and route boundaries.
+  const name = 'demo-rebuild-01';
+  const tenant = 'qual-pilot/tenant-01';
+  const backendDigest = `sha256:${digest(backendBytes)}`;
+  const carrier = render(
+    chart,
+    name,
+    '--set-string',
+    'operation=rebuild-current',
+    '--set-string',
+    `tenant=${tenant}`,
+    '--set-string',
+    `backendDigest=${backendDigest}`,
+    '--set-file',
+    `backend=${selectionPath}`,
+  );
+  assert.equal(carrier.length, 1);
+  assert.equal(carrier[0].kind, 'ConfigMap');
+  const operation = JSON.parse(carrier[0].data['operation.json']);
+  assert.equal(operation.name, name);
+  assert.equal(operation.namespace, namespace);
+  assert.equal(operation.deadlineSeconds, 300);
+  assert.equal(operation.podSpec.initContainers, undefined);
+  assert.equal(operation.podSpec.containers.length, 1);
+  const [container] = operation.podSpec.containers;
+  assert.equal(container.image, image);
+  assert.equal(container.imagePullPolicy, 'Never');
+  assert.deepEqual(container.command, ['/usr/local/bin/fleetiq-server']);
+  assert.deepEqual(container.args, ['rebuild-current']);
+  assert.deepEqual(container.env, [
+    {
+      name: 'DATABASE_URL',
+      valueFrom: {
+        secretKeyRef: { name: 'fleetiq-db-rebuild-current-url', key: 'url' },
+      },
+    },
+    { name: 'FLEETIQ_PROJECTION_REBUILD_TENANT', value: tenant },
+  ]);
+  const digestPrefix = 'abcdef0123456789abcdef01';
+  const attempt = `demo-launch-${digestPrefix}`;
+  const route = render(
+    chart,
+    'fleetiq',
+    '--set-string',
+    'operation=rebuild-current-route',
+    '--set-string',
+    `attempt=${attempt}`,
+  );
+  checkTemporaryRoute(
+    route,
+    'rebuild-current',
+    namespace,
+    namespace,
+    {
+      [attemptLabel]: attempt,
+      [ciliumAccount]: simulatorAccount(attempt),
+    },
+    `-${digestPrefix}`,
+  );
+  return [...carrier, ...route];
+}
+
 export function checkMinimalDemoData(tools, consumer) {
   const namespace = demoNamespaces(consumer).data;
-  const backendSelection = validateBackendSelection(
-    JSON.parse(readFileSync(selectionPath, 'utf8')),
-  );
+  const backendBytes = readFileSync(selectionPath, 'utf8');
+  const backendSelection = validateBackendSelection(JSON.parse(backendBytes));
   const data = documents(readFileSync(resolve(environment, 'data.yaml'), 'utf8'))[0];
   const render = (chart, name, ...args) =>
     documents(
@@ -327,7 +396,19 @@ export function checkMinimalDemoData(tools, consumer) {
     backend: backendSelection.backend.reference,
     workloads,
   });
-  const operations = [...bootstrap, ...migrationRoute, ...bootstrapRoute];
+  const rebuildPilot = checkRebuildPilot(
+    render,
+    chart,
+    namespace,
+    backendBytes,
+    backendSelection.backend.reference,
+  );
+  const operations = [
+    ...bootstrap,
+    ...migrationRoute,
+    ...bootstrapRoute,
+    ...rebuildPilot,
+  ];
   return {
     phases: Object.fromEntries(
       Object.entries(phases).map(([phase, { rendered, schemas }]) => [

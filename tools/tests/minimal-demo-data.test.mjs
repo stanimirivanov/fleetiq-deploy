@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { stringify } from 'yaml';
 import { checkMinimalDemoData } from '../manifests/minimal-demo-data.mjs';
 import { documents } from '../manifests/render.mjs';
-import { manifestTools, toolsLock } from '../manifests/toolchain.mjs';
+import { manifestTools, sha256, toolsLock } from '../manifests/toolchain.mjs';
 import { root } from '../process.mjs';
 
 const tools = manifestTools();
@@ -129,6 +130,115 @@ test('bootstrap renders a checked operation for the exact data Job delegation', 
   assert.equal(container.volumeMounts[0].readOnly, true);
 });
 
+const backendBytes = readFileSync(pin);
+const rebuildDigest = `backendDigest=sha256:${sha256(backendBytes)}`;
+const rebuildArgs = [
+  'template',
+  'demo-rebuild-01',
+  operations,
+  '--namespace',
+  'qual-fleet-data',
+  '--kube-version',
+  toolsLock.kubernetes,
+  '--set-string',
+  'operation=rebuild-current',
+  '--set-file',
+  `backend=${pin}`,
+];
+
+test('rebuild renders a single provider carrier with the exact tenant and artifact', () => {
+  const rendered = documents(
+    tools.helm([
+      ...rebuildArgs,
+      '--set-string',
+      rebuildDigest,
+      '--set-string',
+      'tenant=qual-pilot/tenant-01',
+    ]),
+  );
+  assert.equal(rendered.length, 1);
+  const [carrier] = rendered;
+  assert.equal(carrier.kind, 'ConfigMap');
+  assert.deepEqual(carrier.metadata, {
+    name: 'demo-rebuild-01',
+    namespace: 'qual-fleet-data',
+  });
+  const operation = JSON.parse(carrier.data['operation.json']);
+  assert.equal(operation.name, 'demo-rebuild-01');
+  assert.equal(operation.namespace, 'qual-fleet-data');
+  assert.equal(operation.deadlineSeconds, 300);
+  assert.equal(operation.podSpec.initContainers, undefined);
+  assert.equal(operation.podSpec.containers.length, 1);
+  const [container] = operation.podSpec.containers;
+  assert.equal(container.image, JSON.parse(backendBytes).backend.reference);
+  assert.deepEqual(container.command, ['/usr/local/bin/fleetiq-server']);
+  assert.deepEqual(container.args, ['rebuild-current']);
+  assert.deepEqual(container.env, [
+    {
+      name: 'DATABASE_URL',
+      valueFrom: {
+        secretKeyRef: { name: 'fleetiq-db-rebuild-current-url', key: 'url' },
+      },
+    },
+    { name: 'FLEETIQ_PROJECTION_REBUILD_TENANT', value: 'qual-pilot/tenant-01' },
+  ]);
+});
+
+test('rebuild refuses malformed inputs and a mismatched reviewed backend digest', () => {
+  const tenant = ['--set-string', 'tenant=qual-pilot/tenant-01'];
+  const digest = ['--set-string', rebuildDigest];
+  assert.throws(() => tools.helm([...rebuildArgs, ...tenant]));
+  assert.throws(() =>
+    tools.helm([
+      ...rebuildArgs,
+      ...tenant,
+      '--set-string',
+      `backendDigest=sha256:${'0'.repeat(64)}`,
+    ]),
+  );
+  assert.throws(() => tools.helm([...rebuildArgs, ...digest]));
+  for (const invalid of ['', ' tenant', 'tenant\u2003', 'a\u0085b', '界'.repeat(129)]) {
+    assert.throws(() =>
+      tools.helm([...rebuildArgs, ...digest, '--set-string', `tenant=${invalid}`]),
+    );
+  }
+  assert.throws(() =>
+    tools.helm([
+      ...rebuildArgs,
+      ...digest,
+      ...tenant,
+      '--namespace',
+      'qual-fleet-apps',
+    ]),
+  );
+  assert.throws(() =>
+    tools.helm([
+      ...rebuildArgs,
+      ...digest,
+      ...tenant,
+      '--set-string',
+      'image=mutable:latest',
+    ]),
+  );
+});
+
+test('rebuild preserves a tenant with valid Unicode and a literal Kubernetes expansion token', () => {
+  const [carrier] = documents(
+    tools.helm([
+      ...rebuildArgs,
+      '--set-string',
+      rebuildDigest,
+      '--set-string',
+      'tenant=qual-pilot/東京$(DATABASE_URL)',
+    ]),
+  );
+  const [container] = JSON.parse(carrier.data['operation.json']).podSpec.containers;
+  assert.deepEqual(container.env[1], {
+    name: 'FLEETIQ_PROJECTION_REBUILD_TENANT',
+    value: 'qual-pilot/東京$$(DATABASE_URL)',
+  });
+});
+
 test('demo manifest qualification validates the WorkflowTemplate and both ConfigMaps', () => {
   assert.equal(checkMinimalDemoData(tools, 'qual-fleet').workflowSchemas, 3);
   const malformedWorkflow = {
@@ -193,6 +303,14 @@ test('demo manifest qualification rejects weakened temporary PostgreSQL routes',
         client.spec.egress[1].toPorts[0].ports[0].protocol = 'UDP';
       },
     ],
+    [
+      'rebuild-current-route',
+      ([client]) => {
+        delete client.spec.endpointSelector.matchLabels[
+          'io.cilium.k8s.policy.serviceaccount'
+        ];
+      },
+    ],
   ]) {
     const weakenedRoute = {
       ...tools,
@@ -240,6 +358,51 @@ test('the bootstrap route binds both the approved digest label and runtime Servi
   assert.deepEqual(database.ingress[0].toPorts[0].ports, [
     { port: '5432', protocol: 'TCP' },
   ]);
+});
+
+test('the rebuild route binds both policies to one exact provider attempt', () => {
+  const args = [
+    'template',
+    'fleetiq',
+    operations,
+    '--namespace',
+    'qual-fleet-data',
+    '--kube-version',
+    toolsLock.kubernetes,
+    '--set-string',
+    'operation=rebuild-current-route',
+  ];
+  assert.throws(() => tools.helm(args));
+  assert.throws(() =>
+    tools.helm([...args, '--set-string', 'attempt=demo-run-0123456789abcdef01234567']),
+  );
+  const rendered = documents(
+    tools.helm([...args, '--set-string', `attempt=${attempt}`]),
+  );
+  assert.equal(rendered.length, 2);
+  const [client, postgres] = rendered;
+  assert.deepEqual(
+    rendered.map(({ metadata }) => metadata),
+    [
+      {
+        name: 'fleetiq-demo-rebuild-current-client-0123456789abcdef01234567',
+        namespace: 'qual-fleet-data',
+      },
+      {
+        name: 'fleetiq-demo-rebuild-current-postgres-0123456789abcdef01234567',
+        namespace: 'qual-fleet-data',
+      },
+    ],
+  );
+  const labels = {
+    'k8s-infrastructure.io/demo-attempt': 'demo-launch-0123456789abcdef01234567',
+    'io.cilium.k8s.policy.serviceaccount': 'demo-run-0123456789abcdef01234567',
+  };
+  assert.deepEqual(client.spec.endpointSelector.matchLabels, labels);
+  assert.deepEqual(postgres.spec.ingress[0].fromEndpoints[0].matchLabels, {
+    ...labels,
+    'k8s:io.kubernetes.pod.namespace': 'qual-fleet-data',
+  });
 });
 
 const phaseValues = (phase) => [

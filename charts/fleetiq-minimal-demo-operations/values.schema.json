@@ -4,14 +4,27 @@
   "additionalProperties": false,
   "required": ["operation"],
   "properties": {
-    "operation": { "enum": ["bootstrap", "bootstrap-route", "migration-route"] },
+    "operation": {
+      "enum": [
+        "bootstrap",
+        "bootstrap-route",
+        "migration-route",
+        "rebuild-current",
+        "rebuild-current-route"
+      ]
+    },
     "attempt": { "type": "string", "pattern": "^demo-launch-[a-f0-9]{24}$" },
     "workflowName": {
       "type": "string",
       "maxLength": 63,
       "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
     },
-    "backend": { "type": "string", "minLength": 1 }
+    "backend": { "type": "string", "minLength": 1 },
+    "backendDigest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "tenant": { "type": "string", "minLength": 1, "maxLength": 128 }
   },
   "allOf": [
     {
@@ -20,12 +33,27 @@
       "else": { "not": { "required": ["workflowName"] } }
     },
     {
-      "if": { "properties": { "operation": { "const": "bootstrap" } } },
+      "if": {
+        "properties": { "operation": { "enum": ["bootstrap", "rebuild-current"] } }
+      },
       "then": { "required": ["backend"] },
       "else": { "not": { "required": ["backend"] } }
     },
     {
-      "if": { "properties": { "operation": { "const": "bootstrap-route" } } },
+      "if": { "properties": { "operation": { "const": "rebuild-current" } } },
+      "then": { "required": ["backendDigest", "tenant"] },
+      "else": {
+        "not": {
+          "anyOf": [{ "required": ["backendDigest"] }, { "required": ["tenant"] }]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "operation": { "enum": ["bootstrap-route", "rebuild-current-route"] }
+        }
+      },
       "then": { "required": ["attempt"] },
       "else": { "not": { "required": ["attempt"] } }
     }
