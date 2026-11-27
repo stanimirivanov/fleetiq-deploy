@@ -7,6 +7,8 @@ import {
   runtimeCommands,
 } from './workload-database.mjs';
 
+const rebuildRole = 'fleetiq_rebuild_current';
+
 function scopedRoles(initdb, selection) {
   const { migrationLogin, retireLegacy } = selection;
   const role = (name, secret, login) => [
@@ -26,13 +28,16 @@ function scopedRoles(initdb, selection) {
 }
 
 function workloadRoles(selection) {
-  const role = (name, secret, login) => [
+  const role = (name, secret, login, options) => [
     name,
-    login
-      ? { login: true, passwordSecret: { name: secret } }
-      : { login: false, disablePassword: true },
+    {
+      ...options,
+      ...(login
+        ? { login: true, passwordSecret: { name: secret } }
+        : { login: false, disablePassword: true }),
+    },
   ];
-  return Object.fromEntries([
+  const roles = [
     role(
       databaseRole(bootstrap),
       'fleetiq-db-bootstrap-platform-operator',
@@ -41,7 +46,14 @@ function workloadRoles(selection) {
     ...databaseIdentities(runtimeCommands).map(({ name, passwordSecret, command }) =>
       role(name, passwordSecret, selection.workloads.includes(command)),
     ),
-  ]);
+  ];
+  if (Object.hasOwn(selection, 'rebuildCurrentLogin'))
+    roles.push(
+      role(rebuildRole, 'fleetiq-db-rebuild-current', selection.rebuildCurrentLogin, {
+        connectionLimit: 2,
+      }),
+    );
+  return Object.fromEntries(roles);
 }
 
 /** Database ownership, authentication and resources remain separate from application Pods. */
@@ -109,11 +121,10 @@ export function dataPolicy(
       'Scoped managed roles differ',
     );
     if (workloadDatabase.maintenance) {
-      const temporaryRole = workloadDatabase.migrationLogin
-        ? initdb.owner
-        : workloadDatabase.bootstrapLogin
-          ? databaseRole(bootstrap)
-          : null;
+      const temporaryRole =
+        (workloadDatabase.migrationLogin && initdb.owner) ||
+        (workloadDatabase.bootstrapLogin && databaseRole(bootstrap)) ||
+        (workloadDatabase.rebuildCurrentLogin && rebuildRole);
       hba = [
         ...(temporaryRole
           ? [`hostssl fleetiq ${temporaryRole} all scram-sha-256`]

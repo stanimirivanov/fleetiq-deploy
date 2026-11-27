@@ -84,6 +84,61 @@ for (const [phase, tempLogin, runtimeLogins] of [
   });
 }
 
+test('rebuild staging and withdrawal disable its login, and the attempt admits only it', () => {
+  for (const [phase, login, admittedRole] of [
+    ['rebuild-current-owner', false, 'fleetiq_migrator'],
+    ['rebuild-current', true, 'fleetiq_rebuild_current'],
+  ]) {
+    const rendered = documents(tools.helm([...dataArgs, ...phaseValues(phase)]));
+    const cluster = rendered.find(({ kind }) => kind === 'Cluster');
+    const roles = rendered.filter(({ kind }) => kind === 'DatabaseRole');
+    const rebuildRole = roles.find(
+      ({ spec }) => spec.name === 'fleetiq_rebuild_current',
+    );
+    assert.equal(roles.length, 10);
+    assert.deepEqual(rebuildRole.spec, {
+      cluster: { name: 'fleetiq-db' },
+      name: 'fleetiq_rebuild_current',
+      databaseRoleReclaimPolicy: 'retain',
+      inherit: false,
+      connectionLimit: 2,
+      login,
+      ...(login
+        ? { passwordSecret: { name: 'fleetiq-db-rebuild-current' } }
+        : { disablePassword: true }),
+    });
+    assert.deepEqual(
+      [...cluster.spec.managed.roles, ...roles.map(({ spec }) => spec)]
+        .filter(({ login }) => login)
+        .map(({ name }) => name),
+      [admittedRole],
+    );
+    assert.deepEqual(cluster.spec.postgresql.pg_hba, [
+      `hostssl fleetiq ${admittedRole} all scram-sha-256`,
+      'host all all all reject',
+    ]);
+  }
+});
+
+test('demo manifest qualification rejects a rebuild role with elevated privileges', () => {
+  const elevatedRole = {
+    ...tools,
+    helm(args) {
+      const output = tools.helm(args);
+      if (!args.includes(phaseValues('rebuild-current')[1])) return output;
+      const rendered = documents(output);
+      rendered.find(
+        ({ spec }) => spec.name === 'fleetiq_rebuild_current',
+      ).spec.createrole = true;
+      return rendered.map((item) => stringify(item)).join('---\n');
+    },
+  };
+  assert.throws(
+    () => checkMinimalDemoData(elevatedRole, 'qual-fleet'),
+    /Invalid DatabaseRole fleetiq_rebuild_current/u,
+  );
+});
+
 const operations = resolve(root, 'charts/fleetiq-minimal-demo-operations');
 const pin = resolve(root, 'environments/minimal-demo/backend.json');
 
@@ -427,6 +482,24 @@ for (const flags of [[], ['--skip-schema-validation']]) {
     ]) {
       assert.throws(() =>
         tools.helm([...dataArgs, ...phaseValues('runtime'), ...flags, ...selection]),
+      );
+    }
+  });
+
+  test(`the demo rebuild login cannot be combined with other admitted logins ${validation}`, () => {
+    for (const selection of [
+      ['--set', 'workloadDatabase.migrationLogin=true'],
+      ['--set', 'workloadDatabase.bootstrapLogin=true'],
+      ['--set', 'workloadDatabase.maintenance=false'],
+      ['--set-json', 'workloadDatabase.workloads=["project-current"]'],
+    ]) {
+      assert.throws(() =>
+        tools.helm([
+          ...dataArgs,
+          ...phaseValues('rebuild-current'),
+          ...flags,
+          ...selection,
+        ]),
       );
     }
   });
