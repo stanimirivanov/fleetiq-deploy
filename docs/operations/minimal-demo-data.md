@@ -9,6 +9,9 @@ the runtime phase and withdraw both temporary credentials before admitting
 writers. Keep the exact target, publication, workflow and Job receipts. Run the
 runtime probe and compare the commissioned observation across a retained restart.
 
+See the [minimal-demo operator baseline](minimal-demo-operator-baseline.md) for the
+supported paths, evidence requirements and proposed administrative Job contract.
+
 ## Prerequisites and identities
 
 Select a disposable `qual-` consumer with separate execution authorization.
