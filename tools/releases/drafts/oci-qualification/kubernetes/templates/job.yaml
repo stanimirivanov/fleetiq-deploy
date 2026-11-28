@@ -1,0 +1,3 @@
+{{- if and (not .Values.workflow) (not .Values.jobUID) -}}
+{{ include "ociDraft.job" . }}
+{{- end -}}
