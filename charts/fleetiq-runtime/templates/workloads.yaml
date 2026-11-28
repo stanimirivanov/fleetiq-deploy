@@ -4,8 +4,17 @@
 {{- fail "nonlocal edge.image must match the qualified publication digest" }}
 {{- end }}
 {{- end }}
-{{- range $component := list "backend" "edge" }}
-{{- $settings := index $.Values $component }}
+{{- $components := list "backend" "edge" }}
+{{- if .Values.rebuildCurrentObserver }}
+{{- if not (and .Values.maintenance .Values.workloadDatabase (eq .Values.profile "local") (eq .Values.gateway.ingressMode "cilium")) }}
+{{- fail "The rebuild-current observer requires a fenced local scoped Cilium installation" }}
+{{- end }}
+{{- $components = append $components "rebuild-current-observer" }}
+{{- end }}
+{{- range $component := $components }}
+{{- $observer := eq $component "rebuild-current-observer" }}
+{{- $backend := or (eq $component "backend") $observer }}
+{{- $settings := index $.Values (ternary "backend" "edge" $backend) }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -22,12 +31,16 @@ metadata:
   name: {{ $.Release.Name }}-{{ $component }}
   labels: { app.kubernetes.io/part-of: fleetiq }
 spec:
-  replicas: {{ ternary 0 $settings.replicas $.Values.maintenance }}
+  replicas: {{ ternary 1 (ternary 0 $settings.replicas $.Values.maintenance) $observer }}
   revisionHistoryLimit: 2
   progressDeadlineSeconds: 300
   strategy:
+    {{- if $observer }}
+    type: Recreate
+    {{- else }}
     type: RollingUpdate
     rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+    {{- end }}
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ $.Release.Name }}-{{ $component }}
@@ -63,14 +76,18 @@ spec:
           ports:
             - { name: http, containerPort: 8080, protocol: TCP }
           resources: {{ toJson $settings.resources }}
-          {{- if eq $component "backend" }}
+          {{- if $backend }}
           # The image entrypoint is the executable, not a shell. No startup DDL.
           args: [serve, --check-schema]
           env:
             - { name: FLEETIQ_BIND_ADDRESS, value: '0.0.0.0:8080' }
             - name: DATABASE_URL
               valueFrom:
+                {{- if $observer }}
+                secretKeyRef: { name: fleetiq-db-rebuild-current-observer-url, key: url }
+                {{- else }}
                 secretKeyRef: {{ include "fleetiq.databaseSecret" (dict "values" $.Values "command" "serve --check-schema") }}
+                {{- end }}
             - { name: FLEETIQ_BROWSER_ORIGIN, value: {{ printf "https://%s" (include "fleetiq.browserAuthority" $) | quote }} }
             - { name: FLEETIQ_OIDC_ISSUER, value: {{ $settings.oidc.issuer | quote }} }
             - { name: FLEETIQ_OIDC_CLIENT_ID, value: {{ $settings.oidc.clientId | quote }} }
@@ -116,7 +133,7 @@ spec:
           {{- end }}
           volumeMounts:
             - { name: tmp, mountPath: /tmp }
-            {{- if eq $component "backend" }}
+            {{- if $backend }}
             - { name: database-trust, mountPath: /etc/fleetiq/database, readOnly: true }
             {{- if $settings.oidc.additionalTrust.name }}
             - { name: oidc-trust, mountPath: /etc/fleetiq/oidc, readOnly: true }
@@ -125,7 +142,7 @@ spec:
       volumes:
         - name: tmp
           emptyDir: { medium: Memory, sizeLimit: 64Mi }
-        {{- if eq $component "backend" }}
+        {{- if $backend }}
         - name: database-trust
           configMap:
             name: {{ $settings.databaseTrust.name | quote }}

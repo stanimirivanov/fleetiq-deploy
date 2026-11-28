@@ -9,14 +9,17 @@ import { documents, validateSchemas } from './render.mjs';
 
 const operations = resolve(root, 'operations');
 
-function checkWorkflow(rendered, { action, releases, postgres, inputs, inventory }) {
+function checkWorkflow(
+  rendered,
+  { action, version, releases, postgres, inputs, inventory },
+) {
   assert.deepEqual(
     rendered.map(({ kind }) => kind),
     ['ConfigMap', 'ConfigMap', 'WorkflowTemplate'],
   );
   const [sqlInputs, sql, workflow] = rendered;
   assert(rendered.every(({ metadata }) => metadata.namespace === releases));
-  const name = `rebuild-current-owner-${action}-v1`;
+  const name = `rebuild-current-owner-${action}-v${version}`;
   const { spec } = workflow;
   assert.deepEqual(workflow.metadata, { name, namespace: releases });
   assert.deepEqual(
@@ -102,11 +105,11 @@ function checkWorkflow(rendered, { action, releases, postgres, inputs, inventory
   assert.equal(sql.immutable, true);
   assert.match(
     sqlInputs.metadata.name,
-    new RegExp(`^rebuild-owner-inputs-${action}-v1-[a-z0-9]{10}$`, 'u'),
+    new RegExp(`^rebuild-owner-inputs-${action}-v${version}-[a-z0-9]{10}$`, 'u'),
   );
   assert.match(
     sql.metadata.name,
-    new RegExp(`^workload-database-sql-${action}-v1-[a-z0-9]{10}$`, 'u'),
+    new RegExp(`^workload-database-sql-${action}-v${version}-[a-z0-9]{10}$`, 'u'),
   );
   assert(
     isDeepStrictEqual(sqlInputs.data, { ...inputs, 'inventory.json': inventory }),
@@ -159,10 +162,20 @@ function checkWorkflow(rendered, { action, releases, postgres, inputs, inventory
   const items = [
     { key: 'context.sql', path: 'workload-database/base/sql/context.sql' },
     { key: 'policy.sql', path: 'workload-database/base/sql/policy.sql' },
-    ...['acl', 'apply-acl', 'context', 'revoke', action].map((file) => ({
-      key: `rebuild-${file}.sql`,
-      path: `rebuild-current/${file}.sql`,
-    })),
+    ...['acl', 'apply-acl', 'context', 'revoke'].map((file) => {
+      const observerInclude = version === 2 && ['acl', 'revoke'].includes(file);
+      return {
+        key: `${observerInclude ? 'observer' : 'rebuild'}-${file}.sql`,
+        path: `rebuild-current/${file}.sql`,
+      };
+    }),
+    ...(version === 2
+      ? ['acl', 'revoke'].map((file) => ({
+          key: `rebuild-${file}.sql`,
+          path: `rebuild-current/rebuild-${file}-v1.sql`,
+        }))
+      : []),
+    { key: `rebuild-${action}.sql`, path: `rebuild-current/${action}.sql` },
     ...(action === 'grant'
       ? [
           {
@@ -180,8 +193,20 @@ function checkWorkflow(rendered, { action, releases, postgres, inputs, inventory
     'Owner SQL projection differs from the reviewed inventory',
   );
   const mountedPaths = new Set(items.map(({ path }) => posix.join('/operation', path)));
+  const observerSources =
+    version === 2
+      ? {
+          'observer-acl.sql': 'rebuild-current-observer/acl.sql',
+          'observer-revoke.sql': 'rebuild-current-observer/revoke.sql',
+          'rebuild-acl.sql': 'rebuild-current/acl.sql',
+          'rebuild-revoke.sql': 'rebuild-current/revoke.sql',
+        }
+      : {};
   for (const { key, path } of items) {
-    const bytes = readFileSync(resolve(operations, path), 'utf8');
+    const bytes = readFileSync(
+      resolve(operations, observerSources[key] ?? path),
+      'utf8',
+    );
     assert(sql.data[key] === bytes, `Owner SQL bytes differ for ${key}`);
     for (const [, argument] of bytes.matchAll(/^[ \t]*\\ir\b[ \t]*(.*)$/gmu)) {
       const include = argument.trim();
@@ -207,9 +232,12 @@ export function checkRebuildOwnerWorkflows(
       resolve(operations, 'workload-database/example/inventory.json'),
       'utf8',
     );
-    const actions = ['grant', 'withdraw'];
-    const workflows = actions.flatMap((action, index) => {
-      const cwd = resolve(directory, 'rebuild-current-owner', action);
+    const selections = [1, 2].flatMap((version) =>
+      ['grant', 'withdraw'].map((action) => ({ action, version })),
+    );
+    const workflows = selections.flatMap(({ action, version }, index) => {
+      const overlayName = version === 1 ? action : `${action}-v2`;
+      const cwd = resolve(directory, 'rebuild-current-owner', overlayName);
       const inputs = {
         PGHOST: `fleetiq-db-rw.${namespace}.svc`,
         FLEETIQ_DATABASE_OID: '16401',
@@ -230,7 +258,7 @@ export function checkRebuildOwnerWorkflows(
         cwd,
       });
       const rendered = render();
-      const reviewed = { action, releases, postgres, inputs, inventory };
+      const reviewed = { action, version, releases, postgres, inputs, inventory };
       checkWorkflow(rendered, reviewed);
       const overlay = resolve(cwd, 'kustomization.yaml');
       const overlayBytes = readFileSync(overlay, 'utf8');

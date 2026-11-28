@@ -1,0 +1,56 @@
+{{- if .Values.rebuildCurrentObserver }}
+{{- $network := .Values.network }}
+{{- $octet := "(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])" }}
+{{- $privateIssuer := printf "^(10\\.%s|172\\.(1[6-9]|2[0-9]|3[01])|192\\.168)\\.%s\\.%s/32$" $octet $octet $octet }}
+{{- if not (and (eq (len $network.oidcCidrs) 1) (regexMatch $privateIssuer (first $network.oidcCidrs))) }}
+{{- fail "The rebuild-current observer requires exactly one private IPv4 OIDC /32 destination" }}
+{{- end }}
+{{- $name := printf "%s-rebuild-current-observer" .Release.Name }}
+{{- $observer := dict "app.kubernetes.io/name" $name "io.cilium.k8s.policy.serviceaccount" $name }}
+{{- $nonRoutine := list (dict "key" "k8s-infrastructure.io/demo-routine" "operator" "DoesNotExist") }}
+{{- $postgres := dict "cnpg.io/cluster" $network.databaseCluster }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ $name }}
+spec:
+  endpointSelector:
+    matchLabels: {{ toJson $observer }}
+    matchExpressions: {{ toJson $nonRoutine }}
+  ingress:
+    - fromEntities: [ingress]
+      toPorts:
+        - ports: [{ port: '8080', protocol: TCP }]
+  egress:
+    - toEndpoints:
+        - matchLabels: {{ toJson (merge (dict "k8s:io.kubernetes.pod.namespace" $network.dnsNamespace) $network.dnsPodLabels) }}
+      toPorts:
+        - ports: [{ port: '53', protocol: UDP }, { port: '53', protocol: TCP }]
+    - toEndpoints:
+        - matchLabels: {{ toJson (merge (dict "k8s:io.kubernetes.pod.namespace" $network.databaseNamespace) $postgres) }}
+      toPorts:
+        - ports: [{ port: '5432', protocol: TCP }]
+    - toCIDR: {{ toJson $network.oidcCidrs }}
+      toPorts:
+        - ports: [{ port: {{ include "fleetiq.oidcPort" . | quote }}, protocol: TCP }]
+    # The minimal-demo issuer is reached through the worker's Gateway listener.
+    - toEntities: [host]
+      toPorts:
+        - ports: [{ port: {{ .Values.gateway.listenerPort | quote }}, protocol: TCP }]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  namespace: {{ $network.databaseNamespace }}
+  name: {{ $name }}-postgres
+spec:
+  endpointSelector:
+    matchLabels: {{ toJson $postgres }}
+  ingress:
+    - fromEndpoints:
+        - matchLabels: {{ toJson (merge (dict "k8s:io.kubernetes.pod.namespace" .Release.Namespace) $observer) }}
+          matchExpressions: {{ toJson $nonRoutine }}
+      toPorts:
+        - ports: [{ port: '5432', protocol: TCP }]
+{{- end }}

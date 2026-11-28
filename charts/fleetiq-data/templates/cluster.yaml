@@ -22,6 +22,11 @@
 {{- fail "Rebuild-current provisioning requires a fenced external-network installation with only the rebuild or migration login" }}
 {{- end }}
 {{- end }}
+{{- if and $scoped (hasKey $scoped "rebuildCurrentObserverLogin") }}
+{{- if not (and (hasKey $scoped "rebuildCurrentLogin") (eq $scoped.rebuildCurrentObserverLogin $scoped.rebuildCurrentLogin)) }}
+{{- fail "The observer login must follow the fenced rebuild-current phase" }}
+{{- end }}
+{{- end }}
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -94,6 +99,9 @@ spec:
       - hostssl fleetiq fleetiq_bootstrap_platform_operator all scram-sha-256
       {{- else if $scoped.rebuildCurrentLogin }}
       - hostssl fleetiq fleetiq_rebuild_current all scram-sha-256
+      {{- if $scoped.rebuildCurrentObserverLogin }}
+      - hostssl fleetiq fleetiq_rebuild_current_observer all scram-sha-256
+      {{- end }}
       {{- end }}
       - host all all all reject
       {{- else }}

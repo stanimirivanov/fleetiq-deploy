@@ -1,0 +1,6 @@
+workloadDatabase:
+  workloads: []
+  maintenance: true
+  migrationLogin: true
+  rebuildCurrentLogin: false
+  rebuildCurrentObserverLogin: false

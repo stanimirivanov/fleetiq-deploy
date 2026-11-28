@@ -8,6 +8,7 @@ import {
 } from './workload-database.mjs';
 
 const rebuildRole = 'fleetiq_rebuild_current';
+const observerRole = 'fleetiq_rebuild_current_observer';
 
 function scopedRoles(initdb, selection) {
   const { migrationLogin, retireLegacy } = selection;
@@ -52,6 +53,15 @@ function workloadRoles(selection) {
       role(rebuildRole, 'fleetiq-db-rebuild-current', selection.rebuildCurrentLogin, {
         connectionLimit: 2,
       }),
+    );
+  if (Object.hasOwn(selection, 'rebuildCurrentObserverLogin'))
+    roles.push(
+      role(
+        observerRole,
+        'fleetiq-db-rebuild-current-observer',
+        selection.rebuildCurrentObserverLogin,
+        { connectionLimit: 10 },
+      ),
     );
   return Object.fromEntries(roles);
 }
@@ -128,6 +138,9 @@ export function dataPolicy(
       hba = [
         ...(temporaryRole
           ? [`hostssl fleetiq ${temporaryRole} all scram-sha-256`]
+          : []),
+        ...(workloadDatabase.rebuildCurrentObserverLogin
+          ? [`hostssl fleetiq ${observerRole} all scram-sha-256`]
           : []),
         'host all all all reject',
       ];

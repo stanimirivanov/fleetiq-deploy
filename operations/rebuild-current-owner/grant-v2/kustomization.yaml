@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+nameSuffix: -grant-v2
+resources:
+  - ../../rebuild-current-observer
+generatorOptions:
+  immutable: true
+configMapGenerator:
+  - name: rebuild-owner-inputs
+    envs: [reviewed-owner.env]
+    files: [inventory.json]
+patches:
+  - target:
+      group: argoproj.io
+      kind: WorkflowTemplate
+      name: rebuild-current-owner
+    patch: |
+      - op: test
+        path: /spec/templates/0/container/args/4
+        value: --file=/operation/unselected.sql
+      - op: replace
+        path: /spec/templates/0/container/args/4
+        value: --file=/operation/rebuild-current/grant.sql
+      - op: add
+        path: /spec/volumes/1/configMap/items/-
+        value: { key: rebuild-grant.sql, path: rebuild-current/grant.sql }
+      - op: add
+        path: /spec/volumes/1/configMap/items/-
+        value: { key: verification.sql, path: workload-database/base/sql/verification.sql }
