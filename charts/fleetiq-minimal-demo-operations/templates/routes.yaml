@@ -1,4 +1,4 @@
-{{- if has .Values.operation (list "migration-route" "bootstrap-route" "rebuild-current-route") }}
+{{- if has .Values.operation (list "migration-route" "bootstrap-route" "rebuild-current-route" "rebuild-current-owner-route") }}
 {{- $data := .Release.Namespace }}
 {{- if or (not (regexMatch "^[a-z][a-z0-9]*(-[a-z0-9]+)*-data$" $data)) (gt (len $data) 37) }}
 {{- fail "Select the delegated data namespace" }}
@@ -9,13 +9,19 @@
 {{- $labels := dict }}
 {{- $phase := trimSuffix "-route" .Values.operation }}
 {{- $suffix := "" }}
-{{- if eq $phase "migration" }}
+{{- $usesExecutor := has $phase (list "migration" "rebuild-current-owner") }}
+{{- if $usesExecutor }}
 {{- $clientNamespace = printf "%s-releases" (trimSuffix "-data" $data) }}
-{{- $workflow := required "Select the approved migration Workflow name" .Values.workflowName }}
+{{- $workflow := required (printf "Select the approved %s Workflow name" $phase) .Values.workflowName }}
 {{- if or (gt (len $workflow) 63) (not (regexMatch "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$" $workflow)) }}
-{{- fail "Select a valid exact migration Workflow name" }}
+{{- fail (printf "Select a valid exact %s Workflow name" $phase) }}
 {{- end }}
-{{- $labels = dict $accountLabel "release-executor" "app.kubernetes.io/component" "fleetiq-demo-database-maintenance" "workflows.argoproj.io/workflow" $workflow }}
+{{- $component := "fleetiq-demo-database-maintenance" }}
+{{- if eq $phase "rebuild-current-owner" }}
+{{- $component = "fleetiq-demo-rebuild-current-owner" }}
+{{- $suffix = printf "-%s" $workflow }}
+{{- end }}
+{{- $labels = dict $accountLabel "release-executor" "app.kubernetes.io/component" $component "workflows.argoproj.io/workflow" $workflow }}
 {{- else }}
 {{- $attempt := required "Select the approved provider attempt" .Values.attempt }}
 {{- if not (regexMatch "^demo-launch-[a-f0-9]{24}$" $attempt) }}
@@ -49,7 +55,7 @@ spec:
             cnpg.io/cluster: fleetiq-db
       toPorts:
         - ports: [{ port: '5432', protocol: TCP }]
-{{- if eq $phase "migration" }}
+{{- if $usesExecutor }}
     - toEntities: [kube-apiserver]
       toPorts:
         - ports: [{ port: '6443', protocol: TCP }]
