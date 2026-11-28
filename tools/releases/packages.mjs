@@ -24,7 +24,7 @@ export function packageVersion(revision, run, attempt) {
   return `0.1.0-r${revision}.run${run}.attempt${attempt}`;
 }
 
-function chartRender(tools, chart, role, directory, providerLocal) {
+function chartRender(tools, chart, role, directory, providerLocal, packageRoot) {
   return documents(
     tools.helm(
       [
@@ -36,11 +36,11 @@ function chartRender(tools, chart, role, directory, providerLocal) {
         '--kube-version',
         toolsLock.kubernetes,
         '--values',
-        resolve(root, `environments/local-preview/${role}.yaml`),
+        resolve(packageRoot, `environments/local-preview/${role}.yaml`),
         ...(providerLocal
           ? [
               '--values',
-              resolve(root, `environments/qualified-local-preview/${role}.yaml`),
+              resolve(packageRoot, `environments/qualified-local-preview/${role}.yaml`),
             ]
           : []),
       ],
@@ -120,12 +120,12 @@ export async function publishChart(
 export async function publishReleasePackage(
   tools,
   directory,
-  { target, source, run: runId, attempt, qualification, ...options },
+  { target, source, run: runId, attempt, qualification, packageRoot = root, ...options },
 ) {
   const version = packageVersion(source.revision, runId, attempt);
   const charts = {};
   for (const role of ['runtime', 'data']) {
-    const sourceChart = resolve(root, `charts/fleetiq-${role}`);
+    const sourceChart = resolve(packageRoot, `charts/fleetiq-${role}`);
     const chart = await publishChart(
       tools,
       directory,
@@ -137,8 +137,8 @@ export async function publishReleasePackage(
     );
     for (const providerLocal of [false, true]) {
       assert.deepEqual(
-        chartRender(tools, chart.pulled, role, directory, providerLocal),
-        chartRender(tools, sourceChart, role, directory, providerLocal),
+        chartRender(tools, chart.pulled, role, directory, providerLocal, packageRoot),
+        chartRender(tools, sourceChart, role, directory, providerLocal, packageRoot),
         'Packaged chart render differs from reviewed source',
       );
     }
@@ -148,7 +148,7 @@ export async function publishReleasePackage(
     format: 'fleetiq-release-package.v1',
     source,
     version,
-    toolchain: digest(readFileSync(resolve(root, 'tools/manifests/tools.lock.json'))),
+    toolchain: digest(readFileSync(resolve(packageRoot, 'tools/manifests/tools.lock.json'))),
     qualification: digest(Buffer.from(JSON.stringify(qualification))),
     charts,
   };
