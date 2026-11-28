@@ -13,7 +13,7 @@
 {{- end }}
 {{- range $component := $components }}
 {{- $observer := eq $component "rebuild-current-observer" }}
-{{- $backend := ne $component "edge" }}
+{{- $backend := or (eq $component "backend") $observer }}
 {{- $settings := index $.Values (ternary "backend" "edge" $backend) }}
 ---
 apiVersion: v1

@@ -21,17 +21,15 @@ reference is `fleetiq-db-rebuild-current-url` key `url`, and the Job mounts
 the public CA ConfigMap `workload-database-ca`. A future staged URL must use verify-full
 with the exact primary Service name and `/etc/fleetiq/database/ca.crt`.
 
-This offline carrier render uses a synthetic tenant, target name and Job name.
-The example's slash is valid for the rebuild command. For the protected-read pilot
-select the same single-segment tenant in the carrier and in the observer values.
-Run the render from the repository root with the installed manifest tools.
-Use `--set-literal` so Helm
-preserves punctuation in the reviewed tenant identifier.
+This offline carrier render uses the same synthetic single-segment tenant as
+the observer example. Run the render from the repository root with the installed
+manifest tools. Use `--set-literal` so Helm preserves punctuation in the reviewed
+tenant identifier.
 
 ```bash
 target/tools/manifests/helm template demo-rebuild-01 charts/fleetiq-minimal-demo-operations \
   --namespace qual-fleet-data --kube-version 1.35.0 \
-  --set-string operation=rebuild-current --set-literal 'tenant=qual-pilot/tenant-01' \
+  --set-string operation=rebuild-current --set-literal 'tenant=proof-rebuild' \
   --set-file backend=environments/minimal-demo/backend.json \
   --set-string backendDigest=sha256:640c563bb21697197242c69e345d43c6182f42733a406cec1fed0038c413bd31
 ```
@@ -47,11 +45,10 @@ deadline and 60-second termination grace. These renders establish the request
 and route shapes. Live admission, target identity and datapath remain open.
 [Provider preview and admission][provider]
 
-For the synthetic selection above, the pinned provider preview and Job render
-agree on `demo-launch-e2e9749c6db012ad7ba8bc9c`. Both route selectors match the
-Job's attempt and runtime identities. Raw bytes matched the baseline across 36
-ordinary local, provider-local and nonlocal Helm and Kustomize outputs and
-seven existing minimal-demo outputs.
+Check both route selectors against the Job's attempt and runtime identities.
+The original offline preparation recorded raw-byte parity across 36 ordinary
+local, provider-local and nonlocal Helm and Kustomize outputs and seven
+existing minimal-demo outputs.
 
 ## Prepare the protected read
 
@@ -84,7 +81,8 @@ rebuildCurrentObserver:
 Render this overlay over the installation's reviewed local scoped runtime values
 in `<consumer>-apps`. Save the rendered manifest with the request. The example
 assumes `RUNTIME_VALUES` contains those installed values and `BACKEND` is the
-published reference from demo preparation.
+published reference from demo preparation. Set `network.oidcCidrs` to the one
+reviewed RFC 1918 IPv4 /32 in the selected runtime values.
 
 ```bash
 "$HELM" template fleetiq charts/fleetiq-runtime --namespace "$CONSUMER-apps" \
@@ -95,15 +93,23 @@ published reference from demo preparation.
   > "$PRIVATE/rebuild-current-observer-runtime.yaml"
 ```
 
-The scope is one HTTPS GET on the existing Gateway listener. The private
-observer Service selects its own tokenless Deployment. The installed Cilium
-rules must select that Pod's workload label and ServiceAccount. They allow only
-Gateway ingress to port 8080, configured DNS, the designated CNPG cluster on
-TCP 5432 and the reviewed issuer destinations. Use the reviewed issuer /32 on
-the canonical HTTPS port and the Cilium local `host` identity at the worker's
-translated Gateway listener port. Confirm both addresses serve the reviewed
-HTTPS issuer through the canonical origin. The data-namespace operator owns the
-matching database ingress rule. [Minimal-demo network][network]
+Compare the reviewed tenant directly with `FLEETIQ_PROJECTION_REBUILD_TENANT` in
+the carrier's `operation.json` and the provider-rendered Job, and with the tenant
+segment in the rendered HTTPRoute's Exact GET path. Require all three to match
+before approving the attempt. The rebuild role's SQL privileges act across
+tenants. The approved immutable Job input binds its execution to this tenant.
+
+The private observer Service selects Pods by workload label. Both the observer
+Cilium endpoint selector and the matching PostgreSQL ingress peer require
+the workload label, the reviewed ServiceAccount and absence of
+`k8s-infrastructure.io/demo-routine`. The policies allow only Gateway ingress
+to port 8080, configured DNS, the designated CNPG cluster on TCP 5432 and the
+reviewed issuer destinations. The issuer /32 uses the canonical HTTPS port.
+The Cilium local `host` identity allows the worker's translated Gateway
+listener port. Confirm both network
+paths serve the reviewed issuer through the canonical HTTPS origin. The
+data-namespace operator owns the database ingress rule.
+[Minimal-demo network][network]
 
 The credential operator stages `fleetiq-db-rebuild-current-observer`, a private
 basic-auth Secret with username `fleetiq_rebuild_current_observer` and label
@@ -115,6 +121,32 @@ database CA reference. Record the credentials' custody and Secret UIDs. Bind
 the observer runtime, exact GET, role inventory and withdrawal checks to the
 reviewed release requests. Keep the saved ordinary maintenance manifest for the
 fully drained owner phases.
+
+The observer's PostgreSQL column privileges span rows across tenants in the
+granted tables. The exact HTTP route binds the request to one property tuple,
+and the backend checks current tenant `telemetry.read` authorization on each
+GET. Keep the database credential and its URL private with the credential
+operator and the observer workload.
+
+### Witness the observer endpoint
+
+Use the existing authorized read access and the reviewed target and namespace
+identities. Before each protected read, the independent witness verifies the
+live observer attempt data phase, writer drain and accepted Exact GET route to
+the reviewed Service and port. Inspect the Service and all EndpointSlices
+with its `kubernetes.io/service-name` label in the apps namespace. Require the
+EndpointSlice owner references to match the Service UID. Require the endpoints
+to target only the intended Pod by namespace, name and UID and to match its
+observed IP and HTTP port. Require a Ready, non-terminating endpoint and a
+Running, Ready, non-terminating Pod with the reviewed ServiceAccount, token
+automount disabled and the routine marker absent.
+
+Follow controller owner references by UID from Pod to ReplicaSet to the
+reviewed observer Deployment. Compare the live Pod's serving configuration
+and running image ID with the reviewed observer render and verified image.
+Record these identities and the phase privately, and recheck them after the
+GET before accepting the read. Treat missing, changed or conflicting endpoint,
+workload or phase evidence as an unresolved read.
 
 ## Prepare reviewed owner execution
 
@@ -278,27 +310,39 @@ Workflow name and UID with the receipts and reserve the name permanently.
    read back only the rebuild and observer product logins, with TLS-only
    authentication and limits of two and ten connections respectively. Confirm
    the ordinary backend, edge, ingester, replay, projector and other writers stay
-   stopped and drained. Stage the scoped observer policies and runtime. Verify
-   the Gateway accepts the exact route and the observer is ready. At the same
-   HTTPS origin, require a successful protected read from the pre-fence browser
-   session. Record the before snapshot privately. Verify that anonymous access
-   is denied and that other paths, property versions and methods have no
-   observer route. If the session has expired or the read is unavailable, stop
-   cutover and preserve evidence. Run the one approved rebuild attempt only
-   after observing the before snapshot. The rebuild role's SQL privileges act
-   across tenants. Its approved immutable Job input binds the reviewed tenant.
-4. Read the after snapshot through the same browser GET before withdrawing
-   access. Record generation, revision, processed count, pending state and the
-   winning change. Restore the ordinary maintenance route. Retire the exact
-   observer Service, Deployment, ServiceAccount and both policies and verify
-   their absence. Withdraw the
-   Job's attempt route and launcher grant. Reconcile the observer-owner data
-   phase and verify both temporary roles are disabled and all observer and
-   rebuild sessions have closed. Run the one independently approved v2 owner
-   withdrawal Workflow. In the same transaction it revokes both ACLs and
-   checks effective connection denial and remaining role dependencies.
+   stopped and drained. Stage the scoped observer policies and runtime. Require
+   the independent endpoint witness and a successful protected GET from the
+   pre-fence browser session on the same HTTPS origin. Record the before
+   snapshot privately. Verify that anonymous access is denied and that other
+   paths, property versions and methods have no observer route. If the session
+   has expired or the read is unavailable, stop cutover and preserve evidence.
+   Require the witnessed before snapshot and repeat the exact tenant comparison
+   against the approved Job and live route before submitting the one attempt.
+4. Before teardown, follow the provider's withdrawal procedure with the existing
+   controlled deployment read authority. Confirm the exact attempt is unused or
+   correlate the original accepted Job UID on the same target, require a terminal
+   Job condition and account for all owned Pods and their termination. Collect
+   the execution receipt privately. Preserve the original Job and evidence if
+   execution is active, missing, or ambiguous. Keep the writers fenced and the
+   attempt route and launcher grant in place until this gate passes.
+   [Provider withdrawal][withdrawal]
+5. After terminal execution, attempt the same witnessed browser GET before
+   withdrawing observer access. Record generation, revision, processed count,
+   pending state and the winning change. If the after-read is unavailable or
+   unverified, record the durable-effect verdict as unresolved, preserve the
+   original execution and before-read evidence, and keep the writers fenced
+   for review. Reconfirm the unused-or-terminal gate immediately before
+   teardown, including when the after-read is unavailable. Have the provider
+   withdraw the launcher grant and the network owner withdraw the Job's
+   attempt route. Restore the ordinary maintenance route. Retire the exact
+   observer Service, Deployment, ServiceAccount and both observer policies
+   and verify their absence. Reconcile the observer-owner data phase and verify
+   both temporary roles are disabled and all observer and rebuild sessions
+   have closed. Run the one independently approved v2 owner withdrawal Workflow.
+   In the same transaction it revokes both ACLs and checks effective connection
+   denial and remaining role dependencies.
    [Withdrawal batch][withdraw-batch] · [Observer withdrawal][observer-withdraw]
-5. Verify both old credentials fail to connect and retire the four temporary
+6. Verify both old credentials fail to connect and retire the four temporary
    rebuild and observer Secrets. Withdraw the owner route and reconcile runtime
    database admission with the owner disabled. Retire the temporary owner
    credentials. Keep the writers fenced if any withdrawal check fails. Both

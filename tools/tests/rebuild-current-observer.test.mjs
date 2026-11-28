@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
+import { stringify } from 'yaml';
 import { checkRebuildObserverRuntime } from '../manifests/rebuild-current-observer.mjs';
 import { checkRebuildOwnerWorkflows } from '../manifests/rebuild-current-owner.mjs';
 import { documents } from '../manifests/render.mjs';
@@ -20,8 +21,8 @@ test('the fenced runtime qualifies its exact GET, checked observer and scoped ne
   assert.equal(schemas, resources);
 });
 
-test('the runtime refuses an unfenced observer, a slash in the tenant, or a broad issuer CIDR', () => {
-  for (const [flag, replacement, extra = []] of [
+test('the runtime refuses an unfenced observer or an invalid route selection', () => {
+  for (const [flag, replacement] of [
     ['maintenance=true', 'maintenance=false'],
     [
       'rebuildCurrentObserver.tenant=pilot:tenant',
@@ -32,11 +33,6 @@ test('the runtime refuses an unfenced observer, a slash in the tenant, or a broa
       'rebuildCurrentObserver.tenant=pilot%2Ftenant',
     ],
     ['rebuildCurrentObserver.version=2', 'rebuildCurrentObserver.version=0'],
-    [
-      'rebuildCurrentObserver.version=2',
-      'rebuildCurrentObserver.version=2',
-      ['--set', 'network.oidcCidrs={203.0.113.0/24}'],
-    ],
   ]) {
     assert.throws(
       () =>
@@ -46,15 +42,42 @@ test('the runtime refuses an unfenced observer, a slash in the tenant, or a broa
             helm(args) {
               if (!args.includes('rebuildCurrentObserver.version=2'))
                 return tools.helm(args);
-              return tools.helm([
-                ...args.map((arg) => (arg === flag ? replacement : arg)),
-                ...extra,
-              ]);
+              return tools.helm(args.map((arg) => (arg === flag ? replacement : arg)));
             },
           },
           selectionInput,
         ),
       /helm template/u,
+    );
+  }
+});
+
+test('the observer requires exactly one private IPv4 issuer host route', () => {
+  for (const cidrs of [
+    '172.18.0.0/24',
+    '203.0.113.10/32',
+    '127.0.0.1/32',
+    '172.15.0.1/32',
+    '172.32.0.1/32',
+    '10.0.256.1/32',
+    '10.0.0.01/32',
+    '10.0.0.1/32,192.168.1.2/32',
+  ]) {
+    assert.throws(
+      () =>
+        checkRebuildObserverRuntime(
+          {
+            ...tools,
+            helm(args) {
+              if (!args.includes('rebuildCurrentObserver.version=2'))
+                return tools.helm(args);
+              return tools.helm([...args, '--set', `network.oidcCidrs={${cidrs}}`]);
+            },
+          },
+          selectionInput,
+        ),
+      /helm template/u,
+      cidrs,
     );
   }
 });
@@ -72,6 +95,34 @@ test('manifest qualification rejects broadening the observer route', () => {
     () => checkRebuildObserverRuntime(weakened, selectionInput),
     /PathPrefix/u,
   );
+});
+
+test('manifest qualification rejects removing either observer routine-marker exclusion', () => {
+  const observer = 'fleetiq-rebuild-current-observer';
+  for (const [name, selector] of [
+    [observer, (spec) => spec.endpointSelector],
+    [`${observer}-postgres`, (spec) => spec.ingress[0].fromEndpoints[0]],
+  ]) {
+    const weakened = {
+      ...tools,
+      helm(args) {
+        const output = tools.helm(args);
+        if (!args.includes('rebuildCurrentObserver.version=2')) return output;
+        const rendered = documents(output);
+        const { spec } = rendered.find(
+          ({ kind, metadata }) =>
+            kind === 'CiliumNetworkPolicy' && metadata.name === name,
+        );
+        delete selector(spec).matchExpressions;
+        return rendered.map((resource) => stringify(resource)).join('---\n');
+      },
+    };
+    assert.throws(
+      () => checkRebuildObserverRuntime(weakened, selectionInput),
+      /DoesNotExist/u,
+      name,
+    );
+  }
 });
 
 test('the observer login is admitted with the rebuild and disabled whenever the owner is admitted', () => {

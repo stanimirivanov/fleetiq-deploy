@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { root } from '../process.mjs';
-import { demoNamespaces } from './minimal-demo-network.mjs';
+import { demoNamespaces, routineLabel } from './minimal-demo-network.mjs';
 import { documents, validateSchemas } from './render.mjs';
 import { toolsLock } from './toolchain.mjs';
 
@@ -27,6 +27,8 @@ export function checkRebuildObserverRuntime(tools, { consumer, image }) {
     `backend.image=${image}`,
     '--set',
     'maintenance=true',
+    '--set',
+    'network.oidcCidrs={172.18.0.4/32}',
   ];
   const baseline = documents(tools.helm(runtimeArgs));
   const rendered = documents(
@@ -128,6 +130,7 @@ export function checkRebuildObserverRuntime(tools, { consumer, image }) {
     'app.kubernetes.io/name': name,
     'io.cilium.k8s.policy.serviceaccount': name,
   };
+  const nonRoutine = [{ key: routineLabel, operator: 'DoesNotExist' }];
   const database = { 'cnpg.io/cluster': 'fleetiq-db' };
   const port = (number) => [{ ports: [{ port: String(number), protocol: 'TCP' }] }];
   assert.deepEqual(
@@ -137,7 +140,10 @@ export function checkRebuildObserverRuntime(tools, { consumer, image }) {
       kind: 'CiliumNetworkPolicy',
       metadata: { name, namespace: apps },
       spec: {
-        endpointSelector: { matchLabels: observerLabels },
+        endpointSelector: {
+          matchLabels: observerLabels,
+          matchExpressions: nonRoutine,
+        },
         ingress: [{ fromEntities: ['ingress'], toPorts: port(8080) }],
         egress: [
           {
@@ -169,7 +175,7 @@ export function checkRebuildObserverRuntime(tools, { consumer, image }) {
             ],
             toPorts: port(5432),
           },
-          { toCIDR: ['203.0.113.10/32'], toPorts: port(19443) },
+          { toCIDR: ['172.18.0.4/32'], toPorts: port(19443) },
           { toEntities: ['host'], toPorts: port(8443) },
         ],
       },
@@ -191,6 +197,7 @@ export function checkRebuildObserverRuntime(tools, { consumer, image }) {
                   'k8s:io.kubernetes.pod.namespace': apps,
                   ...observerLabels,
                 },
+                matchExpressions: nonRoutine,
               },
             ],
             toPorts: port(5432),
