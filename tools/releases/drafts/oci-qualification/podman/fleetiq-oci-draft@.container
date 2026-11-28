@@ -1,0 +1,30 @@
+[Unit]
+Description=FleetIQ OCI qualification draft registry
+
+[Container]
+Image=docker.io/library/registry:3.0.0@sha256:6c5666b861f3505b116bb9aa9b25175e71210414bd010d92035ff64018f9457e
+ContainerName=fleetiq-oci-draft-%i
+User=65532:65532
+ReadOnly=true
+ReadOnlyTmpfs=false
+NoNewPrivileges=true
+DropCapability=all
+PublishPort=127.0.0.1::5000
+Volume=./registry.yaml:/etc/distribution/qualification.yaml:ro,z
+Entrypoint=/bin/registry
+Exec=serve /etc/distribution/qualification.yaml
+Memory=192m
+PidsLimit=128
+PodmanArgs=--cpus=1
+Tmpfs=/var/lib/registry:rw,noexec,nosuid,size=64m,mode=0700,uid=65532,gid=65532
+HealthCmd=/bin/busybox wget -q -O /dev/null http://127.0.0.1:5000/v2/
+HealthInterval=2s
+HealthTimeout=1s
+HealthRetries=5
+Notify=healthy
+
+[Service]
+TimeoutStartSec=45s
+RuntimeMaxSec=300s
+TimeoutStopSec=15s
+Restart=no
