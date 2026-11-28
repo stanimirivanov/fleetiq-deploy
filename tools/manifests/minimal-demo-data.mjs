@@ -13,6 +13,7 @@ import {
   postgresPort,
   simulatorAccount,
 } from './minimal-demo-network.mjs';
+import { checkRebuildObserverRuntime } from './rebuild-current-observer.mjs';
 import { checkRebuildOwnerWorkflows } from './rebuild-current-owner.mjs';
 import { documents, validateSchemas } from './render.mjs';
 import { toolsLock } from './toolchain.mjs';
@@ -45,6 +46,19 @@ const demoPhases = {
     rebuildCurrentLogin: false,
   },
   'rebuild-current': { workloads: [], maintenance: true, rebuildCurrentLogin: true },
+  'rebuild-current-observer-owner': {
+    workloads: [],
+    maintenance: true,
+    migrationLogin: true,
+    rebuildCurrentLogin: false,
+    rebuildCurrentObserverLogin: false,
+  },
+  'rebuild-current-observer': {
+    workloads: [],
+    maintenance: true,
+    rebuildCurrentLogin: true,
+    rebuildCurrentObserverLogin: true,
+  },
 };
 const ciliumNamespace = 'k8s:io.kubernetes.pod.namespace';
 const ciliumAccount = 'io.cilium.k8s.policy.serviceaccount';
@@ -331,7 +345,9 @@ export function checkMinimalDemoData(tools, consumer) {
       });
       assert.equal(
         rendered.length,
-        Object.hasOwn(workloadDatabase, 'rebuildCurrentLogin') ? 11 : 10,
+        10 +
+          Number(Object.hasOwn(workloadDatabase, 'rebuildCurrentLogin')) +
+          Number(Object.hasOwn(workloadDatabase, 'rebuildCurrentObserverLogin')),
       );
       assert.equal(cluster.kind, 'Cluster');
       assert.equal(cluster.apiVersion, 'postgresql.cnpg.io/v1');
@@ -487,6 +503,10 @@ export function checkMinimalDemoData(tools, consumer) {
       consumer,
       postgres: data.image,
       workloads,
+    }),
+    rebuildObserverRuntime: checkRebuildObserverRuntime(tools, {
+      consumer,
+      image: backendSelection.backend.reference,
     }),
     connections,
     execution: 'not-performed',

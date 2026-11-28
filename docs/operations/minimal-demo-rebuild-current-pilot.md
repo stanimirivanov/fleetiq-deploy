@@ -1,12 +1,13 @@
-# Minimal-demo rebuild-current offline pilot
+# Minimal-demo rebuild-current pilot
 
 ## TL;DR
 
-Render the provider carrier and attempt-bound database route offline. The
-deployment owner stages and withdraws the temporary database login under the
-writer fence through separately approved grant and withdrawal Workflows.
-Live acceptance in [#139](https://github.com/stanimirivanov/fleetiq-deploy/issues/139)
-requires a protected read under that fence and a single read-only recovery result.
+Render the provider carrier, attempt-bound database route and exact current-property
+read offline. One owner grant and one owner withdrawal cover the rebuild and
+observer logins. Establish the observer's browser session before fencing writers.
+Use the same HTTPS origin and exact GET before and after the rebuild.
+Live Kubernetes qualification and the single read-only recovery result remain open
+in [#139](https://github.com/stanimirivanov/fleetiq-deploy/issues/139).
 [Offline preparation in PR #152](https://github.com/stanimirivanov/fleetiq-deploy/pull/152)
 
 ## Offline preparation
@@ -20,8 +21,11 @@ reference is `fleetiq-db-rebuild-current-url` key `url`, and the Job mounts
 the public CA ConfigMap `workload-database-ca`. A future staged URL must use verify-full
 with the exact primary Service name and `/etc/fleetiq/database/ca.crt`.
 
-This render uses a synthetic tenant, target name and Job name. Run it from the
-repository root with the installed manifest tools. Use `--set-literal` so Helm
+This offline carrier render uses a synthetic tenant, target name and Job name.
+The example's slash is valid for the rebuild command. For the protected-read pilot
+select the same single-segment tenant in the carrier and in the observer values.
+Run the render from the repository root with the installed manifest tools.
+Use `--set-literal` so Helm
 preserves punctuation in the reviewed tenant identifier.
 
 ```bash
@@ -49,18 +53,81 @@ Job's attempt and runtime identities. Raw bytes matched the baseline across 36
 ordinary local, provider-local and nonlocal Helm and Kustomize outputs and
 seven existing minimal-demo outputs.
 
+## Prepare the protected read
+
+Use the installed local scoped Cilium runtime release and the same canonical
+HTTPS origin and certificate that served ordinary browser sign-in. Before
+fencing, the independent observer signs in through the deployed OIDC provider.
+Confirm that the session can read the reviewed property with a current
+`telemetry.read` grant. It must last through the attempt. The fenced Deployment
+runs the published `serve --check-schema` image with the same browser origin,
+OIDC issuer, client, authority and trust. The browser continues to use its
+existing secure session on that origin.
+
+The reviewed private runtime overlay contains the property selection and
+maintenance setting. Reuse the ordinary reviewed runtime values and the pinned
+backend reference from demo preparation. The selected identifiers must begin
+with an ASCII letter or digit and may then include letters, digits, `. _ ~ : -`,
+up to 128 characters. Choose a positive property version. Gateway API rejects
+encoded slashes in Exact paths. If the reviewed tuple cannot be expressed in
+these values, stop the pilot for that target. [Gateway path contract][gateway-path]
+
+```yaml
+maintenance: true
+rebuildCurrentObserver:
+  tenant: proof-rebuild
+  asset: asset-a
+  property: electrical.voltage
+  version: 1
+```
+
+Render this overlay over the installation's reviewed local scoped runtime values
+in `<consumer>-apps`. Save the rendered manifest with the request. The example
+assumes `RUNTIME_VALUES` contains those installed values and `BACKEND` is the
+published reference from demo preparation.
+
+```bash
+"$HELM" template fleetiq charts/fleetiq-runtime --namespace "$CONSUMER-apps" \
+  --kube-version 1.35.0 -f "$RUNTIME_VALUES" -f "$DEMO/runtime.yaml" \
+  -f "$PRIVATE/rebuild-current-observer-values.yaml" \
+  --set-string "backend.image=$BACKEND" \
+  --set-string "network.databaseNamespace=$DATA" \
+  > "$PRIVATE/rebuild-current-observer-runtime.yaml"
+```
+
+The scope is one HTTPS GET on the existing Gateway listener. The private
+observer Service selects its own tokenless Deployment. The installed Cilium
+rules must select that Pod's workload label and ServiceAccount. They allow only
+Gateway ingress to port 8080, configured DNS, the designated CNPG cluster on
+TCP 5432 and the reviewed issuer destinations. Use the reviewed issuer /32 on
+the canonical HTTPS port and the Cilium local `host` identity at the worker's
+translated Gateway listener port. Confirm both addresses serve the reviewed
+HTTPS issuer through the canonical origin. The data-namespace operator owns the
+matching database ingress rule. [Minimal-demo network][network]
+
+The credential operator stages `fleetiq-db-rebuild-current-observer`, a private
+basic-auth Secret with username `fleetiq_rebuild_current_observer` and label
+`cnpg.io/reload: "true"` in `DATA`.
+Stage the dedicated URL in `fleetiq-db-rebuild-current-observer-url` key `url` in
+`<consumer>-apps`, pointing to the reviewed CNPG primary DNS with verify-full TLS
+and the mounted `/etc/fleetiq/database/ca.crt`. Reuse the ordinary reviewed
+database CA reference. Record the credentials' custody and Secret UIDs. Bind
+the observer runtime, exact GET, role inventory and withdrawal checks to the
+reviewed release requests. Keep the saved ordinary maintenance manifest for the
+fully drained owner phases.
+
 ## Prepare reviewed owner execution
 
 Use the installation release lock and the same fenced target throughout. Include
-`rebuild-current-owner-grant-v1` and `rebuild-current-owner-withdraw-v1` in the
+`rebuild-current-owner-grant-v2` and `rebuild-current-owner-withdraw-v2` in the
 provider's reviewed `approvedTemplates` when selecting the disposable target.
 A retained target missing those names needs a provider-reviewed delegation
 transition before staging. The provider admits only the named template and one
 `release-digest` parameter on a suspended Workflow and makes the approved
 template spec immutable. [Delegated Argo admission][owner-admission]
 
-Render `rebuild-current-owner.yaml` and `rebuild-current.yaml` over
-`environments/minimal-demo/data.yaml` with `charts/fleetiq-data`. Review a separate
+Render `rebuild-current-observer-owner.yaml` and `rebuild-current-observer.yaml`
+over `environments/minimal-demo/data.yaml` with `charts/fleetiq-data`. Review a separate
 release request for each owner action. Bind the following inputs to its digest
 before staging its WorkflowTemplate. [Retained database release preparation][release-review]
 
@@ -72,11 +139,11 @@ before staging its WorkflowTemplate. [Retained database release preparation][rel
   image digests, the verified publication run and attempt with their artifact
   and record digests, and the published migration inventory digest.
 - The reviewed tenant, migration owner, legacy role and installed workload ACL
-  selection. Bind the expected rebuild ACL and the withdrawal checks for role
+  selection. Bind both expected ACLs and the withdrawal checks for role
   dependencies, connection denial, routes and credentials. [Rebuild ACL inventory][rebuild-acl]
 
 From the reviewed checkout, the release owner copies `operations/` into a
-fresh private staging directory, `OWNER_STAGING`. For each action overlay
+fresh private staging directory, `OWNER_STAGING`. For the `grant-v2` and `withdraw-v2` overlays
 under `operations/rebuild-current-owner/`, place the verified publication
 inventory as `inventory.json` and the reviewed values as `reviewed-owner.env`.
 Include these four keys.
@@ -94,7 +161,7 @@ image `POSTGRES`, pinned tool paths and private directory from demo preparation.
 ```bash
 OWNER_ACTION=grant
 (
-  cd "$OWNER_STAGING/operations/rebuild-current-owner/$OWNER_ACTION"
+  cd "$OWNER_STAGING/operations/rebuild-current-owner/$OWNER_ACTION-v2"
   "$KUSTOMIZE" edit set namespace "$RELEASES"
   "$KUSTOMIZE" edit set image "invalid.invalid/psql=$POSTGRES"
   "$KUSTOMIZE" build . > "$PRIVATE/db-rebuild-owner-$OWNER_ACTION.yaml"
@@ -128,8 +195,8 @@ are ready.
 For each action, the release owner prepares the private request artifact
 `$PRIVATE/db-$WORKFLOW_NAME-request.yaml` using the pinned provider's exact
 suspended Workflow shape. Choose a fresh explicit `WORKFLOW_NAME` in
-`RELEASES`. Select the staged `rebuild-current-owner-grant-v1` or
-`rebuild-current-owner-withdraw-v1` template and the matching reviewed
+`RELEASES`. Select the staged `rebuild-current-owner-grant-v2` or
+`rebuild-current-owner-withdraw-v2` template and the matching reviewed
 `release-digest`. Verify the consumer label and submitter identity against
 the reviewed provider delegation. Render the route in `DATA` with the same
 Workflow name. [Provider submission][owner-admission]
@@ -188,55 +255,72 @@ Workflow name and UID with the receipts and reserve the name permanently.
 
 ## Scoped database lifecycle
 
-1. Keep product writers fenced and observe the drain. Have the credential
-   operator re-stage the existing migration owner credentials and confirm the
-   route for the approved grant execution. Use `rebuild-current-owner.yaml` to
-   admit the migration owner as the only product login and reconcile the retained
-   `fleetiq_rebuild_current` role with `NOLOGIN` and `disablePassword`.
-   Verify the reconciled role and observed admission. The credential operator
-   stages the `fleetiq-db-rebuild-current` Secret of type `kubernetes.io/basic-auth`
-   with username `fleetiq_rebuild_current` and label `cnpg.io/reload: "true"`.
-   Stage the separate `fleetiq-db-rebuild-current-url` Secret with the same
-   credentials. Both Secrets are private and attempt-bound. [CNPG password reconciliation][cnpg-passwords]
-2. Run the approved owner grant Workflow for the reviewed [grant batch][grant-batch].
-   The batch takes the shared transaction lock and checks the reviewed migration
-   inventory, primary, database OID, role
-   isolation, and drain. It verifies the ordinary workload grants, checks the
-   source row's immutability trigger and applies the scoped rebuild ACL. The
-   transaction commits only after verifying every intended effective rebuild
-   privilege. [Shared workload database context][identity]
-3. Withdraw the owner route for the attempt. Use `rebuild-current.yaml` to
-   admit the dedicated login alone, with a two-connection limit. Observe the
-   reconciled login, TLS-only admission and
-   attempt-scoped route before granting submission authority. The published
-   rebuild function executes with the login's projection-table privileges across
-   tenants. The provider-approved Job and its immutable tenant input bind the
-   tenant selection. Keep the credential exclusive to that attempt.
-4. Withdraw the attempt route and launcher grant, then reconcile
-   `rebuild-current-owner.yaml` again. Wait for active rebuild sessions to close
-   and follow the independent approval flow for the owner withdrawal Workflow.
-   The reviewed [withdrawal batch][withdraw-batch] revokes the scoped ACL and
-   verifies effective connection denial and no remaining database-object
-   dependencies for the role. Verify that the old
-   credential cannot connect and retire both rebuild Secrets. Withdraw the owner
-   route and reconcile runtime admission with the owner disabled. Retire the
-   temporary owner credentials. Keep the fenced installation and evidence if
-   any withdrawal check fails. The retained rebuild role stays disabled when
-   ordinary values return.
+1. Keep product writers fenced and observe the drain. Reconcile ordinary runtime
+   maintenance without the observer values. Have the credential operator stage
+   the owner credentials and routes for the approved grant execution. Reconcile
+   the observer-owner data phase to admit the migration owner alone and declare
+   both temporary DatabaseRoles with `NOLOGIN` and `disablePassword`. Verify
+   the actual role and authentication state. Stage the private rebuild Secrets
+   `fleetiq-db-rebuild-current` and `fleetiq-db-rebuild-current-url` with the same
+   dedicated login. Use a basic-auth password Secret with `cnpg.io/reload: "true"`.
+   [CNPG password reconciliation][cnpg-passwords]
+2. Run the one approved v2 owner grant Workflow. It takes the shared transaction
+   lock and checks the migration inventory, primary, database OID, role isolation
+   and drain. It verifies ordinary workload grants and the source immutability
+   trigger, applies both scoped ACLs and checks their effective privileges before
+   commit. The [observer ACL][observer-acl] allows the checked-schema ledger,
+   browser session lookup, actor and tenant policy and the exact snapshot's query
+   inputs. SQL write privileges and rebuild execution stay disabled for the
+   observer. The pinned binary attempts background browser-expiry deletes in
+   browser mode. PostgreSQL denies them and serving continues. Keep the role
+   read-only. [Grant batch][grant-batch]
+3. Withdraw the owner route. Reconcile the observer attempt data phase and
+   read back only the rebuild and observer product logins, with TLS-only
+   authentication and limits of two and ten connections respectively. Confirm
+   the ordinary backend, edge, ingester, replay, projector and other writers stay
+   stopped and drained. Stage the scoped observer policies and runtime. Verify
+   the Gateway accepts the exact route and the observer is ready. At the same
+   HTTPS origin, require a successful protected read from the pre-fence browser
+   session. Record the before snapshot privately. Verify that anonymous access
+   is denied and that other paths, property versions and methods have no
+   observer route. If the session has expired or the read is unavailable, stop
+   cutover and preserve evidence. Run the one approved rebuild attempt only
+   after observing the before snapshot. The rebuild role's SQL privileges act
+   across tenants. Its approved immutable Job input binds the reviewed tenant.
+4. Read the after snapshot through the same browser GET before withdrawing
+   access. Record generation, revision, processed count, pending state and the
+   winning change. Restore the ordinary maintenance route. Retire the exact
+   observer Service, Deployment, ServiceAccount and both policies and verify
+   their absence. Withdraw the
+   Job's attempt route and launcher grant. Reconcile the observer-owner data
+   phase and verify both temporary roles are disabled and all observer and
+   rebuild sessions have closed. Run the one independently approved v2 owner
+   withdrawal Workflow. In the same transaction it revokes both ACLs and
+   checks effective connection denial and remaining role dependencies.
+   [Withdrawal batch][withdraw-batch] · [Observer withdrawal][observer-withdraw]
+5. Verify both old credentials fail to connect and retire the four temporary
+   rebuild and observer Secrets. Withdraw the owner route and reconcile runtime
+   database admission with the owner disabled. Retire the temporary owner
+   credentials. Keep the writers fenced if any withdrawal check fails. Both
+   retained roles stay disabled when ordinary values return.
 
 The phase and SQL assets belong to the deployment owner. The submitting operator
-uses the approved Job and recovery interfaces described by the pilot. This phase
-admits the rebuild login alone and does not establish protected read access.
+uses the approved Job and recovery interfaces described by the pilot.
 
-## Cutover prerequisites
+## Qualification and cutover
 
-- **Protected read under the writer fence.** The maintenance chart scales the
-  backend and edge to zero. The migration and bootstrap database phases
-  admit only their temporary logins. The protected current-property GET
-  requires a serving backend and a tenant observer with `telemetry.read`.
-  Deployment owns a configuration that keeps the exact HTTPS read available
-  while excluding competing writers. It needs installed reachability and
-  authorization evidence. [Maintenance contract][maintenance] · [Product read][snapshot]
+An isolated fixture used the published backend with PostgreSQL 18 and a real
+synthetic OIDC session established before the fence. With the ordinary backend
+stopped and the two temporary logins admitted, the protected GET reported
+generation, revision and processed count advancing from `1:0:0` to `2:1:2`.
+Pending work cleared and the expected event at time `2000` won. Anonymous and
+cross-tenant access were denied. The fixture's exact HTTPS route denied other
+versions, login and POST. PostgreSQL denied observer writes, rebuild execution
+and unrelated reads, and rejected the old observer credential after withdrawal.
+This fixture exercised the pinned product and rendered SQL through a local
+HTTPS relay. The native Gateway and Cilium datapath still requires installed
+qualification. [Product snapshot contract][snapshot]
+
 - **A single read-only recovery result.** Provider `health` observes delegation
   resources. Kubernetes exposes the exact Job and owned Pods, and the protected
   GET exposes the independent committed projection. The existing interfaces
@@ -265,9 +349,11 @@ parity remain open.
 [argo-deadline]: https://github.com/argoproj/argo-workflows/blob/v4.1.5/workflow/controller/operator.go#L318-L361
 [baseline]: minimal-demo-operator-baseline.md#proposed-operator-contract-for-the-pilot
 [cnpg-passwords]: https://cloudnative-pg.io/docs/1.30/declarative_role_management/#password-management
-[maintenance]: kubernetes-packages.md#networks-maintenance-and-non-local-limits
+[network]: minimal-demo-network.md#ownership-and-flow-contract
+[observer-acl]: ../../operations/rebuild-current-observer/acl.sql
+[observer-withdraw]: ../../operations/rebuild-current-observer/revoke.sql
+[gateway-path]: https://github.com/kubernetes-sigs/gateway-api/blob/v1.6.3/apis/v1/httproute_types.go
 [grant-batch]: ../../operations/rebuild-current/grant.sql
-[identity]: workload-database-identities.md#operate-the-upgrade
 [migration-route]: minimal-demo-data.md#render-the-phases
 [owner-admission]: https://github.com/stanimirivanov/k8s-infrastructure/blob/db9f01b7db30a4a72581781af35c04f38f9a1ec7/docs/delegated-argo.md#submission-approval-and-identity
 [owner-rbac]: https://github.com/stanimirivanov/k8s-infrastructure/blob/db9f01b7db30a4a72581781af35c04f38f9a1ec7/scripts/delegated_argo_policy.py#L41-L165

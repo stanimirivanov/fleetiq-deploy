@@ -13,6 +13,13 @@
 {{- end }}
 {{- $_ := set $roles $rebuild (dict "login" $scoped.rebuildCurrentLogin "secret" "fleetiq-db-rebuild-current") }}
 {{- end }}
+{{- $observer := "fleetiq_rebuild_current_observer" }}
+{{- if hasKey $scoped "rebuildCurrentObserverLogin" }}
+{{- if or (eq $.Values.owner.role $observer) (eq $.Values.runtime.role $observer) }}
+{{- fail "Rebuild-current observer role collides with an existing role" }}
+{{- end }}
+{{- $_ := set $roles $observer (dict "login" $scoped.rebuildCurrentObserverLogin "secret" "fleetiq-db-rebuild-current-observer") }}
+{{- end }}
 {{- $known := list "serve --check-schema" "ingest-tcp" "replay-worker" "semantic-worker" "project-current" "analytics-worker" "notification-worker" "archive-worker" }}
 {{- range $command := $scoped.workloads }}
 {{- if not (has $command $known) }}
@@ -50,6 +57,8 @@ spec:
   inherit: false
   {{- if eq $name $rebuild }}
   connectionLimit: 2
+  {{- else if eq $name $observer }}
+  connectionLimit: 10
   {{- end }}
   {{- if $role.login }}
   passwordSecret: { name: {{ $role.secret | quote }} }

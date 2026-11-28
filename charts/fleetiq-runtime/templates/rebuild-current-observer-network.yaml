@@ -1,0 +1,53 @@
+{{- if .Values.rebuildCurrentObserver }}
+{{- $network := .Values.network }}
+{{- range $network.oidcCidrs }}
+{{- if not (hasSuffix "/32" .) }}
+{{- fail "The rebuild-current observer requires exact OIDC /32 destinations" }}
+{{- end }}
+{{- end }}
+{{- $name := printf "%s-rebuild-current-observer" .Release.Name }}
+{{- $observer := dict "app.kubernetes.io/name" $name "io.cilium.k8s.policy.serviceaccount" $name }}
+{{- $postgres := dict "cnpg.io/cluster" $network.databaseCluster }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  namespace: {{ .Release.Namespace }}
+  name: {{ $name }}
+spec:
+  endpointSelector:
+    matchLabels: {{ toJson $observer }}
+  ingress:
+    - fromEntities: [ingress]
+      toPorts:
+        - ports: [{ port: '8080', protocol: TCP }]
+  egress:
+    - toEndpoints:
+        - matchLabels: {{ toJson (merge (dict "k8s:io.kubernetes.pod.namespace" $network.dnsNamespace) $network.dnsPodLabels) }}
+      toPorts:
+        - ports: [{ port: '53', protocol: UDP }, { port: '53', protocol: TCP }]
+    - toEndpoints:
+        - matchLabels: {{ toJson (merge (dict "k8s:io.kubernetes.pod.namespace" $network.databaseNamespace) $postgres) }}
+      toPorts:
+        - ports: [{ port: '5432', protocol: TCP }]
+    - toCIDR: {{ toJson $network.oidcCidrs }}
+      toPorts:
+        - ports: [{ port: {{ include "fleetiq.oidcPort" . | quote }}, protocol: TCP }]
+    # The minimal-demo issuer is reached through the worker's Gateway listener.
+    - toEntities: [host]
+      toPorts:
+        - ports: [{ port: {{ .Values.gateway.listenerPort | quote }}, protocol: TCP }]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  namespace: {{ $network.databaseNamespace }}
+  name: {{ $name }}-postgres
+spec:
+  endpointSelector:
+    matchLabels: {{ toJson $postgres }}
+  ingress:
+    - fromEndpoints:
+        - matchLabels: {{ toJson (merge (dict "k8s:io.kubernetes.pod.namespace" .Release.Namespace) $observer) }}
+      toPorts:
+        - ports: [{ port: '5432', protocol: TCP }]
+{{- end }}

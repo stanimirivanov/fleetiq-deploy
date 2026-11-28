@@ -54,6 +54,10 @@
           "type": "boolean",
           "description": "Opt in to the retained rebuild-current role. Use true only in its exclusive attempt phase."
         },
+        "rebuildCurrentObserverLogin": {
+          "type": "boolean",
+          "description": "Reconcile the retained read-only observer role. It can log in only beside the rebuild login."
+        },
         "retireLegacy": {
           "type": "boolean"
         }

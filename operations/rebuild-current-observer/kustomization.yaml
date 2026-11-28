@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../rebuild-current
+generatorOptions:
+  immutable: true
+configMapGenerator:
+  - name: workload-database-sql
+    behavior: merge
+    files:
+      - observer-acl.sql=acl.sql
+      - observer-revoke.sql=revoke.sql
+patches:
+  # Map the existing transaction's two includes to the observer-aware batches.
+  # The original bytes remain mounted at explicit paths used by those batches.
+  - target:
+      group: argoproj.io
+      kind: WorkflowTemplate
+      name: rebuild-current-owner
+    patch: |
+      - op: test
+        path: /spec/volumes/1/configMap/items/2
+        value: { key: rebuild-acl.sql, path: rebuild-current/acl.sql }
+      - op: replace
+        path: /spec/volumes/1/configMap/items/2/key
+        value: observer-acl.sql
+      - op: test
+        path: /spec/volumes/1/configMap/items/5
+        value: { key: rebuild-revoke.sql, path: rebuild-current/revoke.sql }
+      - op: replace
+        path: /spec/volumes/1/configMap/items/5/key
+        value: observer-revoke.sql
+      - op: add
+        path: /spec/volumes/1/configMap/items/-
+        value: { key: rebuild-acl.sql, path: rebuild-current/rebuild-acl-v1.sql }
+      - op: add
+        path: /spec/volumes/1/configMap/items/-
+        value: { key: rebuild-revoke.sql, path: rebuild-current/rebuild-revoke-v1.sql }

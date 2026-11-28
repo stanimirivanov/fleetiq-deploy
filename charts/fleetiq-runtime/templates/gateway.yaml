@@ -28,7 +28,17 @@ spec:
     - { group: gateway.networking.k8s.io, kind: Gateway, name: {{ .Release.Name }}, sectionName: https }
   hostnames: [{{ .Values.public.host | quote }}]
   rules:
+    {{- with .Values.rebuildCurrentObserver }}
+    - matches:
+        - method: GET
+          path:
+            type: Exact
+            value: {{ printf "/api/v1/tenants/%s/assets/%s/properties/%s/versions/%d/current" .tenant .asset .property (int64 .version) | quote }}
+      backendRefs:
+        - { group: '', kind: Service, name: {{ $.Release.Name }}-rebuild-current-observer, port: 8080, weight: 1 }
+    {{- else }}
     - matches:
         - path: { type: PathPrefix, value: / }
       backendRefs:
         - { group: '', kind: Service, name: {{ .Release.Name }}-edge, port: 8080, weight: 1 }
+{{- end }}

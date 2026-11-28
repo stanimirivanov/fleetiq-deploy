@@ -1,0 +1,5 @@
+workloadDatabase:
+  workloads: []
+  maintenance: true
+  rebuildCurrentLogin: true
+  rebuildCurrentObserverLogin: true
