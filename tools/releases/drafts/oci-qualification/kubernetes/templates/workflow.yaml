@@ -1,0 +1,68 @@
+{{- if .Values.workflow -}}
+{{- $name := include "ociDraft.name" . -}}
+{{- $account := required "workflowServiceAccount is required" .Values.workflowServiceAccount -}}
+{{- $inputValues := deepCopy .Values -}}
+{{- $_ := set $inputValues "jobUID" "{{inputs.parameters.job-uid}}" -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: {{ printf "%s-flow" $name | quote }}
+  namespace: {{ .Release.Namespace | quote }}
+spec:
+  serviceAccountName: {{ $account | quote }}
+  entrypoint: qualify
+  activeDeadlineSeconds: 360
+  ttlStrategy:
+    secondsAfterCompletion: 600
+  templates:
+    - name: qualify
+      steps:
+        - - name: create-job
+            template: create-job
+        - - name: stage-inputs
+            template: stage-inputs
+            arguments:
+              parameters:
+                - name: job-uid
+                  value: {{ "{{steps.create-job.outputs.parameters.job-uid}}" | quote }}
+        - - name: observe-job
+            template: observe-job
+            arguments:
+              parameters:
+                - name: job-uid
+                  value: {{ "{{steps.create-job.outputs.parameters.job-uid}}" | quote }}
+    - name: create-job
+      resource:
+        action: create
+        setOwnerReference: true
+        manifest: |
+          {{- include "ociDraft.job" . | nindent 10 }}
+      outputs:
+        parameters:
+          - name: job-uid
+            globalName: job-uid
+            valueFrom:
+              jsonPath: "{.metadata.uid}"
+    - name: stage-inputs
+      inputs:
+        parameters:
+          - name: job-uid
+      resource:
+        action: create
+        manifest: |
+          {{- include "ociDraft.inputs" (dict "Values" $inputValues "Release" .Release) | nindent 10 }}
+    - name: observe-job
+      inputs:
+        parameters:
+          - name: job-uid
+      resource:
+        action: get
+        successCondition: {{ printf "metadata.uid == %s,status.succeeded > 0" "{{inputs.parameters.job-uid}}" | quote }}
+        failureCondition: status.failed > 0
+        manifest: |
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: {{ $name | quote }}
+            namespace: {{ .Release.Namespace | quote }}
+{{- end -}}

@@ -3,3 +3,5 @@ verifierImage: ""
 inputDigest: ""
 jobUID: ""
 reviewedBundle: ""
+workflow: false
+workflowServiceAccount: ""
