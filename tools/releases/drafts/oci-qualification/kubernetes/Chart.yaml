@@ -1,0 +1,5 @@
+apiVersion: v2
+name: oci-qualification-draft
+description: Review-only OCI fixture for issue 149
+type: application
+version: 0.1.0

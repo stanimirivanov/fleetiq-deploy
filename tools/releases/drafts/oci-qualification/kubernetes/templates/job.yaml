@@ -1,0 +1,3 @@
+{{- if not .Values.jobUID -}}
+{{ include "ociDraft.job" . }}
+{{- end -}}
